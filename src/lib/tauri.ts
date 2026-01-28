@@ -29,6 +29,12 @@
  * - batchGenerateDocs - Generate and apply docs for multiple files
  * - checkFreshness - Check freshness of a single file
  * - getStaleFiles - Get files with outdated or missing docs
+ * - listSkills - List skills for a project
+ * - createSkill - Create a new skill
+ * - updateSkill - Update an existing skill
+ * - deleteSkill - Delete a skill
+ * - detectPatterns - Detect project patterns for skill suggestions
+ * - incrementSkillUsage - Bump usage count for a skill
  *
  * PATTERNS:
  * - Each function wraps a single Tauri command
@@ -46,6 +52,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type { ClaudeMdInfo, DetectionResult, Project, ProjectSetup } from "@/types/project";
 import type { HealthScore } from "@/types/health";
 import type { ModuleStatus, ModuleDoc } from "@/types/module";
+import type { Skill, Pattern } from "@/types/skill";
 
 export async function scanProject(path: string): Promise<DetectionResult> {
   return invoke<DetectionResult>("scan_project", { path });
@@ -116,4 +123,43 @@ export async function checkFreshness(filePath: string, projectPath: string): Pro
 
 export async function getStaleFiles(projectPath: string): Promise<ModuleStatus[]> {
   return invoke<ModuleStatus[]>("get_stale_files", { projectPath });
+}
+
+export async function listSkills(projectId?: string): Promise<Skill[]> {
+  return invoke<Skill[]>("list_skills", { projectId: projectId ?? null });
+}
+
+export async function createSkill(
+  name: string,
+  description: string,
+  content: string,
+  projectId?: string,
+): Promise<Skill> {
+  return invoke<Skill>("create_skill", {
+    name,
+    description,
+    content,
+    projectId: projectId ?? null,
+  });
+}
+
+export async function updateSkill(
+  id: string,
+  name: string,
+  description: string,
+  content: string,
+): Promise<Skill> {
+  return invoke<Skill>("update_skill", { id, name, description, content });
+}
+
+export async function deleteSkill(id: string): Promise<void> {
+  return invoke<void>("delete_skill", { id });
+}
+
+export async function detectPatterns(projectPath: string): Promise<Pattern[]> {
+  return invoke<Pattern[]>("detect_patterns", { projectPath });
+}
+
+export async function incrementSkillUsage(id: string): Promise<number> {
+  return invoke<number>("increment_skill_usage", { id });
 }

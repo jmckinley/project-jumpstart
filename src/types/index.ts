@@ -10,6 +10,7 @@
  * - All types from project.ts
  * - All types from module.ts
  * - All types from health.ts
+ * - All types from skill.ts
  *
  * PATTERNS:
  * - Import from '@/types' for commonly used types
@@ -35,3 +36,4 @@ export type {
   ContextHealth,
   TokenBreakdown,
 } from "./health";
+export type { Skill, Pattern } from "./skill";

@@ -18,8 +18,12 @@
  * - @/components/modules/DocStatus - Coverage statistics bar
  * - @/components/modules/DocPreview - Documentation preview panel
  * - @/components/modules/BatchGenerator - Batch generation controls
+ * - @/components/skills/SkillsList - Skills list with tab filtering
+ * - @/components/skills/SkillEditor - Skill create/edit form
+ * - @/components/skills/PatternDetector - Pattern detection results
  * - @/hooks/useHealth - Health score data and refresh action
  * - @/hooks/useModules - Module scanning and generation actions
+ * - @/hooks/useSkills - Skills CRUD and pattern detection actions
  * - @/stores/projectStore - Active project for display name
  *
  * EXPORTS:
@@ -30,14 +34,18 @@
  * - "dashboard" section renders health cards and activity feed
  * - "claude-md" section renders the Editor component
  * - "modules" section renders file tree, doc preview, and batch generator
+ * - "skills" section renders skills list, skill editor, and pattern detector
  * - Other sections show a placeholder message
  * - useHealth().refresh() is called in useEffect when dashboard is active
+ * - useSkills().loadSkills() and detectProjectPatterns() are called in useEffect when skills is active
  *
  * CLAUDE NOTES:
  * - The dashboard layout uses a 2-column grid for HealthScore and QuickWins
  * - ContextRotAlert is placed at the top of the dashboard and returns null for "low" risk
  * - RecentActivity is rendered full-width below the grid
  * - The Editor component manages its own state via useClaudeMd hook
+ * - SkillsView manages selectedSkill and editing state locally
+ * - SkillsView uses a 2-column grid (SkillsList left, SkillEditor right) with PatternDetector below
  * - Section components will be added as they are built in later phases
  */
 
@@ -53,8 +61,13 @@ import { DocPreview } from "@/components/modules/DocPreview";
 import { BatchGenerator } from "@/components/modules/BatchGenerator";
 import { useHealth } from "@/hooks/useHealth";
 import { useModules } from "@/hooks/useModules";
+import { useSkills } from "@/hooks/useSkills";
 import { useProjectStore } from "@/stores/projectStore";
+import { SkillsList } from "@/components/skills/SkillsList";
+import { SkillEditor } from "@/components/skills/SkillEditor";
+import { PatternDetector } from "@/components/skills/PatternDetector";
 import type { ModuleDoc } from "@/types/module";
+import type { Skill } from "@/types/skill";
 
 interface MainPanelProps {
   activeSection: string;
@@ -179,6 +192,140 @@ function ModulesView() {
   );
 }
 
+function SkillsView() {
+  const {
+    skills,
+    patterns,
+    loading,
+    detecting,
+    error,
+    loadSkills,
+    addSkill,
+    editSkill,
+    removeSkill,
+    detectProjectPatterns,
+  } = useSkills();
+
+  const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    loadSkills();
+    detectProjectPatterns();
+  }, [loadSkills, detectProjectPatterns]);
+
+  const handleSelect = useCallback((skill: Skill) => {
+    setSelectedSkill(skill);
+    setEditing(true);
+  }, []);
+
+  const handleCreateNew = useCallback(() => {
+    setSelectedSkill(null);
+    setEditing(true);
+  }, []);
+
+  const handleSave = useCallback(
+    async (name: string, description: string, content: string) => {
+      if (selectedSkill && selectedSkill.id !== "") {
+        await editSkill(selectedSkill.id, name, description, content);
+      } else {
+        await addSkill(name, description, content);
+      }
+      setSelectedSkill(null);
+      setEditing(false);
+    },
+    [selectedSkill, editSkill, addSkill],
+  );
+
+  const handleCancel = useCallback(() => {
+    setSelectedSkill(null);
+    setEditing(false);
+  }, []);
+
+  const handleDelete = useCallback(
+    async (id: string) => {
+      await removeSkill(id);
+      if (selectedSkill?.id === id) {
+        setSelectedSkill(null);
+        setEditing(false);
+      }
+    },
+    [removeSkill, selectedSkill],
+  );
+
+  const handleCreateFromPattern = useCallback(
+    (description: string, content: string) => {
+      // Create a pseudo-skill with empty id to pre-fill the editor in create mode.
+      // The editor treats id="" as a new skill (shows "New Skill" title / "Create Skill" button).
+      // The save handler also checks id !== "" to decide between addSkill and editSkill.
+      setEditing(true);
+      setSelectedSkill({
+        id: "",
+        name: description,
+        description: "Auto-generated from detected pattern",
+        content,
+        projectId: null,
+        usageCount: 0,
+        createdAt: "",
+        updatedAt: "",
+      });
+    },
+    [],
+  );
+
+  if (loading && skills.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center text-neutral-500">
+        <p>Loading skills...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className="rounded-md border border-red-900 bg-red-950/50 px-4 py-3 text-sm text-red-400">
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-1">
+          <SkillsList
+            skills={skills}
+            selectedId={selectedSkill?.id ?? null}
+            onSelect={handleSelect}
+            onCreateNew={handleCreateNew}
+            onDelete={handleDelete}
+          />
+        </div>
+        <div className="lg:col-span-2">
+          {editing ? (
+            <SkillEditor
+              skill={selectedSkill}
+              onSave={handleSave}
+              onCancel={handleCancel}
+            />
+          ) : (
+            <div className="flex h-full min-h-[300px] items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-500">
+              <p className="text-sm">
+                Select a skill to edit or click "New Skill" to create one.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <PatternDetector
+        patterns={patterns}
+        detecting={detecting}
+        onDetect={detectProjectPatterns}
+        onCreateFromPattern={handleCreateFromPattern}
+      />
+    </div>
+  );
+}
+
 function renderSection(section: string) {
   switch (section) {
     case "dashboard":
@@ -187,6 +334,8 @@ function renderSection(section: string) {
       return <Editor />;
     case "modules":
       return <ModulesView />;
+    case "skills":
+      return <SkillsView />;
     default:
       return (
         <div className="flex h-full items-center justify-center text-neutral-500">

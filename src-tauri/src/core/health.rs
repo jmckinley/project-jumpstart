@@ -9,6 +9,7 @@
 //!
 //! DEPENDENCIES:
 //! - models::project - HealthScore, HealthComponents, QuickWin types
+//! - core::freshness - Freshness scoring engine
 //! - std::path::Path - File system checks
 //!
 //! EXPORTS:
@@ -23,6 +24,7 @@
 //! CLAUDE NOTES:
 //! - Weights: CLAUDE.md=25, Modules=25, Freshness=15, Skills=15, Context=10, Enforcement=10
 //! - Phase 5 added freshness scoring via core::freshness engine
+//! - Phase 6 added skills scoring: min(skill_count * 3, 15)
 //! - Freshness score is the average freshness of all documented files, scaled to weight
 //! - Context rot risk: low (>=70), medium (40-69), high (<40)
 
@@ -38,15 +40,16 @@ const WEIGHT_CONTEXT: u32 = 10;
 const WEIGHT_ENFORCEMENT: u32 = 10;
 
 /// Calculate the full health score for a project at the given path.
-/// Checks for CLAUDE.md existence, module documentation coverage, etc.
-pub fn calculate_health(project_path: &str) -> HealthScore {
+/// `skill_count` is the number of skills created for the project (from DB).
+/// Checks for CLAUDE.md existence, module documentation coverage, freshness, skills.
+pub fn calculate_health(project_path: &str, skill_count: u32) -> HealthScore {
     let path = Path::new(project_path);
 
     let claude_md_score = calculate_claude_md_score(path);
     let module_docs_score = calculate_module_docs_score(path);
     let freshness_score = calculate_freshness_score(project_path);
+    let skills_score = calculate_skills_score(skill_count);
     // These will be properly implemented in later phases
-    let skills_score: u32 = 0;
     let context_score: u32 = 0;
     let enforcement_score: u32 = 0;
 
@@ -127,6 +130,13 @@ fn calculate_claude_md_score(project_path: &Path) -> u32 {
     }
 
     score.min(WEIGHT_CLAUDE_MD)
+}
+
+/// Score the skills component (0-15 points).
+/// Based on the number of skills created: min(skill_count * 3, 15).
+/// 5+ skills = full score.
+fn calculate_skills_score(skill_count: u32) -> u32 {
+    (skill_count * 3).min(WEIGHT_SKILLS)
 }
 
 /// Score the freshness component (0-15 points).
@@ -235,7 +245,7 @@ fn generate_quick_wins(
     claude_md: u32,
     module_docs: u32,
     freshness: u32,
-    _skills: u32,
+    skills: u32,
     _enforcement: u32,
 ) -> Vec<QuickWin> {
     let mut wins = Vec::new();
@@ -291,6 +301,22 @@ fn generate_quick_wins(
         });
     }
 
+    if skills == 0 {
+        wins.push(QuickWin {
+            title: "Create reusable skills".to_string(),
+            description: "Define skills to capture reusable patterns. Skills reduce token usage by avoiding re-explanation.".to_string(),
+            impact: WEIGHT_SKILLS,
+            effort: "medium".to_string(),
+        });
+    } else if skills < WEIGHT_SKILLS {
+        wins.push(QuickWin {
+            title: "Add more skills".to_string(),
+            description: "More skills mean better pattern coverage. Use the pattern detector to find opportunities.".to_string(),
+            impact: WEIGHT_SKILLS - skills,
+            effort: "low".to_string(),
+        });
+    }
+
     // Sort by impact descending
     wins.sort_by(|a, b| b.impact.cmp(&a.impact));
     wins
@@ -321,9 +347,18 @@ mod tests {
 
     #[test]
     fn test_health_nonexistent_path() {
-        let score = calculate_health("/nonexistent/path/12345");
+        let score = calculate_health("/nonexistent/path/12345", 0);
         assert_eq!(score.total, 0);
         assert_eq!(score.context_rot_risk, "high");
         assert!(!score.quick_wins.is_empty());
+    }
+
+    #[test]
+    fn test_skills_score() {
+        assert_eq!(calculate_skills_score(0), 0);
+        assert_eq!(calculate_skills_score(1), 3);
+        assert_eq!(calculate_skills_score(3), 9);
+        assert_eq!(calculate_skills_score(5), 15);
+        assert_eq!(calculate_skills_score(10), 15); // capped at weight
     }
 }

@@ -77,6 +77,16 @@ pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
             FOREIGN KEY (project_id) REFERENCES projects(id)
         );
 
+        CREATE TABLE IF NOT EXISTS patterns (
+            id              TEXT PRIMARY KEY,
+            project_id      TEXT NOT NULL,
+            description     TEXT NOT NULL DEFAULT '',
+            frequency       INTEGER NOT NULL DEFAULT 1,
+            suggested_skill TEXT,
+            detected_at     TEXT NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(id)
+        );
+
         CREATE TABLE IF NOT EXISTS settings (
             key             TEXT PRIMARY KEY,
             value           TEXT NOT NULL

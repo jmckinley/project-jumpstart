@@ -18,12 +18,13 @@
 //! - read_claude_md - Read existing CLAUDE.md and return ClaudeMdInfo
 //! - write_claude_md - Write content to CLAUDE.md file
 //! - generate_claude_md - Generate CLAUDE.md from project data in database
-//! - get_health_score - Calculate health score for a project path
+//! - get_health_score - Calculate health score for a project path (uses State for skill count)
 //!
 //! PATTERNS:
 //! - All commands are async and return Result<T, String>
 //! - File paths are resolved from the project path + "CLAUDE.md"
 //! - Token estimation uses ~4 chars per token approximation
+//! - get_health_score queries skills count from DB for health scoring
 //!
 //! CLAUDE NOTES:
 //! - CLAUDE.md is the most critical file for context rot prevention
@@ -137,7 +138,38 @@ pub async fn generate_claude_md(
 }
 
 /// Calculate and return the health score for a project path.
+/// Queries the database for skill count to include in the calculation.
 #[tauri::command]
-pub async fn get_health_score(project_path: String) -> Result<HealthScore, String> {
-    Ok(health::calculate_health(&project_path))
+pub async fn get_health_score(
+    project_path: String,
+    state: State<'_, AppState>,
+) -> Result<HealthScore, String> {
+    let skill_count = {
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| format!("Failed to lock database: {}", e))?;
+
+        // Get project ID from path, then count skills
+        let project_id: Option<String> = db
+            .query_row(
+                "SELECT id FROM projects WHERE path = ?1",
+                [&project_path],
+                |row| row.get(0),
+            )
+            .ok();
+
+        if let Some(pid) = project_id {
+            db.query_row(
+                "SELECT COUNT(*) FROM skills WHERE project_id = ?1 OR project_id IS NULL",
+                [&pid],
+                |row| row.get::<_, u32>(0),
+            )
+            .unwrap_or(0)
+        } else {
+            0
+        }
+    };
+
+    Ok(health::calculate_health(&project_path, skill_count))
 }
