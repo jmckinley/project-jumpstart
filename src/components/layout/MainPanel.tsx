@@ -92,7 +92,14 @@ import { useProjectStore } from "@/stores/projectStore";
 import { SkillsList } from "@/components/skills/SkillsList";
 import { SkillEditor } from "@/components/skills/SkillEditor";
 import { PatternDetector } from "@/components/skills/PatternDetector";
+import { SkillLibrary } from "@/components/skills/SkillLibrary";
+import { AgentLibrary } from "@/components/agents/AgentLibrary";
+import { AgentsList } from "@/components/agents/AgentsList";
+import { AgentEditor } from "@/components/agents/AgentEditor";
+import { useAgents } from "@/hooks/useAgents";
 import type { ModuleDoc } from "@/types/module";
+import type { LibrarySkill } from "@/types/skill";
+import type { Agent, LibraryAgent, AgentWorkflowStep, AgentTool } from "@/types/agent";
 import { CommandCenter } from "@/components/ralph/CommandCenter";
 import { PromptAnalyzer } from "@/components/ralph/PromptAnalyzer";
 import { LoopMonitor } from "@/components/ralph/LoopMonitor";
@@ -289,6 +296,7 @@ function SkillsView() {
 
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const [editing, setEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState<"my-skills" | "library">("my-skills");
 
   useEffect(() => {
     loadSkills();
@@ -336,9 +344,6 @@ function SkillsView() {
 
   const handleCreateFromPattern = useCallback(
     (description: string, content: string) => {
-      // Create a pseudo-skill with empty id to pre-fill the editor in create mode.
-      // The editor treats id="" as a new skill (shows "New Skill" title / "Create Skill" button).
-      // The save handler also checks id !== "" to decide between addSkill and editSkill.
       setEditing(true);
       setSelectedSkill({
         id: "",
@@ -353,6 +358,29 @@ function SkillsView() {
     },
     [],
   );
+
+  const handleAddFromLibrary = useCallback(
+    async (librarySkill: LibrarySkill) => {
+      await addSkill(librarySkill.name, librarySkill.description, librarySkill.content);
+      setActiveTab("my-skills");
+    },
+    [addSkill],
+  );
+
+  const handleSwitchToExpert = useCallback((librarySkill: LibrarySkill) => {
+    setActiveTab("my-skills");
+    setEditing(true);
+    setSelectedSkill({
+      id: "",
+      name: librarySkill.name,
+      description: librarySkill.description,
+      content: librarySkill.content,
+      projectId: null,
+      usageCount: 0,
+      createdAt: "",
+      updatedAt: "",
+    });
+  }, []);
 
   if (loading && skills.length === 0) {
     return (
@@ -370,39 +398,247 @@ function SkillsView() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-1">
-          <SkillsList
-            skills={skills}
-            selectedId={selectedSkill?.id ?? null}
-            onSelect={handleSelect}
-            onCreateNew={handleCreateNew}
-            onDelete={handleDelete}
-          />
-        </div>
-        <div className="lg:col-span-2">
-          {editing ? (
-            <SkillEditor
-              skill={selectedSkill}
-              onSave={handleSave}
-              onCancel={handleCancel}
-            />
-          ) : (
-            <div className="flex h-full min-h-[300px] items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-500">
-              <p className="text-sm">
-                Select a skill to edit or click "New Skill" to create one.
-              </p>
-            </div>
-          )}
-        </div>
+      {/* Tab Navigation */}
+      <div className="flex gap-1 border-b border-neutral-800">
+        <button
+          onClick={() => setActiveTab("my-skills")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "my-skills"
+              ? "border-b-2 border-blue-500 text-blue-400"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          My Skills ({skills.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("library")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "library"
+              ? "border-b-2 border-blue-500 text-blue-400"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          Skill Library
+        </button>
       </div>
 
-      <PatternDetector
-        patterns={patterns}
-        detecting={detecting}
-        onDetect={detectProjectPatterns}
-        onCreateFromPattern={handleCreateFromPattern}
-      />
+      {activeTab === "my-skills" ? (
+        <>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-1">
+              <SkillsList
+                skills={skills}
+                selectedId={selectedSkill?.id ?? null}
+                onSelect={handleSelect}
+                onCreateNew={handleCreateNew}
+                onDelete={handleDelete}
+              />
+            </div>
+            <div className="lg:col-span-2">
+              {editing ? (
+                <SkillEditor
+                  skill={selectedSkill}
+                  onSave={handleSave}
+                  onCancel={handleCancel}
+                />
+              ) : (
+                <div className="flex h-full min-h-[300px] items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-500">
+                  <p className="text-sm">
+                    Select a skill to edit or click "New Skill" to create one.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <PatternDetector
+            patterns={patterns}
+            detecting={detecting}
+            onDetect={detectProjectPatterns}
+            onCreateFromPattern={handleCreateFromPattern}
+          />
+        </>
+      ) : (
+        <SkillLibrary
+          existingSkillNames={skills.map((s) => s.name)}
+          onAddSkill={handleAddFromLibrary}
+          onSwitchToExpert={handleSwitchToExpert}
+        />
+      )}
+    </div>
+  );
+}
+
+function AgentsView() {
+  const {
+    agents,
+    loading,
+    error,
+    loadAgents,
+    addAgent,
+    editAgent,
+    removeAgent,
+    addFromLibrary,
+  } = useAgents();
+
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState<"my-agents" | "library">("my-agents");
+
+  useEffect(() => {
+    loadAgents();
+  }, [loadAgents]);
+
+  const handleSelect = useCallback((agent: Agent) => {
+    setSelectedAgent(agent);
+    setEditing(true);
+  }, []);
+
+  const handleCreateNew = useCallback(() => {
+    setSelectedAgent(null);
+    setEditing(true);
+  }, []);
+
+  const handleSave = useCallback(
+    async (
+      name: string,
+      description: string,
+      tier: string,
+      category: string,
+      instructions: string,
+      workflow: AgentWorkflowStep[] | null,
+      tools: AgentTool[] | null,
+      triggerPatterns: string[] | null,
+    ) => {
+      if (selectedAgent && selectedAgent.id !== "") {
+        await editAgent(selectedAgent.id, name, description, tier, category, instructions, workflow, tools, triggerPatterns);
+      } else {
+        await addAgent(name, description, tier, category, instructions, workflow, tools, triggerPatterns);
+      }
+      setSelectedAgent(null);
+      setEditing(false);
+    },
+    [selectedAgent, editAgent, addAgent],
+  );
+
+  const handleCancel = useCallback(() => {
+    setSelectedAgent(null);
+    setEditing(false);
+  }, []);
+
+  const handleDelete = useCallback(
+    async (id: string) => {
+      await removeAgent(id);
+      if (selectedAgent?.id === id) {
+        setSelectedAgent(null);
+        setEditing(false);
+      }
+    },
+    [removeAgent, selectedAgent],
+  );
+
+  const handleAddFromLibrary = useCallback(
+    async (libraryAgent: LibraryAgent) => {
+      await addFromLibrary(libraryAgent);
+      setActiveTab("my-agents");
+    },
+    [addFromLibrary],
+  );
+
+  const handleSwitchToExpert = useCallback((libraryAgent: LibraryAgent) => {
+    setActiveTab("my-agents");
+    setEditing(true);
+    setSelectedAgent({
+      id: "",
+      name: libraryAgent.name,
+      description: libraryAgent.description,
+      tier: libraryAgent.tier,
+      category: libraryAgent.category,
+      instructions: libraryAgent.instructions,
+      workflow: libraryAgent.workflow ?? null,
+      tools: libraryAgent.tools ?? null,
+      triggerPatterns: libraryAgent.triggerPatterns ?? null,
+      projectId: null,
+      usageCount: 0,
+      createdAt: "",
+      updatedAt: "",
+    });
+  }, []);
+
+  if (loading && agents.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center text-neutral-500">
+        <p>Loading agents...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className="rounded-md border border-red-900 bg-red-950/50 px-4 py-3 text-sm text-red-400">
+          {error}
+        </div>
+      )}
+
+      {/* Tab Navigation */}
+      <div className="flex gap-1 border-b border-neutral-800">
+        <button
+          onClick={() => setActiveTab("my-agents")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "my-agents"
+              ? "border-b-2 border-blue-500 text-blue-400"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          My Agents ({agents.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("library")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "library"
+              ? "border-b-2 border-blue-500 text-blue-400"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          Agent Library
+        </button>
+      </div>
+
+      {activeTab === "my-agents" ? (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-1">
+            <AgentsList
+              agents={agents}
+              selectedId={selectedAgent?.id ?? null}
+              onSelect={handleSelect}
+              onCreateNew={handleCreateNew}
+              onDelete={handleDelete}
+            />
+          </div>
+          <div className="lg:col-span-2">
+            {editing ? (
+              <AgentEditor
+                agent={selectedAgent}
+                onSave={handleSave}
+                onCancel={handleCancel}
+              />
+            ) : (
+              <div className="flex h-full min-h-[300px] items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-500">
+                <p className="text-sm">
+                  Select an agent to edit or click "New Agent" to create one.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <AgentLibrary
+          existingAgentNames={agents.map((a) => a.name)}
+          onAddAgent={handleAddFromLibrary}
+          onSwitchToExpert={handleSwitchToExpert}
+        />
+      )}
     </div>
   );
 }
@@ -556,6 +792,8 @@ function renderSection(section: string, onNavigate?: (section: string) => void) 
       return <ModulesView />;
     case "skills":
       return <SkillsView />;
+    case "agents":
+      return <AgentsView />;
     case "ralph":
       return <RalphView />;
     case "context":

@@ -19,7 +19,7 @@
  * - Badge shows counts (e.g., outdated modules)
  *
  * CLAUDE NOTES:
- * - Sections: Dashboard, CLAUDE.md, Modules, Skills, RALPH, Context, Enforcement, Settings
+ * - Sections: Dashboard, CLAUDE.md, Modules, Skills, Agents, RALPH, Context, Enforcement, Settings
  * - See spec Part 3.2 for full sidebar design
  */
 
@@ -33,6 +33,7 @@ const sections = [
   { id: "claude-md", label: "CLAUDE.md" },
   { id: "modules", label: "Modules" },
   { id: "skills", label: "Skills" },
+  { id: "agents", label: "Agents" },
   { id: "ralph", label: "RALPH" },
   { id: "context", label: "Context" },
   { id: "enforcement", label: "Enforcement" },
