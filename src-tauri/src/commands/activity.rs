@@ -34,6 +34,7 @@ use uuid::Uuid;
 use crate::db::AppState;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Activity {
     pub id: String,
     pub project_id: String,

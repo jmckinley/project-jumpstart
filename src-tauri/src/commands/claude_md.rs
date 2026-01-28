@@ -46,6 +46,7 @@ use crate::models::project::{HealthScore, Project};
 
 /// Metadata about a CLAUDE.md file returned to the frontend.
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ClaudeMdInfo {
     pub exists: bool,
     pub content: String,

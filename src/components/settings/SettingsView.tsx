@@ -148,10 +148,10 @@ export function SettingsView() {
             {ENFORCEMENT_OPTIONS.map((option) => (
               <Button
                 key={option.value}
-                variant={enforcementLevel === option.value ? "default" : "outline"}
+                variant={enforcementLevel === option.value ? "ghost" : "outline"}
                 className={
                   enforcementLevel === option.value
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    ? "bg-blue-600 text-white hover:bg-blue-500 hover:text-white"
                     : "border-neutral-700 bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-neutral-100"
                 }
                 onClick={() => handleEnforcementChange(option.value)}

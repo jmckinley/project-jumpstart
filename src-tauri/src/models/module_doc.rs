@@ -23,6 +23,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModuleStatus {
     pub path: String,
     pub status: String,
@@ -32,6 +33,7 @@ pub struct ModuleStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModuleDoc {
     pub module_path: String,
     pub description: String,

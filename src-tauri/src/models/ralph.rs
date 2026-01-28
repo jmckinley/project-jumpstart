@@ -27,6 +27,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RalphLoop {
     pub id: String,
     pub project_id: String,
@@ -43,6 +44,7 @@ pub struct RalphLoop {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PromptAnalysis {
     pub quality_score: u32,
     pub criteria: Vec<PromptCriterion>,
@@ -51,6 +53,7 @@ pub struct PromptAnalysis {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PromptCriterion {
     pub name: String,
     pub score: u32,

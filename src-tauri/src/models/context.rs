@@ -31,6 +31,7 @@ use serde::{Deserialize, Serialize};
 
 /// Overall context health summary.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ContextHealth {
     pub total_tokens: u32,
     pub usage_percent: f64,
@@ -40,6 +41,7 @@ pub struct ContextHealth {
 
 /// Token usage breakdown by category.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TokenBreakdown {
     pub conversation: u32,
     pub code: u32,
@@ -49,6 +51,7 @@ pub struct TokenBreakdown {
 
 /// Status and recommendation for an MCP server.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct McpServerStatus {
     pub name: String,
     pub status: String,
@@ -59,6 +62,7 @@ pub struct McpServerStatus {
 
 /// Context checkpoint — a snapshot of context state at a point in time.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Checkpoint {
     pub id: String,
     pub project_id: String,

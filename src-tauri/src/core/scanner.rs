@@ -19,13 +19,16 @@
 //! PATTERNS:
 //! - High confidence: config file signals (package.json -> TypeScript/JavaScript)
 //! - Medium confidence: dependency analysis (express -> Node.js API)
-//! - Low confidence: file extension counting
+//! - Medium confidence: CDN detection from HTML script tags (cdn.tailwindcss.com -> Tailwind CSS)
+//! - Low confidence: file extension counting (proportion-based: share * 0.85)
 //! - Detection runs synchronously (project dirs are local)
 //!
 //! CLAUDE NOTES:
-//! - Detection priority: config files > dependencies > file extensions
+//! - Detection priority: config files > dependencies > CDN tags > file extensions
 //! - Framework detection depends on language detection happening first
 //! - All detected values include a "source" string explaining how they were found
+//! - CDN detection scans .html files in project root for known CDN URLs
+//! - Extension confidence uses proportion: (lang_count / total_source_files) * 0.85
 //! - See spec Part 5.1 for full scanner specification
 
 use std::collections::HashMap;
@@ -330,20 +333,36 @@ fn detect_language_from_extensions(path: &Path) -> Option<DetectedValue> {
     ];
 
     let mut lang_counts: HashMap<&str, u32> = HashMap::new();
+    let mut total_source_files: u32 = 0;
     for (ext, lang) in &ext_to_lang {
         if let Some(&count) = ext_counts.get(*ext) {
             *lang_counts.entry(lang).or_insert(0) += count;
+            total_source_files += count;
         }
+    }
+
+    if total_source_files == 0 {
+        return None;
     }
 
     lang_counts
         .into_iter()
         .max_by_key(|(_, count)| *count)
         .filter(|(_, count)| *count > 0)
-        .map(|(lang, count)| DetectedValue {
-            value: lang.to_string(),
-            confidence: (count as f64 / 50.0).min(0.6),
-            source: format!("{} source files with matching extensions", count),
+        .map(|(lang, count)| {
+            // Confidence is based on what share of source files belong to this language.
+            // If 100% of source files are one language, confidence is 0.85.
+            // Scaled down proportionally when mixed (e.g. 50% share -> 0.425).
+            let share = count as f64 / total_source_files as f64;
+            let confidence = share * 0.85;
+            DetectedValue {
+                value: lang.to_string(),
+                confidence,
+                source: format!(
+                    "{}/{} source files ({:.0}%)",
+                    count, total_source_files, share * 100.0
+                ),
+            }
         })
 }
 
@@ -379,34 +398,7 @@ fn detect_framework(path: &Path, language: &Option<DetectedValue>) -> Option<Det
 }
 
 fn detect_js_framework(path: &Path) -> Option<DetectedValue> {
-    let pkg_json_path = path.join("package.json");
-    if !pkg_json_path.exists() {
-        return None;
-    }
-
-    let content = fs::read_to_string(&pkg_json_path).ok()?;
-    let pkg: serde_json::Value = serde_json::from_str(&content).ok()?;
-
-    let deps = merge_deps(&pkg);
-
-    // Check in priority order (most specific first)
-    let frameworks = [
-        ("next", "Next.js"),
-        ("nuxt", "Nuxt"),
-        ("@remix-run/react", "Remix"),
-        ("@angular/core", "Angular"),
-        ("vue", "Vue"),
-        ("svelte", "Svelte"),
-        ("solid-js", "SolidJS"),
-        ("react", "React"),
-        ("express", "Express"),
-        ("fastify", "Fastify"),
-        ("hono", "Hono"),
-        ("@nestjs/core", "NestJS"),
-        ("electron", "Electron"),
-    ];
-
-    // Also check for Tauri
+    // Also check for Tauri (structural signal, independent of package.json)
     if path.join("src-tauri").exists() {
         return Some(DetectedValue {
             value: "Tauri".to_string(),
@@ -415,24 +407,98 @@ fn detect_js_framework(path: &Path) -> Option<DetectedValue> {
         });
     }
 
-    // Check for Vite (secondary signal, not a framework itself)
-    let has_vite = deps.contains_key("vite");
+    let pkg_json_path = path.join("package.json");
+    if pkg_json_path.exists() {
+        if let Ok(content) = fs::read_to_string(&pkg_json_path) {
+            if let Ok(pkg) = serde_json::from_str::<serde_json::Value>(&content) {
+                let deps = merge_deps(&pkg);
 
-    for (dep, name) in &frameworks {
-        if deps.contains_key(*dep) {
-            let source = if has_vite && *name != "Express" && *name != "Fastify" {
-                format!("{} + Vite in package.json dependencies", dep)
-            } else {
-                format!("{} in package.json dependencies", dep)
-            };
-            return Some(DetectedValue {
-                value: name.to_string(),
-                confidence: 0.9,
-                source,
-            });
+                // Check in priority order (most specific first)
+                let frameworks = [
+                    ("next", "Next.js"),
+                    ("nuxt", "Nuxt"),
+                    ("@remix-run/react", "Remix"),
+                    ("@angular/core", "Angular"),
+                    ("vue", "Vue"),
+                    ("svelte", "Svelte"),
+                    ("solid-js", "SolidJS"),
+                    ("react", "React"),
+                    ("express", "Express"),
+                    ("fastify", "Fastify"),
+                    ("hono", "Hono"),
+                    ("@nestjs/core", "NestJS"),
+                    ("electron", "Electron"),
+                ];
+
+                // Check for Vite (secondary signal, not a framework itself)
+                let has_vite = deps.contains_key("vite");
+
+                for (dep, name) in &frameworks {
+                    if deps.contains_key(*dep) {
+                        let source = if has_vite && *name != "Express" && *name != "Fastify" {
+                            format!("{} + Vite in package.json dependencies", dep)
+                        } else {
+                            format!("{} in package.json dependencies", dep)
+                        };
+                        return Some(DetectedValue {
+                            value: name.to_string(),
+                            confidence: 0.9,
+                            source,
+                        });
+                    }
+                }
+            }
         }
     }
 
+    // Fallback: scan HTML files for CDN-loaded frameworks
+    detect_framework_from_html(path)
+}
+
+/// Scan HTML files in the project root for CDN script tags that indicate frameworks.
+fn detect_framework_from_html(path: &Path) -> Option<DetectedValue> {
+    let cdn_frameworks = [
+        ("unpkg.com/react", "React"),
+        ("cdn.jsdelivr.net/npm/react", "React"),
+        ("cdnjs.cloudflare.com/ajax/libs/react", "React"),
+        ("unpkg.com/vue", "Vue"),
+        ("cdn.jsdelivr.net/npm/vue", "Vue"),
+        ("unpkg.com/@angular", "Angular"),
+        ("cdn.jsdelivr.net/npm/@angular", "Angular"),
+        ("unpkg.com/svelte", "Svelte"),
+    ];
+
+    scan_html_for_patterns(path, &cdn_frameworks, "CDN script tag in HTML")
+}
+
+/// Scan HTML files in the project root for patterns (CDN URLs).
+/// Returns the first match found with the given source description.
+fn scan_html_for_patterns(
+    path: &Path,
+    patterns: &[(&str, &str)],
+    source_prefix: &str,
+) -> Option<DetectedValue> {
+    let entries = fs::read_dir(path).ok()?;
+    for entry in entries.flatten() {
+        let file_path = entry.path();
+        if file_path.extension().and_then(|e| e.to_str()) == Some("html") {
+            if let Ok(content) = fs::read_to_string(&file_path) {
+                for (pattern, name) in patterns {
+                    if content.contains(pattern) {
+                        return Some(DetectedValue {
+                            value: name.to_string(),
+                            confidence: 0.8,
+                            source: format!(
+                                "{} ({})",
+                                source_prefix,
+                                file_path.file_name().unwrap_or_default().to_string_lossy()
+                            ),
+                        });
+                    }
+                }
+            }
+        }
+    }
     None
 }
 
@@ -800,7 +866,18 @@ fn detect_styling(path: &Path) -> Option<DetectedValue> {
         });
     }
 
-    None
+    // Fallback: scan HTML files for CDN-loaded styling libraries
+    let cdn_styles = [
+        ("cdn.tailwindcss.com", "Tailwind CSS"),
+        ("cdn.jsdelivr.net/npm/tailwindcss", "Tailwind CSS"),
+        ("cdn.jsdelivr.net/npm/bootstrap", "Bootstrap"),
+        ("cdnjs.cloudflare.com/ajax/libs/bootstrap", "Bootstrap"),
+        ("cdn.jsdelivr.net/npm/bulma", "Bulma"),
+        ("cdnjs.cloudflare.com/ajax/libs/bulma", "Bulma"),
+        ("fonts.googleapis.com/css", "Google Fonts"),
+    ];
+
+    scan_html_for_patterns(path, &cdn_styles, "CDN link in HTML")
 }
 
 // ---------------------------------------------------------------------------

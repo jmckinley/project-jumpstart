@@ -29,6 +29,7 @@ use serde::{Deserialize, Serialize};
 
 /// A recorded enforcement event (hook block, warning, etc.)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EnforcementEvent {
     pub id: String,
     pub project_id: String,
@@ -41,6 +42,7 @@ pub struct EnforcementEvent {
 
 /// Status of git hook installation for a project.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HookStatus {
     pub installed: bool,
     pub hook_path: String,
@@ -50,6 +52,7 @@ pub struct HookStatus {
 
 /// CI integration template snippet.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CiSnippet {
     pub provider: String,
     pub name: String,

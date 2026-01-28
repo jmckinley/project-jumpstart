@@ -35,6 +35,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Project {
     pub id: String,
     pub name: String,
@@ -51,6 +52,7 @@ pub struct Project {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HealthScore {
     pub total: u32,
     pub components: HealthComponents,
@@ -59,6 +61,7 @@ pub struct HealthScore {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HealthComponents {
     pub claude_md: u32,
     pub module_docs: u32,
@@ -69,6 +72,7 @@ pub struct HealthComponents {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct QuickWin {
     pub title: String,
     pub description: String,
@@ -77,6 +81,7 @@ pub struct QuickWin {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DetectionResult {
     pub confidence: String,
     pub language: Option<DetectedValue>,
@@ -91,6 +96,7 @@ pub struct DetectionResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DetectedValue {
     pub value: String,
     pub confidence: f64,
@@ -99,6 +105,7 @@ pub struct DetectedValue {
 
 /// Configuration collected during onboarding wizard
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectSetup {
     pub path: String,
     pub name: String,
