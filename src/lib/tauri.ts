@@ -39,6 +39,10 @@
  * - startRalphLoop - Start a new RALPH loop
  * - pauseRalphLoop - Pause an active RALPH loop
  * - listRalphLoops - List loops for a project
+ * - getContextHealth - Get context health with token breakdown
+ * - getMcpStatus - Get MCP server status and recommendations
+ * - createCheckpoint - Create a context checkpoint
+ * - listCheckpoints - List checkpoints for a project
  *
  * PATTERNS:
  * - Each function wraps a single Tauri command
@@ -54,7 +58,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { ClaudeMdInfo, DetectionResult, Project, ProjectSetup } from "@/types/project";
-import type { HealthScore } from "@/types/health";
+import type { HealthScore, ContextHealth, McpServerStatus, Checkpoint } from "@/types/health";
 import type { ModuleStatus, ModuleDoc } from "@/types/module";
 import type { Skill, Pattern } from "@/types/skill";
 import type { RalphLoop, PromptAnalysis } from "@/types/ralph";
@@ -188,4 +192,25 @@ export async function pauseRalphLoop(loopId: string): Promise<void> {
 
 export async function listRalphLoops(projectId: string): Promise<RalphLoop[]> {
   return invoke<RalphLoop[]>("list_ralph_loops", { projectId });
+}
+
+export async function getContextHealth(projectPath: string): Promise<ContextHealth> {
+  return invoke<ContextHealth>("get_context_health", { projectPath });
+}
+
+export async function getMcpStatus(projectPath: string): Promise<McpServerStatus[]> {
+  return invoke<McpServerStatus[]>("get_mcp_status", { projectPath });
+}
+
+export async function createCheckpoint(
+  projectId: string,
+  label: string,
+  summary: string,
+  projectPath: string,
+): Promise<Checkpoint> {
+  return invoke<Checkpoint>("create_checkpoint", { projectId, label, summary, projectPath });
+}
+
+export async function listCheckpoints(projectId: string): Promise<Checkpoint[]> {
+  return invoke<Checkpoint[]>("list_checkpoints", { projectId });
 }

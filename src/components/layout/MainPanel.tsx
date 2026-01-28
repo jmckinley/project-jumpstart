@@ -24,10 +24,14 @@
  * - @/components/ralph/CommandCenter - RALPH prompt input and controls
  * - @/components/ralph/PromptAnalyzer - Prompt quality analysis display
  * - @/components/ralph/LoopMonitor - Active and recent loop monitor
+ * - @/components/context/HealthMonitor - Context health overview with checkpoints
+ * - @/components/context/TokenBreakdown - Token usage breakdown chart
+ * - @/components/context/McpOptimizer - MCP server status and recommendations
  * - @/hooks/useHealth - Health score data and refresh action
  * - @/hooks/useModules - Module scanning and generation actions
  * - @/hooks/useSkills - Skills CRUD and pattern detection actions
  * - @/hooks/useRalph - RALPH loop and prompt analysis actions
+ * - @/hooks/useContextHealth - Context health and MCP monitoring actions
  * - @/stores/projectStore - Active project for display name
  *
  * EXPORTS:
@@ -40,6 +44,7 @@
  * - "modules" section renders file tree, doc preview, and batch generator
  * - "skills" section renders skills list, skill editor, and pattern detector
  * - "ralph" section renders command center, prompt analyzer, and loop monitor
+ * - "context" section renders health monitor, token breakdown, and MCP optimizer
  * - Other sections show a placeholder message
  * - useHealth().refresh() is called in useEffect when dashboard is active
  * - useSkills().loadSkills() and detectProjectPatterns() are called in useEffect when skills is active
@@ -52,6 +57,7 @@
  * - SkillsView manages selectedSkill and editing state locally
  * - SkillsView uses a 2-column grid (SkillsList left, SkillEditor right) with PatternDetector below
  * - RalphView uses a 2-column grid (CommandCenter left, PromptAnalyzer right) with LoopMonitor below
+ * - ContextView uses a 2-column grid (HealthMonitor left, TokenBreakdown right) with McpOptimizer below
  * - Section components will be added as they are built in later phases
  */
 
@@ -77,6 +83,10 @@ import { CommandCenter } from "@/components/ralph/CommandCenter";
 import { PromptAnalyzer } from "@/components/ralph/PromptAnalyzer";
 import { LoopMonitor } from "@/components/ralph/LoopMonitor";
 import { useRalph } from "@/hooks/useRalph";
+import { HealthMonitor } from "@/components/context/HealthMonitor";
+import { TokenBreakdownChart } from "@/components/context/TokenBreakdown";
+import { McpOptimizer } from "@/components/context/McpOptimizer";
+import { useContextHealth } from "@/hooks/useContextHealth";
 import type { Skill } from "@/types/skill";
 
 interface MainPanelProps {
@@ -388,6 +398,50 @@ function RalphView() {
   );
 }
 
+function ContextView() {
+  const {
+    contextHealth,
+    mcpServers,
+    checkpoints,
+    loading,
+    error,
+    refresh,
+    loadCheckpoints,
+    addCheckpoint,
+  } = useContextHealth();
+
+  useEffect(() => {
+    refresh();
+    loadCheckpoints();
+  }, [refresh, loadCheckpoints]);
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className="rounded-md border border-red-900 bg-red-950/50 px-4 py-3 text-sm text-red-400">
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <HealthMonitor
+          contextHealth={contextHealth}
+          checkpoints={checkpoints}
+          onCreateCheckpoint={addCheckpoint}
+          onRefresh={refresh}
+          loading={loading}
+        />
+        <TokenBreakdownChart
+          breakdown={contextHealth?.breakdown ?? null}
+          totalTokens={contextHealth?.totalTokens ?? 0}
+        />
+      </div>
+
+      <McpOptimizer servers={mcpServers} />
+    </div>
+  );
+}
+
 function renderSection(section: string) {
   switch (section) {
     case "dashboard":
@@ -400,6 +454,8 @@ function renderSection(section: string) {
       return <SkillsView />;
     case "ralph":
       return <RalphView />;
+    case "context":
+      return <ContextView />;
     default:
       return (
         <div className="flex h-full items-center justify-center text-neutral-500">

@@ -13,14 +13,17 @@
  * - QuickWin - Prioritized improvement suggestion
  * - ContextHealth - Context usage and rot risk
  * - TokenBreakdown - Token usage by category
+ * - McpServerStatus - MCP server status with overhead and recommendation
+ * - Checkpoint - Context checkpoint snapshot
  *
  * PATTERNS:
  * - Health scores are always 0-100
  * - Quick wins are sorted by impact/effort ratio
  *
  * CLAUDE NOTES:
- * - Keep in sync with Rust models in src-tauri/src/models/project.rs
+ * - Keep in sync with Rust models in src-tauri/src/models/project.rs and models/context.rs
  * - contextRotRisk uses lowercase string enum values
+ * - McpServerStatus.recommendation: "keep" | "optimize" | "disable" | "none"
  */
 
 export interface HealthScore {
@@ -58,4 +61,22 @@ export interface TokenBreakdown {
   code: number;
   mcp: number;
   skills: number;
+}
+
+export interface McpServerStatus {
+  name: string;
+  status: string;
+  tokenOverhead: number;
+  recommendation: string;
+  description: string;
+}
+
+export interface Checkpoint {
+  id: string;
+  projectId: string;
+  label: string;
+  summary: string;
+  tokenSnapshot: number;
+  contextPercent: number;
+  createdAt: string;
 }

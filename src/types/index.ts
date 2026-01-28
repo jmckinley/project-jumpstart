@@ -36,6 +36,8 @@ export type {
   QuickWin,
   ContextHealth,
   TokenBreakdown,
+  McpServerStatus,
+  Checkpoint,
 } from "./health";
 export type { Skill, Pattern } from "./skill";
 export type { RalphLoop, PromptAnalysis, PromptCriterion } from "./ralph";
