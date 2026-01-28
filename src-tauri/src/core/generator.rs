@@ -37,8 +37,12 @@ pub fn generate_claude_md_content(project: &Project) -> String {
 
     sections.push(generate_header(project));
     sections.push(generate_tech_stack(project));
+    sections.push(generate_project_structure(project));
     sections.push(generate_commands(project));
+    sections.push(generate_documentation_format(project));
     sections.push(generate_patterns(project));
+    sections.push(generate_current_focus());
+    sections.push(generate_decisions(project));
     sections.push(generate_notes(project));
 
     sections.join("\n---\n\n")
@@ -197,6 +201,277 @@ fn generate_tech_stack(project: &Project) -> String {
     )
 }
 
+fn generate_project_structure(project: &Project) -> String {
+    // Collect top-level directories and key files
+    let root = std::path::Path::new(&project.path);
+    let mut structure_lines: Vec<String> = Vec::new();
+
+    structure_lines.push(format!("{}/ ", project.name));
+
+    if let Ok(entries) = std::fs::read_dir(root) {
+        let skip_dirs = [
+            "node_modules", "target", ".git", "dist", "build", ".next",
+            "__pycache__", ".venv", "venv", "coverage", ".turbo", ".cache",
+        ];
+
+        let mut dirs: Vec<String> = Vec::new();
+        let mut files: Vec<String> = Vec::new();
+
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') && name != ".env.example" {
+                continue;
+            }
+
+            let path = entry.path();
+            if path.is_dir() {
+                if !skip_dirs.contains(&name.as_str()) {
+                    dirs.push(name);
+                }
+            } else {
+                // Only include important root files
+                let important_files = [
+                    "package.json", "Cargo.toml", "pyproject.toml", "go.mod",
+                    "tsconfig.json", "vite.config.ts", "next.config.js",
+                    "tailwind.config.js", "README.md", "CLAUDE.md",
+                    ".env.example", "Dockerfile", "docker-compose.yml",
+                ];
+                if important_files.contains(&name.as_str()) || name.ends_with(".toml") || name.ends_with(".json") {
+                    files.push(name);
+                }
+            }
+        }
+
+        dirs.sort();
+        files.sort();
+
+        for dir in &dirs {
+            structure_lines.push(format!("├── {}/", dir));
+            // Add one level of subdirectories for key folders
+            if let Ok(sub_entries) = std::fs::read_dir(root.join(dir)) {
+                let mut sub_items: Vec<(String, bool)> = Vec::new();
+                for sub_entry in sub_entries.flatten().take(8) {
+                    let sub_name = sub_entry.file_name().to_string_lossy().to_string();
+                    if !sub_name.starts_with('.') {
+                        sub_items.push((sub_name, sub_entry.path().is_dir()));
+                    }
+                }
+                sub_items.sort_by(|a, b| a.0.cmp(&b.0));
+                for (sub_name, is_dir) in sub_items.iter().take(6) {
+                    if *is_dir {
+                        structure_lines.push(format!("│   ├── {}/", sub_name));
+                    } else {
+                        structure_lines.push(format!("│   ├── {}", sub_name));
+                    }
+                }
+                if sub_items.len() > 6 {
+                    structure_lines.push("│   └── ...".to_string());
+                }
+            }
+        }
+
+        for file in &files {
+            structure_lines.push(format!("├── {}", file));
+        }
+    }
+
+    format!(
+        "## Project Structure\n\n```\n{}\n```\n",
+        structure_lines.join("\n")
+    )
+}
+
+fn generate_documentation_format(project: &Project) -> String {
+    let (format_example, lang_comment) = match project.language.as_str() {
+        "TypeScript" | "JavaScript" => (
+            r#"/**
+ * @module [path/from/src]
+ * @description [One-line description]
+ *
+ * PURPOSE:
+ * - [Main responsibility]
+ *
+ * EXPORTS:
+ * - [functionName] - [what it does]
+ *
+ * CLAUDE NOTES:
+ * - [Important context for AI assistants]
+ */"#,
+            "JSDoc block comment"
+        ),
+        "Rust" => (
+            r#"//! @module [path/from/src]
+//! @description [One-line description]
+//!
+//! PURPOSE:
+//! - [Main responsibility]
+//!
+//! EXPORTS:
+//! - [function_name] - [what it does]
+//!
+//! CLAUDE NOTES:
+//! - [Important context for AI assistants]"#,
+            "Doc comment"
+        ),
+        "Python" => (
+            r#""""
+@module [path/from/src]
+@description [One-line description]
+
+PURPOSE:
+- [Main responsibility]
+
+EXPORTS:
+- [function_name] - [what it does]
+
+CLAUDE NOTES:
+- [Important context for AI assistants]
+""""#,
+            "Docstring"
+        ),
+        "Go" => (
+            r#"// Package [name] provides [description]
+//
+// @module [path/from/src]
+// @description [One-line description]
+//
+// PURPOSE:
+// - [Main responsibility]
+//
+// EXPORTS:
+// - [FunctionName] - [what it does]
+//
+// CLAUDE NOTES:
+// - [Important context for AI assistants]"#,
+            "Package comment"
+        ),
+        _ => (
+            r#"/**
+ * @module [path/from/src]
+ * @description [One-line description]
+ *
+ * PURPOSE:
+ * - [Main responsibility]
+ *
+ * EXPORTS:
+ * - [functionName] - [what it does]
+ *
+ * CLAUDE NOTES:
+ * - [Important context for AI assistants]
+ */"#,
+            "Block comment"
+        ),
+    };
+
+    format!(
+        r#"## Module Documentation Format
+
+Every source file should have a documentation header ({}) at the top:
+
+```{}
+{}
+```
+
+**Why this matters:**
+- Headers survive context compaction in long AI sessions
+- Makes codebase self-documenting for AI assistants
+- Provides quick orientation when opening any file
+
+**Update documentation when you:**
+- Add or remove exports
+- Change function signatures
+- Discover important patterns or gotchas
+"#,
+        lang_comment,
+        project.language.to_lowercase(),
+        format_example
+    )
+}
+
+fn generate_current_focus() -> String {
+    r#"## Current Focus
+
+**Status**: Active development
+**Working on**: [Describe current task]
+**Next up**: [What comes after]
+**Blocked by**: Nothing
+
+<!-- Update this section to help AI assistants understand project priorities -->
+"#.to_string()
+}
+
+fn generate_decisions(project: &Project) -> String {
+    let mut decisions: Vec<String> = Vec::new();
+
+    // Add framework-specific decisions
+    if let Some(ref fw) = project.framework {
+        match fw.as_str() {
+            "React" => {
+                decisions.push("1. **React for UI**: Component-based architecture, large ecosystem".to_string());
+            }
+            "Next.js" => {
+                decisions.push("1. **Next.js**: Server-side rendering, file-based routing, API routes".to_string());
+            }
+            "Tauri" => {
+                decisions.push("1. **Tauri over Electron**: Smaller bundle size (~10MB vs ~150MB), better performance, native feel".to_string());
+            }
+            "FastAPI" => {
+                decisions.push("1. **FastAPI**: Async support, automatic OpenAPI docs, Pydantic validation".to_string());
+            }
+            "Django" => {
+                decisions.push("1. **Django**: Batteries-included, ORM, admin panel, mature ecosystem".to_string());
+            }
+            _ => {
+                decisions.push(format!("1. **{}**: [Add rationale for choosing this framework]", fw));
+            }
+        }
+    }
+
+    // Add database decisions
+    if let Some(ref db) = project.database {
+        match db.as_str() {
+            "PostgreSQL" => {
+                decisions.push("2. **PostgreSQL**: ACID compliance, JSON support, extensibility".to_string());
+            }
+            "SQLite" => {
+                decisions.push("2. **SQLite**: Zero-config, file-based, perfect for local-first apps".to_string());
+            }
+            "MongoDB" => {
+                decisions.push("2. **MongoDB**: Flexible schema, horizontal scaling, document model".to_string());
+            }
+            _ => {
+                decisions.push(format!("2. **{}**: [Add rationale for choosing this database]", db));
+            }
+        }
+    }
+
+    // Add styling decisions
+    if let Some(ref style) = project.styling {
+        match style.as_str() {
+            "Tailwind CSS" => {
+                decisions.push("3. **Tailwind CSS**: Utility-first, no context switching, consistent design".to_string());
+            }
+            "CSS Modules" => {
+                decisions.push("3. **CSS Modules**: Scoped styles, no naming conflicts, works with any CSS".to_string());
+            }
+            _ => {
+                decisions.push(format!("3. **{}**: [Add rationale for choosing this styling approach]", style));
+            }
+        }
+    }
+
+    if decisions.is_empty() {
+        decisions.push("1. [Add key architectural decisions here]".to_string());
+        decisions.push("2. [Document why you chose specific technologies]".to_string());
+        decisions.push("3. [Note any important tradeoffs made]".to_string());
+    }
+
+    format!(
+        "## Architectural Decisions\n\nKey decisions and their rationale (helps AI understand project constraints):\n\n{}\n",
+        decisions.join("\n\n")
+    )
+}
+
 fn generate_commands(project: &Project) -> String {
     let commands = match project.language.as_str() {
         "TypeScript" | "JavaScript" => {
@@ -350,21 +625,93 @@ fn generate_patterns(project: &Project) -> String {
 }
 
 fn generate_notes(project: &Project) -> String {
-    let mut notes = Vec::new();
+    let mut sections: Vec<String> = Vec::new();
 
-    notes.push(format!("- Project type: {}", project.project_type));
-    notes.push(format!("- Primary language: {}", project.language));
-
+    // General notes
+    let mut general = vec![
+        format!("- Project type: {}", project.project_type),
+        format!("- Primary language: {}", project.language),
+    ];
     if let Some(ref fw) = project.framework {
-        notes.push(format!("- Framework: {}", fw));
+        general.push(format!("- Framework: {}", fw));
+    }
+    sections.push(format!("### General\n{}", general.join("\n")));
+
+    // Language-specific notes
+    let lang_notes = match project.language.as_str() {
+        "TypeScript" | "JavaScript" => vec![
+            "- Use functional components, not class components",
+            "- Prefer `const` over `let`; never use `var`",
+            "- Use named exports over default exports",
+            "- Keep files focused; one component/function per file when possible",
+        ],
+        "Rust" => vec![
+            "- All public functions should return `Result<T, E>` for fallible operations",
+            "- Use `?` operator for error propagation",
+            "- Prefer `&str` over `String` in function parameters",
+            "- Run `cargo clippy` before committing",
+        ],
+        "Python" => vec![
+            "- Use type hints for all function signatures",
+            "- Follow PEP 8 style guidelines",
+            "- Use `pathlib.Path` over string paths",
+            "- Prefer f-strings for string formatting",
+        ],
+        "Go" => vec![
+            "- Keep packages small and focused",
+            "- Use `error` return values, not panics",
+            "- Run `go fmt` before committing",
+            "- Prefer composition over inheritance",
+        ],
+        _ => vec![
+            "- Follow language-specific best practices",
+            "- Keep code well-documented",
+        ],
+    };
+    sections.push(format!("### {}\n{}", project.language, lang_notes.join("\n")));
+
+    // Framework-specific notes
+    if let Some(ref fw) = project.framework {
+        let fw_notes = match fw.as_str() {
+            "React" | "Next.js" => vec![
+                "- Use hooks for state and side effects",
+                "- Colocate related files (component, styles, tests)",
+                "- Prefer server components where possible (Next.js)",
+            ],
+            "Tauri" => vec![
+                "- All IPC commands are async",
+                "- Commands return `Result<T, String>` for error handling",
+                "- Use `State<AppState>` for shared application state",
+                "- Frontend calls backend via `invoke()` from @tauri-apps/api",
+            ],
+            "FastAPI" => vec![
+                "- Use Pydantic models for all request/response bodies",
+                "- Use dependency injection for database sessions",
+                "- Keep routes thin; business logic in services",
+            ],
+            "Django" => vec![
+                "- Keep views thin; business logic in models or services",
+                "- Use Django ORM; avoid raw SQL unless necessary",
+                "- Run migrations with `python manage.py migrate`",
+            ],
+            _ => vec![],
+        };
+        if !fw_notes.is_empty() {
+            sections.push(format!("### {}\n{}", fw, fw_notes.join("\n")));
+        }
     }
 
-    notes.push("- Always update this file when project conventions change".to_string());
-    notes.push("- Keep documentation headers current in all source files".to_string());
+    // File conventions
+    let file_notes = vec![
+        "- Update CLAUDE.md when project conventions change",
+        "- Keep documentation headers current in all source files",
+        "- Use forward slashes in paths (even on Windows)",
+    ];
+    sections.push(format!("### Files & Documentation\n{}", file_notes.join("\n")));
 
     format!(
         "## CLAUDE NOTES\n\n{}\n\n---\n\n*Generated by Claude Code Copilot. Update this file as your project evolves!*\n",
-        notes.join("\n")
+        sections.join("\n\n")
     )
 }
 
