@@ -37,15 +37,45 @@ import type { PromptAnalysis } from "@/types/ralph";
 const EXAMPLE_PROMPTS = [
   {
     label: "Add a feature",
-    prompt: "Add a 'Export to CSV' button to the dashboard that exports the current health score breakdown and quick wins list to a downloadable CSV file.",
+    prompt: `GOAL: Add CSV export functionality to the dashboard.
+
+CONTEXT: The dashboard (src/components/dashboard/) displays health scores and quick wins. Users need to export this data.
+
+REQUIREMENTS:
+1. Add an "Export CSV" button to the dashboard header
+2. Export should include: health score, component breakdown, and quick wins list
+3. Use the browser's native download API
+4. File should be named "health-report-{date}.csv"
+
+SUCCESS CRITERIA: Clicking the button downloads a valid CSV file with all dashboard data.`,
   },
   {
     label: "Fix a bug",
-    prompt: "The file watcher stops detecting changes after the app has been open for more than 30 minutes. Investigate src/core/watcher.rs and fix the timeout issue.",
+    prompt: `GOAL: Fix file watcher timeout issue in src-tauri/src/core/watcher.rs
+
+PROBLEM: The file watcher stops detecting changes after ~30 minutes of app usage. Users report needing to restart the app.
+
+INVESTIGATION STEPS:
+1. Check if the watcher thread is being dropped
+2. Look for timeout configurations in notify-rs
+3. Verify event channel isn't filling up
+
+SUCCESS CRITERIA: File watcher continues to detect changes after 1+ hours of continuous use.`,
   },
   {
     label: "Refactor code",
-    prompt: "Refactor the useHealth hook to use React Query for caching and automatic background refetching instead of manual useState/useEffect patterns.",
+    prompt: `GOAL: Migrate useHealth hook from useState/useEffect to React Query.
+
+CURRENT STATE: src/hooks/useHealth.ts uses manual state management with useState and useEffect for data fetching.
+
+REQUIREMENTS:
+1. Install @tanstack/react-query if not present
+2. Replace useState with useQuery for health data
+3. Add automatic background refetching every 30 seconds
+4. Preserve existing refresh() function API for manual refetch
+5. Add proper loading and error states
+
+SUCCESS CRITERIA: Hook works identically but with automatic caching and background updates.`,
   },
 ];
 
@@ -103,12 +133,10 @@ export function CommandCenter({
         <div>
           <h3 className="text-sm font-medium text-neutral-300">RALPH Command Center</h3>
           <p className="mt-1 text-xs leading-relaxed text-neutral-400">
-            RALPH helps Claude Code work more effectively by structuring tasks into clear phases:
-            <span className="ml-1 font-medium text-neutral-300">R</span>eview context,
-            <span className="ml-1 font-medium text-neutral-300">A</span>nalyze requirements,
-            <span className="ml-1 font-medium text-neutral-300">L</span>ist steps,
-            <span className="ml-1 font-medium text-neutral-300">P</span>lan implementation,
-            <span className="ml-1 font-medium text-neutral-300">H</span>andoff with documentation.
+            The RALPH loop is an automated agentic coding technique that repeatedly feeds your prompt to Claude Code
+            until the task is complete. Each iteration starts with a fresh context, solving the "context accumulation"
+            problem where AI agents lose focus as conversations grow. Write a clear, structured prompt and let RALPH
+            handle the rest.
           </p>
         </div>
         {analysis && (
