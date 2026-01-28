@@ -38,9 +38,10 @@ use chrono::DateTime;
 use serde::Serialize;
 use tauri::State;
 
+use crate::core::ai;
 use crate::core::generator;
 use crate::core::health;
-use crate::db::AppState;
+use crate::db::{self, AppState};
 use crate::models::project::{HealthScore, Project};
 
 /// Metadata about a CLAUDE.md file returned to the frontend.
@@ -84,56 +85,98 @@ pub async fn read_claude_md(project_path: String) -> Result<ClaudeMdInfo, String
 /// Write content to the CLAUDE.md file at the given project path.
 /// Creates the file if it doesn't exist, overwrites if it does.
 #[tauri::command]
-pub async fn write_claude_md(project_path: String, content: String) -> Result<(), String> {
+pub async fn write_claude_md(
+    project_path: String,
+    content: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     let file_path = PathBuf::from(&project_path).join("CLAUDE.md");
 
     std::fs::write(&file_path, &content).map_err(|e| format!("Failed to write CLAUDE.md: {}", e))?;
+
+    // Log activity
+    let _ = state.db.lock().map(|db| {
+        if let Ok(pid) = db.query_row(
+            "SELECT id FROM projects WHERE path = ?1",
+            [&project_path],
+            |row| row.get::<_, String>(0),
+        ) {
+            let _ = db::log_activity_db(&db, &pid, "edit", "Updated CLAUDE.md");
+        }
+    });
 
     Ok(())
 }
 
 /// Generate a CLAUDE.md file from project data stored in the database.
-/// Looks up the project by ID, generates content using the template engine,
-/// and returns the generated content (does NOT write to disk).
+/// Tries AI generation first (if API key is configured), falls back to template.
+/// Returns the generated content (does NOT write to disk).
 #[tauri::command]
 pub async fn generate_claude_md(
     project_id: String,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    let db = state
-        .db
-        .lock()
-        .map_err(|e| format!("Failed to lock database: {}", e))?;
+    let (project, api_key_result) = {
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| format!("Failed to lock database: {}", e))?;
 
-    let project = db
-        .query_row(
-            "SELECT id, name, path, description, project_type, language, framework, database_tech, testing, styling, health_score, created_at FROM projects WHERE id = ?1",
-            rusqlite::params![project_id],
-            |row| {
-                let created_str: String = row.get(11)?;
-                let created_at = DateTime::parse_from_rfc3339(&created_str)
-                    .map(|dt| dt.with_timezone(&chrono::Utc))
-                    .unwrap_or_else(|_| chrono::Utc::now());
+        let project = db
+            .query_row(
+                "SELECT id, name, path, description, project_type, language, framework, database_tech, testing, styling, health_score, created_at FROM projects WHERE id = ?1",
+                rusqlite::params![project_id],
+                |row| {
+                    let created_str: String = row.get(11)?;
+                    let created_at = DateTime::parse_from_rfc3339(&created_str)
+                        .map(|dt| dt.with_timezone(&chrono::Utc))
+                        .unwrap_or_else(|_| chrono::Utc::now());
 
-                Ok(Project {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    path: row.get(2)?,
-                    description: row.get(3)?,
-                    project_type: row.get(4)?,
-                    language: row.get(5)?,
-                    framework: row.get(6)?,
-                    database: row.get(7)?,
-                    testing: row.get(8)?,
-                    styling: row.get(9)?,
-                    health_score: row.get(10)?,
-                    created_at,
-                })
-            },
-        )
-        .map_err(|e| format!("Project not found: {}", e))?;
+                    Ok(Project {
+                        id: row.get(0)?,
+                        name: row.get(1)?,
+                        path: row.get(2)?,
+                        description: row.get(3)?,
+                        project_type: row.get(4)?,
+                        language: row.get(5)?,
+                        framework: row.get(6)?,
+                        database: row.get(7)?,
+                        testing: row.get(8)?,
+                        styling: row.get(9)?,
+                        health_score: row.get(10)?,
+                        created_at,
+                    })
+                },
+            )
+            .map_err(|e| format!("Project not found: {}", e))?;
+
+        let api_key_result = ai::get_api_key(&db);
+        (project, api_key_result)
+    };
+
+    // Try AI generation if API key is available
+    if let Ok(api_key) = api_key_result {
+        match generator::generate_claude_md_with_ai(&project, &state.http_client, &api_key).await {
+            Ok(content) => {
+                // Log activity on success
+                let _ = state.db.lock().map(|db| {
+                    let _ = db::log_activity_db(&db, &project.id, "generate", "Generated CLAUDE.md (AI)");
+                });
+                return Ok(content);
+            }
+            Err(_) => {
+                // Fall through to template generation
+            }
+        }
+    }
 
     let content = generator::generate_claude_md_content(&project);
+
+    // Log activity
+    let _ = state.db.lock().map(|db| {
+        let _ = db::log_activity_db(&db, &project.id, "generate", "Generated CLAUDE.md (template)");
+    });
+
     Ok(content)
 }
 

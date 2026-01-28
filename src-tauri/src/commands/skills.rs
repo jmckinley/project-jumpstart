@@ -35,7 +35,7 @@ use chrono::Utc;
 use tauri::State;
 use uuid::Uuid;
 
-use crate::db::AppState;
+use crate::db::{self, AppState};
 use crate::models::skill::{Pattern, Skill};
 
 /// List all skills for a project (or global skills if project_id is None).
@@ -96,6 +96,11 @@ pub async fn create_skill(
     )
     .map_err(|e| format!("Failed to insert skill: {}", e))?;
 
+    // Log activity
+    if let Some(ref pid) = project_id {
+        let _ = db::log_activity_db(&db, pid, "skill", &format!("Created skill: {}", &name));
+    }
+
     Ok(Skill {
         id,
         name,
@@ -154,12 +159,26 @@ pub async fn delete_skill(
 ) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| format!("DB lock error: {}", e))?;
 
+    // Get skill name and project_id before deleting
+    let skill_info: Option<(String, Option<String>)> = db
+        .query_row(
+            "SELECT name, project_id FROM skills WHERE id = ?1",
+            [&id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .ok();
+
     let rows_affected = db
         .execute("DELETE FROM skills WHERE id = ?1", [&id])
         .map_err(|e| format!("Failed to delete skill: {}", e))?;
 
     if rows_affected == 0 {
         return Err(format!("Skill not found: {}", id));
+    }
+
+    // Log activity
+    if let Some((name, Some(pid))) = skill_info {
+        let _ = db::log_activity_db(&db, &pid, "skill", &format!("Deleted skill: {}", name));
     }
 
     Ok(())

@@ -53,6 +53,7 @@ use commands::enforcement::{
     get_ci_snippets, get_enforcement_events, get_hook_status, install_git_hooks,
 };
 use commands::settings::{get_all_settings, get_setting, save_setting};
+use commands::watcher::{start_file_watcher, stop_file_watcher};
 use commands::skills::{
     create_skill, delete_skill, detect_patterns, increment_skill_usage, list_skills, update_skill,
 };
@@ -66,6 +67,8 @@ pub fn run() {
             let conn = db::init_db().expect("Failed to initialize database");
             app.manage(db::AppState {
                 db: Mutex::new(conn),
+                http_client: reqwest::Client::new(),
+                watcher: Mutex::new(None),
             });
             Ok(())
         })
@@ -108,6 +111,8 @@ pub fn run() {
             get_all_settings,
             log_activity,
             get_recent_activities,
+            start_file_watcher,
+            stop_file_watcher,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

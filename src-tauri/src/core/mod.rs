@@ -21,6 +21,7 @@
 //! - Core is the heart of the application; commands are thin wrappers
 //! - Each module should be independently testable
 
+pub mod ai;
 pub mod scanner;
 pub mod watcher;
 pub mod analyzer;

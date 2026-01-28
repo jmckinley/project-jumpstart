@@ -20,6 +20,7 @@
  * - Uses compact layout with pipe separators
  * - Color-coded indicators for status
  * - Calls refresh() on mount to load initial context health data
+ * - Polls context health every 30 seconds via setInterval
  *
  * CLAUDE NOTES:
  * - See spec Part 3.1 for status bar wireframe
@@ -57,6 +58,13 @@ export function StatusBar() {
 
   useEffect(() => {
     refresh();
+
+    // Poll context health every 30 seconds
+    const interval = setInterval(() => {
+      refresh();
+    }, 30_000);
+
+    return () => clearInterval(interval);
   }, [refresh]);
 
   const usagePercent = contextHealth?.usagePercent ?? null;

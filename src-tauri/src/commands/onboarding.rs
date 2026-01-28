@@ -31,7 +31,7 @@ use tauri::State;
 use uuid::Uuid;
 
 use crate::core::scanner;
-use crate::db::AppState;
+use crate::db::{self, AppState};
 use crate::models::project::{DetectionResult, Project, ProjectSetup};
 
 #[tauri::command]
@@ -68,8 +68,8 @@ pub async fn save_project(
     )
     .map_err(|e| format!("Failed to insert project: {}", e))?;
 
-    Ok(Project {
-        id,
+    let project = Project {
+        id: id.clone(),
         name: setup.name,
         path: setup.path,
         description: setup.description,
@@ -81,5 +81,10 @@ pub async fn save_project(
         styling: setup.styling,
         health_score: 0,
         created_at: now,
-    })
+    };
+
+    // Log activity
+    let _ = db::log_activity_db(&db, &id, "scan", &format!("Project added: {}", &project.name));
+
+    Ok(project)
 }

@@ -36,7 +36,7 @@
 use std::path::Path;
 use tauri::State;
 
-use crate::db::AppState;
+use crate::db::{self, AppState};
 use crate::models::enforcement::{CiSnippet, EnforcementEvent, HookStatus};
 
 /// Install a pre-commit git hook that checks documentation headers.
@@ -45,6 +45,7 @@ use crate::models::enforcement::{CiSnippet, EnforcementEvent, HookStatus};
 pub async fn install_git_hooks(
     project_path: String,
     mode: String,
+    state: State<'_, AppState>,
 ) -> Result<HookStatus, String> {
     let path = Path::new(&project_path);
     let git_dir = path.join(".git");
@@ -111,6 +112,22 @@ exit 0
     }
 
     let has_husky = path.join(".husky").exists();
+
+    // Log activity
+    let _ = state.db.lock().map(|db| {
+        if let Ok(pid) = db.query_row(
+            "SELECT id FROM projects WHERE path = ?1",
+            [&project_path],
+            |row| row.get::<_, String>(0),
+        ) {
+            let _ = db::log_activity_db(
+                &db,
+                &pid,
+                "enforcement",
+                &format!("Installed git hooks ({})", &mode),
+            );
+        }
+    });
 
     Ok(HookStatus {
         installed: true,

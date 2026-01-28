@@ -1,27 +1,33 @@
 //! @module core/generator
-//! @description Template-based CLAUDE.md generation from project configuration
+//! @description CLAUDE.md generation with AI enhancement and template fallback
 //!
 //! PURPOSE:
-//! - Generate CLAUDE.md content from project data (template-based, no AI required)
+//! - Generate CLAUDE.md content from project data using AI when an API key is available
+//! - Fall back to template-based generation when no API key is configured
 //! - Create structured documentation following the standard CLAUDE.md format
 //! - Include tech stack, project structure, and key conventions
 //!
 //! DEPENDENCIES:
 //! - models::project - Project struct for project data
+//! - core::ai - Claude API caller for AI-powered generation
+//! - reqwest - HTTP client (passed through for API calls)
 //!
 //! EXPORTS:
-//! - generate_claude_md_content - Generate a complete CLAUDE.md string from a Project
+//! - generate_claude_md_content - Template-based CLAUDE.md generation (fallback)
+//! - generate_claude_md_with_ai - AI-powered CLAUDE.md generation
 //!
 //! PATTERNS:
 //! - Template sections are built with helper functions
-//! - All generation is synchronous (no AI calls in v1)
-//! - Output follows the standard CLAUDE.md format from the spec
+//! - AI generation sends project metadata + file list to Claude
+//! - generate_claude_md_with_ai is async, generate_claude_md_content is sync
 //!
 //! CLAUDE NOTES:
-//! - This is template-based generation; AI generation will be added later
+//! - generate_claude_md_content is the synchronous template fallback
+//! - generate_claude_md_with_ai uses the Anthropic API for richer output
+//! - AI prompt includes project name, language, framework, and source file listing
 //! - The generated content includes: overview, tech stack, structure, commands, patterns, notes
-//! - Framework-specific patterns are included when a framework is detected
 
+use crate::core::ai;
 use crate::models::project::Project;
 
 /// Generate a complete CLAUDE.md file from project configuration data.
@@ -36,6 +42,115 @@ pub fn generate_claude_md_content(project: &Project) -> String {
     sections.push(generate_notes(project));
 
     sections.join("\n---\n\n")
+}
+
+/// Generate a CLAUDE.md file using the Claude API for richer, AI-powered content.
+/// Falls back gracefully if the API call fails.
+pub async fn generate_claude_md_with_ai(
+    project: &Project,
+    client: &reqwest::Client,
+    api_key: &str,
+) -> Result<String, String> {
+    let system = "You generate CLAUDE.md files for software projects. A CLAUDE.md file is a \
+        developer documentation file that helps AI coding assistants understand the project. \
+        Include sections for: Overview, Tech Stack (as a markdown table), Commands (common dev commands \
+        in a code block), Code Patterns (bullet points of conventions), and CLAUDE NOTES (important \
+        reminders). Keep the output concise and practical. Use markdown formatting.";
+
+    // Collect source file listing (top 100 files)
+    let file_list = collect_source_files(&project.path, 100);
+    let file_section = if file_list.is_empty() {
+        "No source files detected yet.".to_string()
+    } else {
+        file_list.join("\n")
+    };
+
+    let prompt = format!(
+        "Generate a CLAUDE.md file for this project:\n\n\
+        - Name: {}\n\
+        - Path: {}\n\
+        - Language: {}\n\
+        - Framework: {}\n\
+        - Database: {}\n\
+        - Testing: {}\n\
+        - Styling: {}\n\
+        - Type: {}\n\
+        - Description: {}\n\n\
+        Source files:\n{}\n\n\
+        Generate a complete CLAUDE.md with all sections. Output ONLY the markdown content, no extra explanation.",
+        project.name,
+        project.path,
+        project.language,
+        project.framework.as_deref().unwrap_or("None"),
+        project.database.as_deref().unwrap_or("None"),
+        project.testing.as_deref().unwrap_or("None"),
+        project.styling.as_deref().unwrap_or("None"),
+        project.project_type,
+        if project.description.is_empty() { "Not provided" } else { &project.description },
+        file_section,
+    );
+
+    ai::call_claude(client, api_key, system, &prompt).await
+}
+
+/// Collect source file paths from a project directory (relative paths, limited to max_files).
+fn collect_source_files(project_path: &str, max_files: usize) -> Vec<String> {
+    let mut files = Vec::new();
+    let root = std::path::Path::new(project_path);
+    if root.exists() {
+        collect_files_recursive(root, project_path, &mut files, max_files);
+    }
+    files
+}
+
+fn collect_files_recursive(
+    dir: &std::path::Path,
+    project_path: &str,
+    files: &mut Vec<String>,
+    max_files: usize,
+) {
+    if files.len() >= max_files {
+        return;
+    }
+
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    let skip_dirs = [
+        "node_modules", "target", ".git", "dist", "build", ".next",
+        "__pycache__", ".venv", "venv", "coverage", ".turbo",
+    ];
+
+    for entry in entries.flatten() {
+        if files.len() >= max_files {
+            return;
+        }
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+
+        if name.starts_with('.') {
+            continue;
+        }
+
+        if path.is_dir() {
+            if !skip_dirs.contains(&name.as_str()) {
+                collect_files_recursive(&path, project_path, files, max_files);
+            }
+        } else {
+            let source_exts = [".ts", ".tsx", ".js", ".jsx", ".rs", ".py", ".go", ".toml", ".json"];
+            if source_exts.iter().any(|ext| name.ends_with(ext)) {
+                let abs = path.to_string_lossy().to_string();
+                let rel = abs
+                    .strip_prefix(project_path)
+                    .unwrap_or(&abs)
+                    .trim_start_matches('/')
+                    .to_string();
+                files.push(rel);
+            }
+        }
+    }
 }
 
 fn generate_header(project: &Project) -> String {

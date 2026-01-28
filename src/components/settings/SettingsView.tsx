@@ -9,37 +9,38 @@
  * - Load saved settings from the backend on mount
  *
  * DEPENDENCIES:
- * - react - useEffect for loading settings on mount
+ * - react - useEffect, useState for loading settings on mount and API key input
  * - @/components/ui/card - Card, CardHeader, CardTitle, CardContent for section layout
- * - @/components/ui/button - Button for enforcement level selection
+ * - @/components/ui/button - Button for enforcement level selection and API key save
  * - @/components/ui/badge - Badge for API key status indicator
  * - @/stores/settingsStore - Zustand store for settings state
- * - @/lib/tauri - saveSetting, getAllSettings for IPC persistence
+ * - @/lib/tauri - saveSetting, getAllSettings, getSetting for IPC persistence
  *
  * EXPORTS:
  * - SettingsView - Main settings panel component
  *
  * PATTERNS:
- * - Settings are loaded from SQLite on mount via getAllSettings()
+ * - Settings are loaded from SQLite on mount via getAllSettings() and getSetting()
  * - Each change calls saveSetting() to persist immediately
  * - Zustand store is the single source of truth for UI state
  * - Enforcement level uses radio-style buttons (only one active at a time)
  * - Notifications toggle is a simple on/off button
- * - API key section is read-only (keys managed via system keychain)
+ * - API key input with masked display (last 4 chars), save and remove buttons
  *
  * CLAUDE NOTES:
- * - The API key itself is NEVER stored in the frontend; only a boolean flag (hasApiKey)
+ * - The API key is stored as "anthropic_api_key" in the settings table
+ * - Frontend only displays a masked version (last 4 chars) and a boolean hasApiKey flag
  * - Enforcement levels: "off" (no checks), "warn" (show warnings), "block" (prevent commits)
  * - Settings are persisted as string key-value pairs; booleans are stored as "true"/"false"
  * - The about section is static and does not depend on any backend data
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { saveSetting, getAllSettings } from "@/lib/tauri";
+import { saveSetting, getAllSettings, getSetting } from "@/lib/tauri";
 
 const ENFORCEMENT_OPTIONS: Array<{
   value: "off" | "warn" | "block";
@@ -59,6 +60,10 @@ export function SettingsView() {
   const setNotificationsEnabled = useSettingsStore((s) => s.setNotificationsEnabled);
   const setHasApiKey = useSettingsStore((s) => s.setHasApiKey);
 
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [apiKeyMask, setApiKeyMask] = useState<string | null>(null);
+  const [apiKeySaving, setApiKeySaving] = useState(false);
+
   useEffect(() => {
     async function loadSettings() {
       try {
@@ -72,8 +77,18 @@ export function SettingsView() {
         if (settings.notificationsEnabled !== undefined) {
           setNotificationsEnabled(settings.notificationsEnabled === "true");
         }
-        if (settings.hasApiKey !== undefined) {
-          setHasApiKey(settings.hasApiKey === "true");
+
+        // Check if API key is set
+        const key = await getSetting("anthropic_api_key");
+        if (key && key.length > 4) {
+          setHasApiKey(true);
+          setApiKeyMask(`sk-...${key.slice(-4)}`);
+        } else if (key) {
+          setHasApiKey(true);
+          setApiKeyMask("sk-...");
+        } else {
+          setHasApiKey(false);
+          setApiKeyMask(null);
         }
       } catch {
         // Settings may not be persisted yet; defaults from the store are fine
@@ -81,6 +96,31 @@ export function SettingsView() {
     }
     loadSettings();
   }, [setEnforcementLevel, setNotificationsEnabled, setHasApiKey]);
+
+  async function handleSaveApiKey() {
+    if (!apiKeyInput.trim()) return;
+    setApiKeySaving(true);
+    try {
+      await saveSetting("anthropic_api_key", apiKeyInput.trim());
+      setHasApiKey(true);
+      setApiKeyMask(`sk-...${apiKeyInput.trim().slice(-4)}`);
+      setApiKeyInput("");
+    } catch {
+      // Save failed
+    } finally {
+      setApiKeySaving(false);
+    }
+  }
+
+  async function handleClearApiKey() {
+    try {
+      await saveSetting("anthropic_api_key", "");
+      setHasApiKey(false);
+      setApiKeyMask(null);
+    } catch {
+      // Clear failed
+    }
+  }
 
   async function handleEnforcementChange(level: "off" | "warn" | "block") {
     setEnforcementLevel(level);
@@ -154,13 +194,13 @@ export function SettingsView() {
         </CardContent>
       </Card>
 
-      {/* API Key Status */}
+      {/* Anthropic API Key */}
       <Card className="border-neutral-800 bg-neutral-900">
         <CardHeader>
-          <CardTitle className="text-neutral-100">API Key Status</CardTitle>
+          <CardTitle className="text-neutral-100">Anthropic API Key</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 mb-3">
             <Badge
               variant={hasApiKey ? "default" : "destructive"}
               className={
@@ -171,9 +211,54 @@ export function SettingsView() {
             >
               {hasApiKey ? "Configured" : "Not Configured"}
             </Badge>
+            {apiKeyMask && (
+              <span className="text-xs text-neutral-500 font-mono">{apiKeyMask}</span>
+            )}
           </div>
+
+          {hasApiKey ? (
+            <div>
+              <p className="text-sm text-neutral-400 mb-3">
+                API key is set. AI-powered generation is enabled for CLAUDE.md and module docs.
+              </p>
+              <Button
+                variant="outline"
+                className="border-red-900 bg-red-950/30 text-red-400 hover:bg-red-900/50 hover:text-red-300"
+                onClick={handleClearApiKey}
+              >
+                Remove Key
+              </Button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-sm text-neutral-400 mb-3">
+                Enter your Anthropic API key to enable AI-powered documentation generation.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  placeholder="sk-ant-..."
+                  className="flex-1 rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 placeholder:text-neutral-600 focus:border-blue-500 focus:outline-none"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSaveApiKey();
+                  }}
+                />
+                <Button
+                  variant="default"
+                  className="bg-blue-600 text-white hover:bg-blue-700"
+                  onClick={handleSaveApiKey}
+                  disabled={apiKeySaving || !apiKeyInput.trim()}
+                >
+                  {apiKeySaving ? "Saving..." : "Save"}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <p className="mt-3 text-xs text-neutral-500">
-            API keys are stored securely in the system keychain and are never saved in plain text.
+            Your API key is stored locally in the SQLite database. It is never sent anywhere except to the Anthropic API.
           </p>
         </CardContent>
       </Card>

@@ -37,7 +37,7 @@ use chrono::Utc;
 use tauri::State;
 
 use crate::core::health;
-use crate::db::AppState;
+use crate::db::{self, AppState};
 use crate::models::context::{Checkpoint, ContextHealth, McpServerStatus, TokenBreakdown};
 
 /// Maximum context budget in tokens (Claude's context window).
@@ -157,6 +157,9 @@ pub async fn create_checkpoint(
         rusqlite::params![id, project_id, label, summary, total, context_percent, now],
     )
     .map_err(|e| format!("Failed to create checkpoint: {}", e))?;
+
+    // Log activity
+    let _ = db::log_activity_db(&db, &project_id, "health", &format!("Created checkpoint: {}", &label));
 
     Ok(Checkpoint {
         id,

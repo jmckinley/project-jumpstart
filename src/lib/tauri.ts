@@ -49,6 +49,8 @@
  * - getCiSnippets - Generate CI integration templates
  * - logActivity - Log an activity event for a project
  * - getRecentActivities - Fetch recent activity events for a project
+ * - startFileWatcher - Start watching a project directory for file changes
+ * - stopFileWatcher - Stop the current file watcher
  * - getSetting - Retrieve a single setting by key
  * - saveSetting - Persist a single setting key-value pair
  * - getAllSettings - Retrieve all persisted settings as a key-value map
@@ -257,6 +259,14 @@ export async function getRecentActivities(
   limit?: number,
 ): Promise<{ id: string; projectId: string; activityType: string; message: string; createdAt: string }[]> {
   return invoke<{ id: string; projectId: string; activityType: string; message: string; createdAt: string }[]>("get_recent_activities", { projectId, limit: limit ?? null });
+}
+
+export async function startFileWatcher(projectPath: string): Promise<void> {
+  return invoke<void>("start_file_watcher", { projectPath });
+}
+
+export async function stopFileWatcher(): Promise<void> {
+  return invoke<void>("stop_file_watcher");
 }
 
 export async function getSetting(key: string): Promise<string | null> {

@@ -9,6 +9,7 @@
  * - Show project name in the header bar
  *
  * DEPENDENCIES:
+ * - @tauri-apps/api/event - listen() for file-changed events from backend
  * - @/components/dashboard/HealthScore - Circular score display with component breakdown
  * - @/components/dashboard/QuickWins - Improvement suggestions list
  * - @/components/dashboard/ContextRotAlert - Staleness risk alert banner
@@ -37,7 +38,7 @@
  * - @/hooks/useContextHealth - Context health and MCP monitoring actions
  * - @/hooks/useEnforcement - Enforcement hook/CI status and actions
  * - @/stores/projectStore - Active project for display name
- * - @/lib/tauri (getRecentActivities) - Fetch real activity events from backend
+ * - @/lib/tauri (getRecentActivities, startFileWatcher, stopFileWatcher) - Backend IPC
  *
  * EXPORTS:
  * - MainPanel - Content area component
@@ -55,6 +56,9 @@
  * - Other sections show a placeholder message
  * - useHealth().refresh() is called in useEffect when dashboard is active
  * - useSkills().loadSkills() and detectProjectPatterns() are called in useEffect when skills is active
+ * - DashboardView polls activities every 15 seconds
+ * - MainPanel starts/stops file watcher when active project changes
+ * - File change events from the backend trigger a state counter increment for re-renders
  *
  * CLAUDE NOTES:
  * - The dashboard layout uses a 2-column grid for HealthScore and QuickWins
@@ -69,12 +73,13 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { HealthScore } from "@/components/dashboard/HealthScore";
 import { QuickWins } from "@/components/dashboard/QuickWins";
 import { ContextRotAlert } from "@/components/dashboard/ContextRotAlert";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import type { Activity } from "@/components/dashboard/RecentActivity";
-import { getRecentActivities } from "@/lib/tauri";
+import { getRecentActivities, startFileWatcher, stopFileWatcher } from "@/lib/tauri";
 import { Editor } from "@/components/claude-md/Editor";
 import { FileTree } from "@/components/modules/FileTree";
 import { DocStatus } from "@/components/modules/DocStatus";
@@ -111,9 +116,7 @@ function DashboardView() {
   const activeProject = useProjectStore((s) => s.activeProject);
   const [activities, setActivities] = useState<Activity[]>([]);
 
-  useEffect(() => {
-    refresh();
-
+  const fetchActivities = useCallback(() => {
     if (activeProject) {
       getRecentActivities(activeProject.id)
         .then((items) => {
@@ -129,7 +132,19 @@ function DashboardView() {
           setActivities([]);
         });
     }
-  }, [refresh, activeProject]);
+  }, [activeProject]);
+
+  useEffect(() => {
+    refresh();
+    fetchActivities();
+
+    // Poll activities every 15 seconds
+    const interval = setInterval(() => {
+      fetchActivities();
+    }, 15_000);
+
+    return () => clearInterval(interval);
+  }, [refresh, fetchActivities]);
 
   return (
     <div className="space-y-6">
@@ -545,6 +560,29 @@ function renderSection(section: string) {
 
 export function MainPanel({ activeSection }: MainPanelProps) {
   const activeProject = useProjectStore((s) => s.activeProject);
+  const [, setFileChangeCounter] = useState(0);
+
+  // Start/stop file watcher when active project changes
+  useEffect(() => {
+    if (!activeProject) return;
+
+    startFileWatcher(activeProject.path).catch(() => {
+      // Watcher start failed silently — non-critical feature
+    });
+
+    // Listen for file-changed events from the backend
+    let unlisten: (() => void) | null = null;
+    listen<{ path: string; kind: string }>("file-changed", () => {
+      setFileChangeCounter((c) => c + 1);
+    }).then((fn) => {
+      unlisten = fn;
+    });
+
+    return () => {
+      stopFileWatcher().catch(() => {});
+      if (unlisten) unlisten();
+    };
+  }, [activeProject]);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">

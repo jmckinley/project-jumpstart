@@ -35,7 +35,7 @@
 use chrono::Utc;
 use tauri::State;
 
-use crate::db::AppState;
+use crate::db::{self, AppState};
 use crate::models::ralph::{PromptAnalysis, PromptCriterion, RalphLoop};
 
 /// Analyze a prompt's quality for use in a RALPH loop.
@@ -102,6 +102,9 @@ pub async fn start_ralph_loop(
         rusqlite::params![id, project_id, prompt, enhanced_prompt, quality_score, now],
     )
     .map_err(|e| format!("Failed to create RALPH loop: {}", e))?;
+
+    // Log activity
+    let _ = db::log_activity_db(&db, &project_id, "generate", "Started RALPH loop");
 
     Ok(RalphLoop {
         id,

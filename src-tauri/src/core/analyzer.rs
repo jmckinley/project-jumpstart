@@ -6,9 +6,11 @@
 //! - Parse existing doc headers to extract structured ModuleDoc data
 //! - Detect exports/imports via pattern matching
 //! - Generate template-based documentation for undocumented files
+//! - Generate AI-powered documentation when an API key is available
 //!
 //! DEPENDENCIES:
 //! - models::module_doc - ModuleStatus, ModuleDoc types
+//! - core::ai - Claude API caller for AI-powered doc generation
 //! - std::path - File path operations
 //! - std::fs - File system reading
 //!
@@ -16,6 +18,7 @@
 //! - scan_all_modules - Walk project files and return Vec<ModuleStatus>
 //! - parse_doc_header - Extract ModuleDoc from file content
 //! - generate_module_doc_for_file - Generate a ModuleDoc template for a file
+//! - generate_module_doc_with_ai - Generate a ModuleDoc using the Claude API
 //! - apply_doc_to_file - Prepend or replace doc header in a file
 //! - detect_exports - Pattern-based export detection for a file's content
 //! - detect_imports - Pattern-based import detection for a file's content
@@ -27,6 +30,7 @@
 //! - Recognizes .ts, .tsx, .js, .jsx, .rs, .py, .go extensions
 //! - Doc status: "current" (fresh), "outdated" (stale docs), "missing" (no header)
 //! - Phase 5 freshness detection is integrated via core::freshness
+//! - AI generation truncates file content to ~8k chars to stay within prompt limits
 //!
 //! CLAUDE NOTES:
 //! - TypeScript doc headers use /** ... */ with @module/@description
@@ -35,7 +39,9 @@
 //! - The header_area is the first 40 lines of a file
 //! - Exports detection is approximate — pattern-based, not tree-sitter
 //! - walk_for_modules delegates to freshness::check_file_freshness for accurate status
+//! - generate_module_doc_with_ai parses structured JSON from AI response into ModuleDoc
 
+use crate::core::ai;
 use crate::models::module_doc::{ModuleDoc, ModuleStatus};
 use std::fs;
 use std::path::Path;
@@ -176,6 +182,109 @@ pub fn generate_module_doc_for_file(
         patterns: vec!["TODO: Describe usage patterns".to_string()],
         claude_notes: vec!["TODO: Add important context for Claude".to_string()],
     })
+}
+
+/// Generate a ModuleDoc using the Claude API for richer, AI-powered documentation.
+/// Reads the file content, detects exports/imports, and sends them to Claude.
+pub async fn generate_module_doc_with_ai(
+    file_path: &str,
+    project_path: &str,
+    content: &str,
+    exports: &[String],
+    imports: &[String],
+    client: &reqwest::Client,
+    api_key: &str,
+) -> Result<ModuleDoc, String> {
+    let rel_path = make_relative_path(file_path, project_path);
+    let ext = Path::new(file_path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("");
+
+    let module_path = rel_path
+        .trim_start_matches("src/")
+        .trim_start_matches("src-tauri/src/")
+        .trim_end_matches(&format!(".{}", ext))
+        .to_string();
+
+    // Truncate content to ~8k chars to stay within prompt limits
+    let truncated_content: String = content.chars().take(8000).collect();
+
+    let system = "You generate structured module documentation for source code files. \
+        Return a JSON object with these fields: \
+        description (string, one-line), \
+        purpose (array of strings), \
+        dependencies (array of strings in format 'path - reason'), \
+        exports (array of strings in format 'name - description'), \
+        patterns (array of strings), \
+        claude_notes (array of strings). \
+        Be concise and practical. Output ONLY valid JSON, no markdown fences or explanation.";
+
+    let prompt = format!(
+        "Generate module documentation for this file:\n\n\
+        Module path: {}\n\
+        File extension: .{}\n\
+        Detected exports: {}\n\
+        Detected imports: {}\n\n\
+        File content:\n```\n{}\n```",
+        module_path,
+        ext,
+        exports.join(", "),
+        imports.join(", "),
+        truncated_content,
+    );
+
+    let response = ai::call_claude(client, api_key, system, &prompt).await?;
+
+    // Parse AI response as JSON into ModuleDoc fields
+    match serde_json::from_str::<serde_json::Value>(&response) {
+        Ok(val) => {
+            let get_string = |key: &str| -> String {
+                val.get(key)
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string()
+            };
+            let get_vec = |key: &str| -> Vec<String> {
+                val.get(key)
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|item| item.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            };
+
+            Ok(ModuleDoc {
+                module_path,
+                description: get_string("description"),
+                purpose: get_vec("purpose"),
+                dependencies: get_vec("dependencies"),
+                exports: get_vec("exports"),
+                patterns: get_vec("patterns"),
+                claude_notes: get_vec("claude_notes"),
+            })
+        }
+        Err(_) => {
+            // AI returned non-JSON; use the response as a description and fall back
+            Ok(ModuleDoc {
+                module_path,
+                description: response.lines().next().unwrap_or("AI-generated module").to_string(),
+                purpose: vec!["See AI-generated description above".to_string()],
+                dependencies: imports
+                    .iter()
+                    .map(|i| format!("{} - imported dependency", i))
+                    .collect(),
+                exports: exports
+                    .iter()
+                    .map(|e| format!("{} - exported symbol", e))
+                    .collect(),
+                patterns: vec!["Review AI output for usage patterns".to_string()],
+                claude_notes: vec!["Documentation generated by AI — review for accuracy".to_string()],
+            })
+        }
+    }
 }
 
 /// Apply a ModuleDoc as a documentation header to a file.

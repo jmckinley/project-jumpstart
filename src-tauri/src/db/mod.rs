@@ -1,30 +1,38 @@
 //! @module db/mod
-//! @description Database layer for SQLite operations
+//! @description Database layer for SQLite operations and shared application state
 //!
 //! PURPOSE:
 //! - Initialize and manage the SQLite database connection
 //! - Provide database access to command handlers via AppState
+//! - Hold shared HTTP client for API calls
 //! - Run migrations on startup
+//! - Provide direct DB activity logging for command-level side effects
 //!
 //! EXPORTS:
 //! - schema - Database schema and migrations
 //! - init_db - Initialize the database at the standard location
-//! - AppState - Shared application state holding the DB connection
+//! - AppState - Shared application state holding the DB connection and HTTP client
+//! - log_activity_db - Direct DB insert for activity logging (avoids IPC)
 //!
 //! DEPENDENCIES:
 //! - rusqlite - SQLite database driver
+//! - reqwest - HTTP client for API calls
 //! - std::sync::Mutex - Thread-safe DB access
 //! - std::fs - Create data directory
+//! - uuid - Activity ID generation
+//! - chrono - Timestamp generation
 //!
 //! PATTERNS:
 //! - Database file location: ~/.claude-code-copilot/copilot.db
 //! - Migrations run automatically on init_db()
 //! - AppState is managed via Tauri's State<AppState>
+//! - log_activity_db is called directly by commands, not via IPC
 //!
 //! CLAUDE NOTES:
 //! - Database is local-first, no server dependency
 //! - All timestamps stored in UTC as ISO 8601 strings
 //! - Mutex is used because rusqlite::Connection is not Send+Sync
+//! - reqwest::Client is internally Arc'd, no Mutex needed
 //! - See spec Part 6.2 for table definitions
 
 pub mod schema;
@@ -36,6 +44,29 @@ use std::sync::Mutex;
 /// Shared application state, managed by Tauri
 pub struct AppState {
     pub db: Mutex<Connection>,
+    pub http_client: reqwest::Client,
+    pub watcher: Mutex<Option<crate::core::watcher::ProjectWatcher>>,
+}
+
+/// Log an activity directly to the database.
+/// Used by command handlers as a fire-and-forget side effect.
+/// Errors are silently ignored (activity logging should never block main operations).
+pub fn log_activity_db(
+    db: &Connection,
+    project_id: &str,
+    activity_type: &str,
+    message: &str,
+) -> Result<(), String> {
+    let id = uuid::Uuid::new_v4().to_string();
+    let created_at = chrono::Utc::now().to_rfc3339();
+
+    db.execute(
+        "INSERT INTO activities (id, project_id, activity_type, message, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        rusqlite::params![id, project_id, activity_type, message, created_at],
+    )
+    .map_err(|e| format!("Failed to log activity: {}", e))?;
+
+    Ok(())
 }
 
 /// Initialize the database at ~/.claude-code-copilot/copilot.db

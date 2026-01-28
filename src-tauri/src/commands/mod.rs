@@ -37,3 +37,4 @@ pub mod context;
 pub mod enforcement;
 pub mod settings;
 pub mod activity;
+pub mod watcher;
