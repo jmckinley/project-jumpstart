@@ -74,6 +74,7 @@ import type { ModuleStatus, ModuleDoc } from "@/types/module";
 import type { Skill, Pattern } from "@/types/skill";
 import type { RalphLoop, PromptAnalysis } from "@/types/ralph";
 import type { EnforcementEvent, HookStatus, CiSnippet } from "@/types/enforcement";
+import type { Agent, AgentWorkflowStep, AgentTool } from "@/types/agent";
 
 export async function scanProject(path: string): Promise<DetectionResult> {
   return invoke<DetectionResult>("scan_project", { path });
@@ -279,4 +280,72 @@ export async function saveSetting(key: string, value: string): Promise<void> {
 
 export async function getAllSettings(): Promise<Record<string, string>> {
   return invoke<Record<string, string>>("get_all_settings");
+}
+
+export async function listAgents(projectId?: string): Promise<Agent[]> {
+  return invoke<Agent[]>("list_agents", { projectId: projectId ?? null });
+}
+
+export async function createAgent(
+  name: string,
+  description: string,
+  tier: string,
+  category: string,
+  instructions: string,
+  workflow: AgentWorkflowStep[] | null,
+  tools: AgentTool[] | null,
+  triggerPatterns: string[] | null,
+  projectId?: string,
+): Promise<Agent> {
+  return invoke<Agent>("create_agent", {
+    name,
+    description,
+    tier,
+    category,
+    instructions,
+    workflow,
+    tools,
+    triggerPatterns,
+    projectId: projectId ?? null,
+  });
+}
+
+export async function updateAgent(
+  id: string,
+  name: string,
+  description: string,
+  tier: string,
+  category: string,
+  instructions: string,
+  workflow: AgentWorkflowStep[] | null,
+  tools: AgentTool[] | null,
+  triggerPatterns: string[] | null,
+): Promise<Agent> {
+  return invoke<Agent>("update_agent", {
+    id,
+    name,
+    description,
+    tier,
+    category,
+    instructions,
+    workflow,
+    tools,
+    triggerPatterns,
+  });
+}
+
+export async function deleteAgent(id: string): Promise<void> {
+  return invoke<void>("delete_agent", { id });
+}
+
+export async function incrementAgentUsage(id: string): Promise<number> {
+  return invoke<number>("increment_agent_usage", { id });
+}
+
+export async function enhanceAgentInstructions(
+  name: string,
+  description: string,
+  instructions: string,
+): Promise<string> {
+  return invoke<string>("enhance_agent_instructions", { name, description, instructions });
 }

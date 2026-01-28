@@ -37,3 +37,79 @@ export interface Pattern {
   frequency: number;
   suggestedSkill: string | null;
 }
+
+/**
+ * Technology tags for skill relevance scoring.
+ * Used to match skills to project tech stacks.
+ */
+export type TechTag =
+  | "universal"
+  | "typescript"
+  | "javascript"
+  | "python"
+  | "rust"
+  | "go"
+  | "java"
+  | "react"
+  | "nextjs"
+  | "vue"
+  | "angular"
+  | "svelte"
+  | "express"
+  | "fastify"
+  | "nestjs"
+  | "django"
+  | "fastapi"
+  | "flask"
+  | "tauri"
+  | "electron"
+  | "vitest"
+  | "jest"
+  | "pytest"
+  | "playwright"
+  | "tailwind"
+  | "sass"
+  | "css-modules"
+  | "zustand"
+  | "redux"
+  | "pinia"
+  | "postgresql"
+  | "mysql"
+  | "sqlite"
+  | "mongodb";
+
+/**
+ * Categories for organizing skills in the library.
+ */
+export type SkillCategory =
+  | "documentation"
+  | "testing"
+  | "component-creation"
+  | "state-management"
+  | "api-design"
+  | "error-handling"
+  | "code-review"
+  | "refactoring"
+  | "debugging"
+  | "database";
+
+/**
+ * Metadata for a skill category (for UI display).
+ */
+export interface SkillCategoryInfo {
+  id: SkillCategory;
+  label: string;
+  description: string;
+}
+
+/**
+ * A skill from the pre-defined library catalog.
+ */
+export interface LibrarySkill {
+  slug: string;
+  name: string;
+  description: string;
+  category: SkillCategory;
+  tags: TechTag[];
+  content: string;
+}

@@ -16,7 +16,12 @@
         "width": 1400,
         "height": 1000,
         "minWidth": 900,
-        "minHeight": 700
+        "minHeight": 700,
+        "visible": true,
+        "center": true,
+        "focus": true,
+        "decorations": true,
+        "resizable": true
       }
     ],
     "security": {
