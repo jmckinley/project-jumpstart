@@ -57,6 +57,9 @@ use commands::watcher::{start_file_watcher, stop_file_watcher};
 use commands::skills::{
     create_skill, delete_skill, detect_patterns, increment_skill_usage, list_skills, update_skill,
 };
+use commands::agents::{
+    create_agent, delete_agent, enhance_agent_instructions, increment_agent_usage, list_agents, update_agent,
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -94,6 +97,12 @@ pub fn run() {
             delete_skill,
             detect_patterns,
             increment_skill_usage,
+            list_agents,
+            create_agent,
+            update_agent,
+            delete_agent,
+            increment_agent_usage,
+            enhance_agent_instructions,
             analyze_ralph_prompt,
             start_ralph_loop,
             pause_ralph_loop,

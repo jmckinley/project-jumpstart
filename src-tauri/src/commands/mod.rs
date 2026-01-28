@@ -12,6 +12,7 @@
 //! - modules - Module documentation commands
 //! - freshness - Staleness detection commands
 //! - skills - Skills management commands
+//! - agents - Agents management commands
 //! - ralph - RALPH loop commands
 //! - context - Context health commands
 //! - enforcement - Git hooks and CI commands
@@ -32,6 +33,7 @@ pub mod claude_md;
 pub mod modules;
 pub mod freshness;
 pub mod skills;
+pub mod agents;
 pub mod ralph;
 pub mod context;
 pub mod enforcement;

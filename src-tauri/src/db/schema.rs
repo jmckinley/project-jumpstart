@@ -18,7 +18,7 @@
 //! - IDs are TEXT (UUID v4 strings)
 //!
 //! CLAUDE NOTES:
-//! - Tables: projects, module_docs, freshness_history (Phase 5), skills, patterns,
+//! - Tables: projects, module_docs, freshness_history (Phase 5), skills, patterns, agents,
 //!   ralph_loops (Phase 7), checkpoints (Phase 8), enforcement_events (Phase 9), settings,
 //!   activities (Phase 10)
 //! - freshness_history stores per-file freshness snapshots for trend analysis
@@ -86,6 +86,23 @@ pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
             frequency       INTEGER NOT NULL DEFAULT 1,
             suggested_skill TEXT,
             detected_at     TEXT NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS agents (
+            id                TEXT PRIMARY KEY,
+            project_id        TEXT,
+            name              TEXT NOT NULL,
+            description       TEXT NOT NULL DEFAULT '',
+            tier              TEXT NOT NULL DEFAULT 'basic',
+            category          TEXT NOT NULL DEFAULT 'feature-development',
+            instructions      TEXT NOT NULL DEFAULT '',
+            workflow          TEXT,
+            tools             TEXT,
+            trigger_patterns  TEXT,
+            usage_count       INTEGER NOT NULL DEFAULT 0,
+            created_at        TEXT NOT NULL,
+            updated_at        TEXT NOT NULL,
             FOREIGN KEY (project_id) REFERENCES projects(id)
         );
 

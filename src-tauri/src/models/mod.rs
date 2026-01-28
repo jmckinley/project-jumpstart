@@ -10,6 +10,7 @@
 //! - project - Project, HealthScore, DetectionResult types
 //! - module_doc - ModuleStatus, ModuleDoc types
 //! - skill - Skill, Pattern types
+//! - agent - Agent, WorkflowStep, AgentTool types
 //! - ralph - RalphLoop, PromptAnalysis, PromptCriterion types
 //! - context - ContextHealth, TokenBreakdown, McpServerStatus, Checkpoint types
 //! - enforcement - EnforcementEvent, HookStatus, CiSnippet types
@@ -26,6 +27,7 @@
 pub mod project;
 pub mod module_doc;
 pub mod skill;
+pub mod agent;
 pub mod ralph;
 pub mod context;
 pub mod enforcement;
