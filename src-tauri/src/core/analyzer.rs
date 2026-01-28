@@ -17,20 +17,24 @@
 //! - parse_doc_header - Extract ModuleDoc from file content
 //! - generate_module_doc_for_file - Generate a ModuleDoc template for a file
 //! - apply_doc_to_file - Prepend or replace doc header in a file
+//! - detect_exports - Pattern-based export detection for a file's content
+//! - detect_imports - Pattern-based import detection for a file's content
+//! - is_documentable - Check if a filename should have documentation
 //!
 //! PATTERNS:
 //! - Uses pattern-based detection (regex-like string matching), not tree-sitter AST
 //! - Skips node_modules, target, dist, build, .git, __pycache__ directories
 //! - Recognizes .ts, .tsx, .js, .jsx, .rs, .py, .go extensions
-//! - Doc status: "current" (has valid header), "missing" (no header)
-//! - Phase 4 does not detect "outdated" — that requires Phase 5 freshness detection
+//! - Doc status: "current" (fresh), "outdated" (stale docs), "missing" (no header)
+//! - Phase 5 freshness detection is integrated via core::freshness
 //!
 //! CLAUDE NOTES:
 //! - TypeScript doc headers use /** ... */ with @module/@description
 //! - Rust doc headers use //! with @module/@description
 //! - Python doc headers use triple-quote docstrings with @module/@description
 //! - The header_area is the first 40 lines of a file
-//! - Exports detection is approximate — full AST analysis comes in Phase 5
+//! - Exports detection is approximate — pattern-based, not tree-sitter
+//! - walk_for_modules delegates to freshness::check_file_freshness for accurate status
 
 use crate::models::module_doc::{ModuleDoc, ModuleStatus};
 use std::fs;
@@ -221,39 +225,28 @@ fn walk_for_modules(dir: &Path, project_path: &str, results: &mut Vec<ModuleStat
                 walk_for_modules(&path, project_path, results);
             }
         } else if is_documentable(&name) {
-            let rel_path = make_relative_path(
-                path.to_string_lossy().as_ref(),
-                project_path,
-            );
+            let abs_path = path.to_string_lossy().to_string();
+            let rel_path = make_relative_path(&abs_path, project_path);
 
-            let content = fs::read_to_string(&path).unwrap_or_default();
-            let has_header = has_doc_header(&content);
-            let parsed = if has_header {
-                parse_doc_header(&content)
-            } else {
-                None
-            };
-
-            let status = if has_header && parsed.is_some() {
-                "current".to_string()
-            } else {
-                "missing".to_string()
-            };
-
-            let freshness_score = if status == "current" { 100 } else { 0 };
+            // Delegate to freshness engine for accurate status/score
+            let freshness = super::freshness::check_file_freshness(&abs_path, project_path);
 
             results.push(ModuleStatus {
                 path: rel_path,
-                status,
-                freshness_score,
-                changes: None,
+                status: freshness.status,
+                freshness_score: freshness.score,
+                changes: if freshness.changes.is_empty() {
+                    None
+                } else {
+                    Some(freshness.changes)
+                },
                 suggested_doc: None,
             });
         }
     }
 }
 
-fn is_documentable(name: &str) -> bool {
+pub fn is_documentable(name: &str) -> bool {
     if SKIP_FILES.contains(&name) {
         return false;
     }
@@ -342,7 +335,7 @@ fn extract_list_section(content: &str, section_name: &str) -> Vec<String> {
 // Export / import detection (pattern-based)
 // ---------------------------------------------------------------------------
 
-fn detect_exports(content: &str, ext: &str) -> Vec<String> {
+pub fn detect_exports(content: &str, ext: &str) -> Vec<String> {
     let mut exports = Vec::new();
 
     match ext {
@@ -493,7 +486,7 @@ fn detect_exports(content: &str, ext: &str) -> Vec<String> {
     exports
 }
 
-fn detect_imports(content: &str, ext: &str) -> Vec<String> {
+pub fn detect_imports(content: &str, ext: &str) -> Vec<String> {
     let mut imports = Vec::new();
 
     match ext {

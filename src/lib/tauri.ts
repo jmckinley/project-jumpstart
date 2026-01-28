@@ -27,6 +27,8 @@
  * - generateModuleDoc - Generate doc template for a single file
  * - applyModuleDoc - Apply doc header to a file on disk
  * - batchGenerateDocs - Generate and apply docs for multiple files
+ * - checkFreshness - Check freshness of a single file
+ * - getStaleFiles - Get files with outdated or missing docs
  *
  * PATTERNS:
  * - Each function wraps a single Tauri command
@@ -100,4 +102,18 @@ export async function applyModuleDoc(filePath: string, doc: ModuleDoc): Promise<
 
 export async function batchGenerateDocs(filePaths: string[], projectPath: string): Promise<ModuleStatus[]> {
   return invoke<ModuleStatus[]>("batch_generate_docs", { filePaths, projectPath });
+}
+
+export interface FreshnessCheckResult {
+  score: number;
+  status: string;
+  changes: string[];
+}
+
+export async function checkFreshness(filePath: string, projectPath: string): Promise<FreshnessCheckResult> {
+  return invoke<FreshnessCheckResult>("check_freshness", { filePath, projectPath });
+}
+
+export async function getStaleFiles(projectPath: string): Promise<ModuleStatus[]> {
+  return invoke<ModuleStatus[]>("get_stale_files", { projectPath });
 }

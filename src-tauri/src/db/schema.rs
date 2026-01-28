@@ -18,8 +18,9 @@
 //! - IDs are TEXT (UUID v4 strings)
 //!
 //! CLAUDE NOTES:
-//! - Tables: projects, module_docs, freshness_history, skills, patterns,
+//! - Tables: projects, module_docs, freshness_history (Phase 5), skills, patterns,
 //!   ralph_loops, checkpoints, enforcement_events, settings
+//! - freshness_history stores per-file freshness snapshots for trend analysis
 //! - See spec Part 6.2 for full table definitions
 //! - Add new tables here and call in create_tables()
 
@@ -50,6 +51,17 @@ pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
             status          TEXT NOT NULL DEFAULT 'missing',
             freshness_score INTEGER NOT NULL DEFAULT 0,
             last_checked    TEXT NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS freshness_history (
+            id              TEXT PRIMARY KEY,
+            project_id      TEXT NOT NULL,
+            file_path       TEXT NOT NULL,
+            freshness_score INTEGER NOT NULL DEFAULT 0,
+            status          TEXT NOT NULL DEFAULT 'missing',
+            changes         TEXT,
+            checked_at      TEXT NOT NULL,
             FOREIGN KEY (project_id) REFERENCES projects(id)
         );
 

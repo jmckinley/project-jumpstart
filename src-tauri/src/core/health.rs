@@ -22,9 +22,11 @@
 //!
 //! CLAUDE NOTES:
 //! - Weights: CLAUDE.md=25, Modules=25, Freshness=15, Skills=15, Context=10, Enforcement=10
-//! - Phase 3 implements CLAUDE.md and basic module checks; other components score 0 until their phase
+//! - Phase 5 added freshness scoring via core::freshness engine
+//! - Freshness score is the average freshness of all documented files, scaled to weight
 //! - Context rot risk: low (>=70), medium (40-69), high (<40)
 
+use crate::core::freshness;
 use crate::models::project::{HealthComponents, HealthScore, QuickWin};
 use std::path::Path;
 
@@ -42,8 +44,8 @@ pub fn calculate_health(project_path: &str) -> HealthScore {
 
     let claude_md_score = calculate_claude_md_score(path);
     let module_docs_score = calculate_module_docs_score(path);
+    let freshness_score = calculate_freshness_score(project_path);
     // These will be properly implemented in later phases
-    let freshness_score: u32 = 0;
     let skills_score: u32 = 0;
     let context_score: u32 = 0;
     let enforcement_score: u32 = 0;
@@ -127,9 +129,37 @@ fn calculate_claude_md_score(project_path: &Path) -> u32 {
     score.min(WEIGHT_CLAUDE_MD)
 }
 
+/// Score the freshness component (0-15 points).
+/// Uses the freshness engine to calculate average freshness across documented files.
+fn calculate_freshness_score(project_path: &str) -> u32 {
+    let modules = match freshness::check_project_freshness(project_path) {
+        Ok(m) => m,
+        Err(_) => return 0,
+    };
+
+    if modules.is_empty() {
+        return 0;
+    }
+
+    // Only consider files that have documentation (not "missing")
+    let documented: Vec<&crate::models::module_doc::ModuleStatus> = modules
+        .iter()
+        .filter(|m| m.status != "missing")
+        .collect();
+
+    if documented.is_empty() {
+        return 0;
+    }
+
+    let avg_freshness: f64 =
+        documented.iter().map(|m| m.freshness_score as f64).sum::<f64>() / documented.len() as f64;
+
+    let raw_score = (avg_freshness / 100.0 * WEIGHT_FRESHNESS as f64).round() as u32;
+    raw_score.min(WEIGHT_FRESHNESS)
+}
+
 /// Score the module documentation component (0-25 points).
 /// Checks for source files with documentation headers.
-/// Phase 3 does a basic check; Phase 4 will do full AST analysis.
 fn calculate_module_docs_score(project_path: &Path) -> u32 {
     let src_dir = project_path.join("src");
     if !src_dir.exists() {
@@ -204,7 +234,7 @@ fn generate_quick_wins(
     project_path: &Path,
     claude_md: u32,
     module_docs: u32,
-    _freshness: u32,
+    freshness: u32,
     _skills: u32,
     _enforcement: u32,
 ) -> Vec<QuickWin> {
@@ -242,6 +272,22 @@ fn generate_quick_wins(
             description: "Some source files are missing documentation headers.".to_string(),
             impact: WEIGHT_MODULE_DOCS - module_docs,
             effort: "medium".to_string(),
+        });
+    }
+
+    if freshness == 0 && module_docs > 0 {
+        wins.push(QuickWin {
+            title: "Update stale documentation".to_string(),
+            description: "Documentation headers are out of date. Re-generate module docs to match current code.".to_string(),
+            impact: WEIGHT_FRESHNESS,
+            effort: "medium".to_string(),
+        });
+    } else if freshness < WEIGHT_FRESHNESS && freshness > 0 {
+        wins.push(QuickWin {
+            title: "Fix outdated module docs".to_string(),
+            description: "Some module documentation is stale — exports or imports have changed since docs were written.".to_string(),
+            impact: WEIGHT_FRESHNESS - freshness,
+            effort: "low".to_string(),
         });
     }
 

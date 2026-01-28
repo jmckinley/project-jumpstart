@@ -11,8 +11,8 @@
 //! - tauri::Manager - Trait for app.manage() state injection
 //! - tauri_plugin_opener - System URL/file opener
 //! - tauri_plugin_dialog - Native file/folder dialogs
-//! - commands - IPC command handlers (onboarding, project, claude_md, modules)
-//! - core - Business logic modules (scanner, generator, health, analyzer)
+//! - commands - IPC command handlers (onboarding, project, claude_md, modules, freshness)
+//! - core - Business logic modules (scanner, generator, health, analyzer, freshness)
 //! - models - Data structures
 //! - db - Database layer and AppState
 //!
@@ -40,6 +40,7 @@ use std::sync::Mutex;
 use tauri::Manager;
 
 use commands::claude_md::{generate_claude_md, get_health_score, read_claude_md, write_claude_md};
+use commands::freshness::{check_freshness, get_stale_files};
 use commands::modules::{apply_module_doc, batch_generate_docs, generate_module_doc, scan_modules};
 use commands::onboarding::{save_project, scan_project};
 use commands::project::{get_project, list_projects, remove_project};
@@ -70,6 +71,8 @@ pub fn run() {
             generate_module_doc,
             apply_module_doc,
             batch_generate_docs,
+            check_freshness,
+            get_stale_files,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
