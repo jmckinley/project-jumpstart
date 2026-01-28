@@ -36,10 +36,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useClaudeMd } from "@/hooks/useClaudeMd";
+import { useProjectStore } from "@/stores/projectStore";
 import { Preview } from "./Preview";
 import { Suggestions } from "./Suggestions";
 
 export function Editor() {
+  const activeProject = useProjectStore((s) => s.activeProject);
   const {
     exists,
     content,
@@ -56,6 +58,7 @@ export function Editor() {
   const [dirty, setDirty] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Load content on mount
   useEffect(() => {
@@ -77,8 +80,15 @@ export function Editor() {
   );
 
   const handleSave = useCallback(async () => {
-    await saveContent(draft);
-    setDirty(false);
+    setSaveError(null);
+    try {
+      await saveContent(draft);
+      setDirty(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save";
+      setSaveError(message);
+      console.error("Failed to save CLAUDE.md:", err);
+    }
   }, [draft, saveContent]);
 
   const handleGenerateClick = useCallback(() => {
@@ -121,36 +131,25 @@ export function Editor() {
       <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold text-neutral-100">CLAUDE.md</h2>
-          {dirty && (
-            <span className="rounded bg-amber-900/50 px-2 py-0.5 text-xs text-amber-400">
-              Unsaved
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3">
           <span className="text-xs text-neutral-500">
             ~{draftTokenEstimate.toLocaleString()} tokens
           </span>
+        </div>
 
-          <button
-            onClick={handleGenerateClick}
-            disabled={loading || generating}
-            className="flex items-center gap-1.5 rounded-md border border-emerald-700 bg-emerald-900/30 px-3 py-1 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-900/50 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            {generating ? "Generating..." : "Generate from Template"}
-          </button>
-
-          <button
-            onClick={handleSave}
-            disabled={saving || !dirty}
-            className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Save"}
-          </button>
+        <div className="flex items-center gap-3">
+          {dirty ? (
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="rounded-md bg-blue-600 px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Save Changes"}
+            </button>
+          ) : (
+            <span className="rounded-md border border-neutral-700 bg-neutral-800 px-4 py-1.5 text-xs font-medium text-neutral-500">
+              Saved
+            </span>
+          )}
         </div>
       </div>
 
@@ -183,14 +182,24 @@ export function Editor() {
       )}
 
       {/* Error Banner */}
-      {error && (
+      {(error || saveError) && (
         <div className="border-b border-red-900 bg-red-950 px-4 py-2">
-          <p className="text-xs text-red-400">{error}</p>
+          <p className="text-xs text-red-400">{error || saveError}</p>
+        </div>
+      )}
+
+      {/* No Project Selected */}
+      {!activeProject && !loading && (
+        <div className="flex flex-1 items-center justify-center">
+          <div className="text-center">
+            <p className="text-sm text-neutral-400">No project selected</p>
+            <p className="text-xs text-neutral-500">Select a project from the sidebar to edit its CLAUDE.md</p>
+          </div>
         </div>
       )}
 
       {/* Loading Overlay */}
-      {loading ? (
+      {activeProject && loading ? (
         <div className="flex flex-1 items-center justify-center">
           <div className="flex flex-col items-center gap-3">
             <svg
@@ -216,15 +225,25 @@ export function Editor() {
             <p className="text-sm text-neutral-400">Loading CLAUDE.md...</p>
           </div>
         </div>
-      ) : (
+      ) : activeProject ? (
         /* Split Pane: Editor (left) + Preview & Suggestions (right) */
         <div className="flex min-h-0 flex-1">
           {/* Left Pane: Textarea Editor */}
           <div className="flex flex-1 flex-col border-r border-neutral-800">
-            <div className="border-b border-neutral-800 px-4 py-1.5">
+            <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-1.5">
               <span className="text-xs font-medium text-neutral-500">
                 Editor
               </span>
+              <button
+                onClick={handleGenerateClick}
+                disabled={loading || generating}
+                className="flex items-center gap-1.5 rounded-md border border-emerald-700 bg-emerald-900/30 px-2.5 py-1 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-900/50 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                {generating ? "Generating..." : "Generate from Template"}
+              </button>
             </div>
             <textarea
               value={draft}
@@ -243,7 +262,7 @@ export function Editor() {
             <Suggestions content={draft} onApply={handleApplySuggestion} />
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
