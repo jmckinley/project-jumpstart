@@ -152,7 +152,7 @@ export function SettingsView() {
                 className={
                   enforcementLevel === option.value
                     ? "bg-blue-600 text-white hover:bg-blue-500 hover:text-white"
-                    : "border-neutral-700 bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-neutral-100"
+                    : "border-neutral-700 bg-neutral-800 text-neutral-500 hover:bg-neutral-700 hover:text-neutral-200"
                 }
                 onClick={() => handleEnforcementChange(option.value)}
               >
@@ -184,7 +184,7 @@ export function SettingsView() {
               className={
                 notificationsEnabled
                   ? "border-green-700 bg-green-900/30 text-green-400 hover:bg-green-900/50 hover:text-green-300"
-                  : "border-neutral-700 bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-300"
+                  : "border-neutral-700 bg-neutral-800 text-neutral-500 hover:bg-neutral-700 hover:text-neutral-200"
               }
               onClick={handleNotificationsToggle}
             >

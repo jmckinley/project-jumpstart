@@ -56,7 +56,7 @@ export function AgentCategoryFilter({
     "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap";
   const pillActive = "bg-blue-600 text-white";
   const pillInactive =
-    "bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-neutral-100";
+    "bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-100";
 
   return (
     <div className="space-y-3">
