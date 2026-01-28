@@ -109,9 +109,10 @@ import type { Skill } from "@/types/skill";
 
 interface MainPanelProps {
   activeSection: string;
+  onNavigate?: (section: string) => void;
 }
 
-function DashboardView() {
+function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void }) {
   const { score, components, quickWins, contextRotRisk, refresh } = useHealth();
   const activeProject = useProjectStore((s) => s.activeProject);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -148,11 +149,25 @@ function DashboardView() {
 
   return (
     <div className="space-y-6">
-      <ContextRotAlert risk={contextRotRisk} />
+      <ContextRotAlert
+        risk={contextRotRisk}
+        onReview={() => onNavigate?.("modules")}
+      />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <HealthScore score={score} components={components} />
-        <QuickWins quickWins={quickWins} />
+        <QuickWins
+          quickWins={quickWins}
+          onAction={(win) => {
+            const title = win.title.toLowerCase();
+            if (title.includes("claude.md")) onNavigate?.("claude-md");
+            else if (title.includes("module") || title.includes("doc")) onNavigate?.("modules");
+            else if (title.includes("skill")) onNavigate?.("skills");
+            else if (title.includes("enforce") || title.includes("hook")) onNavigate?.("enforcement");
+            else if (title.includes("context") || title.includes("mcp")) onNavigate?.("context");
+            else onNavigate?.("modules");
+          }}
+        />
       </div>
 
       <RecentActivity activities={activities} />
@@ -531,10 +546,10 @@ function EnforcementView() {
   );
 }
 
-function renderSection(section: string) {
+function renderSection(section: string, onNavigate?: (section: string) => void) {
   switch (section) {
     case "dashboard":
-      return <DashboardView />;
+      return <DashboardView onNavigate={onNavigate} />;
     case "claude-md":
       return <Editor />;
     case "modules":
@@ -558,7 +573,7 @@ function renderSection(section: string) {
   }
 }
 
-export function MainPanel({ activeSection }: MainPanelProps) {
+export function MainPanel({ activeSection, onNavigate }: MainPanelProps) {
   const activeProject = useProjectStore((s) => s.activeProject);
   const [, setFileChangeCounter] = useState(0);
 
@@ -598,7 +613,7 @@ export function MainPanel({ activeSection }: MainPanelProps) {
           )}
         </div>
       </header>
-      <main className="flex-1 overflow-auto p-6">{renderSection(activeSection)}</main>
+      <main className="flex-1 overflow-auto p-6">{renderSection(activeSection, onNavigate)}</main>
     </div>
   );
 }

@@ -103,7 +103,7 @@ function App() {
           activeSection={activeSection}
           onNavigate={setActiveSection}
         />
-        <MainPanel activeSection={activeSection} />
+        <MainPanel activeSection={activeSection} onNavigate={setActiveSection} />
       </div>
       <StatusBar />
     </div>

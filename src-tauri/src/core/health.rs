@@ -28,7 +28,8 @@
 //! - Phase 9 added enforcement scoring: 5 for hooks + 5 for CI config
 //! - Phase 10 added context scoring: based on persistent token usage vs 200k budget
 //! - Freshness score is the average freshness of all documented files, scaled to weight
-//! - Context rot risk: low (>=70), medium (40-69), high (<40)
+//! - Context rot risk is based on doc scores only (CLAUDE.md + modules + freshness)
+//! - Risk thresholds: low (>=70% of doc max), medium (40-69%), high (<40%)
 
 use crate::commands::enforcement;
 use crate::core::freshness;
@@ -58,9 +59,16 @@ pub fn calculate_health(project_path: &str, skill_count: u32) -> HealthScore {
     let total = claude_md_score + module_docs_score + freshness_score + skills_score
         + context_score + enforcement_score;
 
-    let context_rot_risk = if total >= 70 {
+    // Context rot risk is based on documentation-specific scores (CLAUDE.md + modules + freshness),
+    // not the full composite. A project with perfect docs but no skills/enforcement shouldn't
+    // show a rot warning.
+    let doc_score = claude_md_score + module_docs_score + freshness_score;
+    let doc_max = WEIGHT_CLAUDE_MD + WEIGHT_MODULE_DOCS + WEIGHT_FRESHNESS; // 65
+    let doc_pct = if doc_max > 0 { doc_score as f64 / doc_max as f64 * 100.0 } else { 0.0 };
+
+    let context_rot_risk = if doc_pct >= 70.0 {
         "low".to_string()
-    } else if total >= 40 {
+    } else if doc_pct >= 40.0 {
         "medium".to_string()
     } else {
         "high".to_string()
@@ -192,11 +200,8 @@ fn calculate_context_score(project_path: &Path) -> u32 {
         }
     }
 
-    // Doc header tokens from src/
-    let src_dir = project_path.join("src");
-    if src_dir.exists() {
-        persistent_tokens += estimate_dir_header_tokens(&src_dir);
-    }
+    // Doc header tokens from source files across the project
+    persistent_tokens += estimate_dir_header_tokens(project_path);
 
     // MCP config tokens
     let mcp_json = project_path.join(".mcp.json");
@@ -287,17 +292,16 @@ fn count_mcp_servers(content: &str) -> u32 {
 }
 
 /// Score the module documentation component (0-25 points).
-/// Checks for source files with documentation headers.
+/// Scans the entire project tree for source files with documentation headers.
 fn calculate_module_docs_score(project_path: &Path) -> u32 {
-    let src_dir = project_path.join("src");
-    if !src_dir.exists() {
+    if !project_path.exists() {
         return 0;
     }
 
     let mut total_files = 0u32;
     let mut documented_files = 0u32;
 
-    count_documented_files(&src_dir, &mut total_files, &mut documented_files);
+    count_documented_files(project_path, &mut total_files, &mut documented_files);
 
     if total_files == 0 {
         return 0;
