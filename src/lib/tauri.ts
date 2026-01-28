@@ -47,6 +47,11 @@
  * - getHookStatus - Check if hooks are installed
  * - getEnforcementEvents - List recent enforcement events
  * - getCiSnippets - Generate CI integration templates
+ * - logActivity - Log an activity event for a project
+ * - getRecentActivities - Fetch recent activity events for a project
+ * - getSetting - Retrieve a single setting by key
+ * - saveSetting - Persist a single setting key-value pair
+ * - getAllSettings - Retrieve all persisted settings as a key-value map
  *
  * PATTERNS:
  * - Each function wraps a single Tauri command
@@ -237,4 +242,31 @@ export async function getEnforcementEvents(
 
 export async function getCiSnippets(projectPath: string): Promise<CiSnippet[]> {
   return invoke<CiSnippet[]>("get_ci_snippets", { projectPath });
+}
+
+export async function logActivity(
+  projectId: string,
+  activityType: string,
+  message: string,
+): Promise<{ id: string; projectId: string; activityType: string; message: string; createdAt: string }> {
+  return invoke<{ id: string; projectId: string; activityType: string; message: string; createdAt: string }>("log_activity", { projectId, activityType, message });
+}
+
+export async function getRecentActivities(
+  projectId: string,
+  limit?: number,
+): Promise<{ id: string; projectId: string; activityType: string; message: string; createdAt: string }[]> {
+  return invoke<{ id: string; projectId: string; activityType: string; message: string; createdAt: string }[]>("get_recent_activities", { projectId, limit: limit ?? null });
+}
+
+export async function getSetting(key: string): Promise<string | null> {
+  return invoke<string | null>("get_setting", { key });
+}
+
+export async function saveSetting(key: string, value: string): Promise<void> {
+  return invoke<void>("save_setting", { key, value });
+}
+
+export async function getAllSettings(): Promise<Record<string, string>> {
+  return invoke<Record<string, string>>("get_all_settings");
 }

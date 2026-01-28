@@ -29,6 +29,7 @@
  * - @/components/context/McpOptimizer - MCP server status and recommendations
  * - @/components/enforcement/GitHookSetup - Git hook installation and status
  * - @/components/enforcement/CISetup - CI integration templates
+ * - @/components/settings/SettingsView - User settings and app info panel
  * - @/hooks/useHealth - Health score data and refresh action
  * - @/hooks/useModules - Module scanning and generation actions
  * - @/hooks/useSkills - Skills CRUD and pattern detection actions
@@ -36,6 +37,7 @@
  * - @/hooks/useContextHealth - Context health and MCP monitoring actions
  * - @/hooks/useEnforcement - Enforcement hook/CI status and actions
  * - @/stores/projectStore - Active project for display name
+ * - @/lib/tauri (getRecentActivities) - Fetch real activity events from backend
  *
  * EXPORTS:
  * - MainPanel - Content area component
@@ -49,6 +51,7 @@
  * - "ralph" section renders command center, prompt analyzer, and loop monitor
  * - "context" section renders health monitor, token breakdown, and MCP optimizer
  * - "enforcement" section renders git hook setup and CI integration templates
+ * - "settings" section renders SettingsView for preferences and app info
  * - Other sections show a placeholder message
  * - useHealth().refresh() is called in useEffect when dashboard is active
  * - useSkills().loadSkills() and detectProjectPatterns() are called in useEffect when skills is active
@@ -56,7 +59,7 @@
  * CLAUDE NOTES:
  * - The dashboard layout uses a 2-column grid for HealthScore and QuickWins
  * - ContextRotAlert is placed at the top of the dashboard and returns null for "low" risk
- * - RecentActivity is rendered full-width below the grid
+ * - RecentActivity is rendered full-width below the grid with real data from getRecentActivities
  * - The Editor component manages its own state via useClaudeMd hook
  * - SkillsView manages selectedSkill and editing state locally
  * - SkillsView uses a 2-column grid (SkillsList left, SkillEditor right) with PatternDetector below
@@ -70,6 +73,8 @@ import { HealthScore } from "@/components/dashboard/HealthScore";
 import { QuickWins } from "@/components/dashboard/QuickWins";
 import { ContextRotAlert } from "@/components/dashboard/ContextRotAlert";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
+import type { Activity } from "@/components/dashboard/RecentActivity";
+import { getRecentActivities } from "@/lib/tauri";
 import { Editor } from "@/components/claude-md/Editor";
 import { FileTree } from "@/components/modules/FileTree";
 import { DocStatus } from "@/components/modules/DocStatus";
@@ -94,6 +99,7 @@ import { useContextHealth } from "@/hooks/useContextHealth";
 import { GitHookSetup } from "@/components/enforcement/GitHookSetup";
 import { CISetup } from "@/components/enforcement/CISetup";
 import { useEnforcement } from "@/hooks/useEnforcement";
+import { SettingsView } from "@/components/settings/SettingsView";
 import type { Skill } from "@/types/skill";
 
 interface MainPanelProps {
@@ -102,10 +108,28 @@ interface MainPanelProps {
 
 function DashboardView() {
   const { score, components, quickWins, contextRotRisk, refresh } = useHealth();
+  const activeProject = useProjectStore((s) => s.activeProject);
+  const [activities, setActivities] = useState<Activity[]>([]);
 
   useEffect(() => {
     refresh();
-  }, [refresh]);
+
+    if (activeProject) {
+      getRecentActivities(activeProject.id)
+        .then((items) => {
+          setActivities(
+            items.map((item) => ({
+              type: item.activityType,
+              message: item.message,
+              timestamp: item.createdAt,
+            })),
+          );
+        })
+        .catch(() => {
+          setActivities([]);
+        });
+    }
+  }, [refresh, activeProject]);
 
   return (
     <div className="space-y-6">
@@ -116,7 +140,7 @@ function DashboardView() {
         <QuickWins quickWins={quickWins} />
       </div>
 
-      <RecentActivity />
+      <RecentActivity activities={activities} />
     </div>
   );
 }
@@ -508,6 +532,8 @@ function renderSection(section: string) {
       return <ContextView />;
     case "enforcement":
       return <EnforcementView />;
+    case "settings":
+      return <SettingsView />;
     default:
       return (
         <div className="flex h-full items-center justify-center text-neutral-500">

@@ -15,6 +15,8 @@
 //! - ralph - RALPH loop commands
 //! - context - Context health commands
 //! - enforcement - Git hooks and CI commands
+//! - settings - User settings persistence
+//! - activity - Activity feed logging and retrieval
 //!
 //! PATTERNS:
 //! - Each submodule contains #[tauri::command] functions
@@ -33,3 +35,5 @@ pub mod skills;
 pub mod ralph;
 pub mod context;
 pub mod enforcement;
+pub mod settings;
+pub mod activity;

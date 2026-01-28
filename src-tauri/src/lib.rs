@@ -11,7 +11,7 @@
 //! - tauri::Manager - Trait for app.manage() state injection
 //! - tauri_plugin_opener - System URL/file opener
 //! - tauri_plugin_dialog - Native file/folder dialogs
-//! - commands - IPC command handlers (onboarding, project, claude_md, modules, freshness, skills, ralph, context, enforcement)
+//! - commands - IPC command handlers (onboarding, project, claude_md, modules, freshness, skills, ralph, context, enforcement, settings)
 //! - core - Business logic modules (scanner, generator, health, analyzer, freshness)
 //! - models - Data structures
 //! - db - Database layer and AppState
@@ -39,6 +39,7 @@ use std::sync::Mutex;
 
 use tauri::Manager;
 
+use commands::activity::{get_recent_activities, log_activity};
 use commands::claude_md::{generate_claude_md, get_health_score, read_claude_md, write_claude_md};
 use commands::context::{create_checkpoint, get_context_health, get_mcp_status, list_checkpoints};
 use commands::freshness::{check_freshness, get_stale_files};
@@ -51,6 +52,7 @@ use commands::ralph::{
 use commands::enforcement::{
     get_ci_snippets, get_enforcement_events, get_hook_status, install_git_hooks,
 };
+use commands::settings::{get_all_settings, get_setting, save_setting};
 use commands::skills::{
     create_skill, delete_skill, detect_patterns, increment_skill_usage, list_skills, update_skill,
 };
@@ -101,6 +103,11 @@ pub fn run() {
             get_hook_status,
             get_enforcement_events,
             get_ci_snippets,
+            get_setting,
+            save_setting,
+            get_all_settings,
+            log_activity,
+            get_recent_activities,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

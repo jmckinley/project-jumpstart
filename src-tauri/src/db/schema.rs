@@ -19,7 +19,8 @@
 //!
 //! CLAUDE NOTES:
 //! - Tables: projects, module_docs, freshness_history (Phase 5), skills, patterns,
-//!   ralph_loops (Phase 7), checkpoints (Phase 8), enforcement_events (Phase 9), settings
+//!   ralph_loops (Phase 7), checkpoints (Phase 8), enforcement_events (Phase 9), settings,
+//!   activities (Phase 10)
 //! - freshness_history stores per-file freshness snapshots for trend analysis
 //! - ralph_loops tracks RALPH loop execution with status (idle/running/paused/completed/failed)
 //! - See spec Part 6.2 for full table definitions
@@ -129,6 +130,15 @@ pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
         CREATE TABLE IF NOT EXISTS settings (
             key             TEXT PRIMARY KEY,
             value           TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS activities (
+            id              TEXT PRIMARY KEY,
+            project_id      TEXT NOT NULL,
+            activity_type   TEXT NOT NULL DEFAULT 'info',
+            message         TEXT NOT NULL DEFAULT '',
+            created_at      TEXT NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(id)
         );
         ",
     )?;
