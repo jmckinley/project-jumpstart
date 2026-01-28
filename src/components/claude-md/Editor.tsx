@@ -21,7 +21,8 @@
  * - Calls loadContent() on mount via useEffect to fetch current CLAUDE.md
  * - Maintains local draft state so the textarea is a controlled component
  * - Syncs local draft from hook content when content loads or changes externally
- * - "Generate" button only appears when no CLAUDE.md exists (exists === false)
+ * - "Generate from Template" button is always visible and prominent
+ * - Shows confirmation dialog when generating would replace existing content
  * - Suggestions onApply appends the template snippet to the draft
  *
  * CLAUDE NOTES:
@@ -30,6 +31,7 @@
  * - generate() returns content but does NOT auto-save; user must click Save
  * - Loading spinner overlays the entire editor when loading is true
  * - Error banner appears at the top of the editor when error is non-null
+ * - Confirmation dialog prevents accidental overwrites of existing content
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -52,6 +54,8 @@ export function Editor() {
 
   const [draft, setDraft] = useState("");
   const [dirty, setDirty] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   // Load content on mount
   useEffect(() => {
@@ -77,13 +81,32 @@ export function Editor() {
     setDirty(false);
   }, [draft, saveContent]);
 
-  const handleGenerate = useCallback(async () => {
-    const generated = await generate();
-    if (generated !== null) {
-      setDraft(generated);
-      setDirty(true);
+  const handleGenerateClick = useCallback(() => {
+    // If content exists, show confirmation first
+    if (exists && draft.trim().length > 0) {
+      setShowConfirm(true);
+    } else {
+      handleGenerateConfirmed();
+    }
+  }, [exists, draft]);
+
+  const handleGenerateConfirmed = useCallback(async () => {
+    setShowConfirm(false);
+    setGenerating(true);
+    try {
+      const generated = await generate();
+      if (generated !== null) {
+        setDraft(generated);
+        setDirty(true);
+      }
+    } finally {
+      setGenerating(false);
     }
   }, [generate]);
+
+  const handleCancelGenerate = useCallback(() => {
+    setShowConfirm(false);
+  }, []);
 
   const handleApplySuggestion = useCallback((template: string) => {
     setDraft((prev) => prev + template);
@@ -110,15 +133,16 @@ export function Editor() {
             ~{draftTokenEstimate.toLocaleString()} tokens
           </span>
 
-          {!exists && !loading && (
-            <button
-              onClick={handleGenerate}
-              disabled={loading}
-              className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Generate
-            </button>
-          )}
+          <button
+            onClick={handleGenerateClick}
+            disabled={loading || generating}
+            className="flex items-center gap-1.5 rounded-md border border-emerald-700 bg-emerald-900/30 px-3 py-1 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-900/50 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {generating ? "Generating..." : "Generate from Template"}
+          </button>
 
           <button
             onClick={handleSave}
@@ -129,6 +153,34 @@ export function Editor() {
           </button>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      {showConfirm && (
+        <div className="border-b border-amber-900 bg-amber-950/50 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-amber-300">Replace existing content?</p>
+              <p className="text-xs text-amber-400/70">
+                This will replace your current CLAUDE.md with a fresh template based on your project settings.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleCancelGenerate}
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleGenerateConfirmed}
+                className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-500"
+              >
+                Replace & Generate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error Banner */}
       {error && (
