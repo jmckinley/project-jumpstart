@@ -125,20 +125,18 @@ export function CommandCenter({
       </div>
 
       {/* Example Prompts */}
-      {!prompt && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-neutral-500">Try an example:</span>
-          {EXAMPLE_PROMPTS.map((example) => (
-            <button
-              key={example.label}
-              onClick={() => handleUseExample(example.prompt)}
-              className="rounded-full bg-neutral-800 px-3 py-1 text-xs text-neutral-300 transition-colors hover:bg-neutral-700 hover:text-neutral-100"
-            >
-              {example.label}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-neutral-500">Examples:</span>
+        {EXAMPLE_PROMPTS.map((example) => (
+          <button
+            key={example.label}
+            onClick={() => handleUseExample(example.prompt)}
+            className="rounded-full bg-neutral-800 px-3 py-1 text-xs text-neutral-300 transition-colors hover:bg-neutral-700 hover:text-neutral-100"
+          >
+            {example.label}
+          </button>
+        ))}
+      </div>
 
       {/* Prompt Input */}
       <div>
