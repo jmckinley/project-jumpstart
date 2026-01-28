@@ -26,6 +26,7 @@
 //! - Phase 5 added freshness scoring via core::freshness engine
 //! - Phase 6 added skills scoring: min(skill_count * 3, 15)
 //! - Phase 9 added enforcement scoring: 5 for hooks + 5 for CI config
+//! - Phase 10 added context scoring: based on persistent token usage vs 200k budget
 //! - Freshness score is the average freshness of all documented files, scaled to weight
 //! - Context rot risk: low (>=70), medium (40-69), high (<40)
 
@@ -51,8 +52,7 @@ pub fn calculate_health(project_path: &str, skill_count: u32) -> HealthScore {
     let module_docs_score = calculate_module_docs_score(path);
     let freshness_score = calculate_freshness_score(project_path);
     let skills_score = calculate_skills_score(skill_count);
-    // Context score will be fully implemented with live session data
-    let context_score: u32 = 0;
+    let context_score = calculate_context_score(path);
     let enforcement_score = enforcement::calculate_enforcement_score(project_path);
 
     let total = claude_md_score + module_docs_score + freshness_score + skills_score
@@ -72,6 +72,7 @@ pub fn calculate_health(project_path: &str, skill_count: u32) -> HealthScore {
         module_docs_score,
         freshness_score,
         skills_score,
+        context_score,
         enforcement_score,
     );
 
@@ -170,6 +171,121 @@ fn calculate_freshness_score(project_path: &str) -> u32 {
     raw_score.min(WEIGHT_FRESHNESS)
 }
 
+/// Score the context efficiency component (0-10 points).
+/// Estimates persistent token usage (CLAUDE.md + doc headers + MCP configs) against the
+/// 200k context budget. Lower usage means more headroom for conversations.
+/// Scoring: <25% usage → 10pts, 25-50% → 8pts, 50-75% → 5pts, >75% → 2pts.
+fn calculate_context_score(project_path: &Path) -> u32 {
+    const CONTEXT_BUDGET: u32 = 200_000;
+
+    if !project_path.exists() {
+        return 0;
+    }
+
+    let mut persistent_tokens: u32 = 0;
+
+    // CLAUDE.md tokens
+    let claude_md = project_path.join("CLAUDE.md");
+    if claude_md.exists() {
+        if let Ok(content) = std::fs::read_to_string(&claude_md) {
+            persistent_tokens += estimate_tokens(&content);
+        }
+    }
+
+    // Doc header tokens from src/
+    let src_dir = project_path.join("src");
+    if src_dir.exists() {
+        persistent_tokens += estimate_dir_header_tokens(&src_dir);
+    }
+
+    // MCP config tokens
+    let mcp_json = project_path.join(".mcp.json");
+    if mcp_json.exists() {
+        if let Ok(content) = std::fs::read_to_string(&mcp_json) {
+            persistent_tokens += estimate_tokens(&content);
+            // Add overhead for tool schemas injected per server
+            let server_count = count_mcp_servers(&content);
+            persistent_tokens += server_count * 400;
+        }
+    }
+
+    let claude_mcp = project_path.join(".claude").join("mcp_servers.json");
+    if claude_mcp.exists() {
+        if let Ok(content) = std::fs::read_to_string(&claude_mcp) {
+            persistent_tokens += estimate_tokens(&content);
+            let server_count = count_mcp_servers(&content);
+            persistent_tokens += server_count * 400;
+        }
+    }
+
+    let usage_pct = persistent_tokens as f64 / CONTEXT_BUDGET as f64 * 100.0;
+
+    let score = if usage_pct < 25.0 {
+        WEIGHT_CONTEXT // 10
+    } else if usage_pct < 50.0 {
+        8
+    } else if usage_pct < 75.0 {
+        5
+    } else {
+        2
+    };
+
+    score.min(WEIGHT_CONTEXT)
+}
+
+/// Recursively estimate tokens from documentation headers in source files.
+fn estimate_dir_header_tokens(dir: &Path) -> u32 {
+    let mut tokens: u32 = 0;
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return 0,
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+
+        if name.starts_with('.')
+            || name == "node_modules"
+            || name == "target"
+            || name == "dist"
+            || name == "build"
+        {
+            continue;
+        }
+
+        if path.is_dir() {
+            tokens += estimate_dir_header_tokens(&path);
+        } else if is_documentable_file(&name) {
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                let header: String = content.lines().take(30).collect::<Vec<_>>().join("\n");
+                if header.contains("@module") || header.contains("@description") {
+                    tokens += estimate_tokens(&header);
+                }
+            }
+        }
+    }
+
+    tokens
+}
+
+/// Count MCP server entries in a JSON config string.
+fn count_mcp_servers(content: &str) -> u32 {
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(content) {
+        let mcp_obj = value
+            .get("mcpServers")
+            .or_else(|| value.get("mcp_servers"))
+            .or(Some(&value));
+
+        if let Some(obj) = mcp_obj {
+            if let Some(map) = obj.as_object() {
+                return map.len() as u32;
+            }
+        }
+    }
+    0
+}
+
 /// Score the module documentation component (0-25 points).
 /// Checks for source files with documentation headers.
 fn calculate_module_docs_score(project_path: &Path) -> u32 {
@@ -248,6 +364,7 @@ fn generate_quick_wins(
     module_docs: u32,
     freshness: u32,
     skills: u32,
+    context: u32,
     enforcement: u32,
 ) -> Vec<QuickWin> {
     let mut wins = Vec::new();
@@ -319,6 +436,15 @@ fn generate_quick_wins(
         });
     }
 
+    if context < WEIGHT_CONTEXT {
+        wins.push(QuickWin {
+            title: "Reduce context overhead".to_string(),
+            description: "Persistent context (docs, MCP configs) is consuming a large share of the context window. Consider trimming verbose documentation or removing unused MCP servers.".to_string(),
+            impact: WEIGHT_CONTEXT - context,
+            effort: "medium".to_string(),
+        });
+    }
+
     if enforcement == 0 {
         wins.push(QuickWin {
             title: "Set up enforcement".to_string(),
@@ -369,6 +495,20 @@ mod tests {
         assert_eq!(score.total, 0);
         assert_eq!(score.context_rot_risk, "high");
         assert!(!score.quick_wins.is_empty());
+    }
+
+    #[test]
+    fn test_context_score_nonexistent_path() {
+        let score = calculate_context_score(Path::new("/nonexistent/path/12345"));
+        assert_eq!(score, 0);
+    }
+
+    #[test]
+    fn test_count_mcp_servers() {
+        let config = r#"{"mcpServers":{"fs":{"command":"npx"},"db":{"command":"python"}}}"#;
+        assert_eq!(count_mcp_servers(config), 2);
+        assert_eq!(count_mcp_servers("{}"), 0);
+        assert_eq!(count_mcp_servers("invalid"), 0);
     }
 
     #[test]

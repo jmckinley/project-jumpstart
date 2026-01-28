@@ -7,10 +7,10 @@
  * - Shared utility functions used across components
  *
  * DEPENDENCIES:
- * - (clsx and tailwind-merge will be added with shadcn/ui)
+ * - (none — pure utility functions)
  *
  * EXPORTS:
- * - cn - Tailwind class name merger (placeholder until shadcn setup)
+ * - cn - Tailwind class name merger for conditional className composition
  *
  * PATTERNS:
  * - Import cn from '@/lib/utils' for all className composition
@@ -18,7 +18,7 @@
  *
  * CLAUDE NOTES:
  * - This file is required by shadcn/ui components
- * - cn() will be updated when shadcn/ui is installed
+ * - cn() filters falsy values and joins remaining class strings
  */
 
 export function cn(...classes: (string | undefined | false)[]) {

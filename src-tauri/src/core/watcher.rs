@@ -1,5 +1,5 @@
 //! @module core/watcher
-//! @description File system watcher for project change monitoring
+//! @description File system watcher for project change monitoring (deferred)
 //!
 //! PURPOSE:
 //! - Watch project directories for file changes
@@ -7,18 +7,17 @@
 //! - Emit structured change events to the frontend
 //!
 //! DEPENDENCIES:
-//! - notify - Cross-platform file watching
-//! - tokio - Async runtime for debouncing
+//! - notify - Cross-platform file watching (not yet added)
 //!
 //! EXPORTS:
-//! - (none yet - will be added in Phase 2)
+//! - (none — implementation deferred to a future release)
 //!
 //! PATTERNS:
-//! - Uses notify-rs for cross-platform watching
-//! - Debounces events within a configurable window
+//! - Will use notify-rs for cross-platform watching
+//! - Will debounce events within a configurable window
 //! - Special handling for CLAUDE.md and .claude/ directory changes
 //!
 //! CLAUDE NOTES:
-//! - File events: Created, Modified, Deleted, Renamed
-//! - CLAUDE.md changes trigger immediate freshness recalculation
-//! - See spec Part 5.2 for full watcher specification
+//! - This module is intentionally empty; file watching is deferred post-v1.0
+//! - Freshness checks are currently on-demand via commands/freshness.rs
+//! - See spec Part 5.2 for the full watcher specification when implementing
