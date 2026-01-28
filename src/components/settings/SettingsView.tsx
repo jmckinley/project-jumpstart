@@ -246,8 +246,7 @@ export function SettingsView() {
                   }}
                 />
                 <Button
-                  variant="default"
-                  className="bg-blue-600 text-white hover:bg-blue-700"
+                  variant="primary"
                   onClick={handleSaveApiKey}
                   disabled={apiKeySaving || !apiKeyInput.trim()}
                 >

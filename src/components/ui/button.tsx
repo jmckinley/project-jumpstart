@@ -4,7 +4,7 @@
  *
  * PURPOSE:
  * - Provide a consistent button primitive across the application
- * - Support visual variants: default, outline, ghost
+ * - Support visual variants: default, primary, destructive, outline, ghost
  * - Support sizes: default, sm
  *
  * DEPENDENCIES:
@@ -33,6 +33,10 @@ function cn(...classes: (string | undefined | false | null)[]) {
 const variantClasses: Record<string, string> = {
   default:
     "bg-neutral-100 text-neutral-900 hover:bg-neutral-200",
+  primary:
+    "bg-blue-600 text-white hover:bg-blue-500",
+  destructive:
+    "bg-red-600 text-white hover:bg-red-500",
   outline:
     "border border-neutral-700 bg-transparent text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100",
   ghost:
@@ -45,7 +49,7 @@ const sizeClasses: Record<string, string> = {
 };
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "outline" | "ghost";
+  variant?: "default" | "primary" | "destructive" | "outline" | "ghost";
   size?: "default" | "sm";
 }
 
