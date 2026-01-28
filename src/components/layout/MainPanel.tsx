@@ -296,7 +296,7 @@ function SkillsView() {
 
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const [editing, setEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"my-skills" | "library">("my-skills");
+  const [activeTab, setActiveTab] = useState<"my-skills" | "library">("library");
 
   useEffect(() => {
     loadSkills();
@@ -483,7 +483,7 @@ function AgentsView() {
 
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [editing, setEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"my-agents" | "library">("my-agents");
+  const [activeTab, setActiveTab] = useState<"my-agents" | "library">("library");
 
   useEffect(() => {
     loadAgents();
