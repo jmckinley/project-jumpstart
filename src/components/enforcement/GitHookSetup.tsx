@@ -85,9 +85,9 @@ export function GitHookSetup({ hookStatus, loading, installing, onInstall, onRef
         <div className="flex items-center gap-3">
           <Button
             size="sm"
+            variant="destructive"
             onClick={() => onInstall("block")}
             disabled={installing || loading}
-            className="bg-red-600 text-white hover:bg-red-700"
           >
             {installing ? "Installing..." : "Install (Block Mode)"}
           </Button>
