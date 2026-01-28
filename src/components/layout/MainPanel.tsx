@@ -21,9 +21,13 @@
  * - @/components/skills/SkillsList - Skills list with tab filtering
  * - @/components/skills/SkillEditor - Skill create/edit form
  * - @/components/skills/PatternDetector - Pattern detection results
+ * - @/components/ralph/CommandCenter - RALPH prompt input and controls
+ * - @/components/ralph/PromptAnalyzer - Prompt quality analysis display
+ * - @/components/ralph/LoopMonitor - Active and recent loop monitor
  * - @/hooks/useHealth - Health score data and refresh action
  * - @/hooks/useModules - Module scanning and generation actions
  * - @/hooks/useSkills - Skills CRUD and pattern detection actions
+ * - @/hooks/useRalph - RALPH loop and prompt analysis actions
  * - @/stores/projectStore - Active project for display name
  *
  * EXPORTS:
@@ -35,6 +39,7 @@
  * - "claude-md" section renders the Editor component
  * - "modules" section renders file tree, doc preview, and batch generator
  * - "skills" section renders skills list, skill editor, and pattern detector
+ * - "ralph" section renders command center, prompt analyzer, and loop monitor
  * - Other sections show a placeholder message
  * - useHealth().refresh() is called in useEffect when dashboard is active
  * - useSkills().loadSkills() and detectProjectPatterns() are called in useEffect when skills is active
@@ -46,6 +51,7 @@
  * - The Editor component manages its own state via useClaudeMd hook
  * - SkillsView manages selectedSkill and editing state locally
  * - SkillsView uses a 2-column grid (SkillsList left, SkillEditor right) with PatternDetector below
+ * - RalphView uses a 2-column grid (CommandCenter left, PromptAnalyzer right) with LoopMonitor below
  * - Section components will be added as they are built in later phases
  */
 
@@ -67,6 +73,10 @@ import { SkillsList } from "@/components/skills/SkillsList";
 import { SkillEditor } from "@/components/skills/SkillEditor";
 import { PatternDetector } from "@/components/skills/PatternDetector";
 import type { ModuleDoc } from "@/types/module";
+import { CommandCenter } from "@/components/ralph/CommandCenter";
+import { PromptAnalyzer } from "@/components/ralph/PromptAnalyzer";
+import { LoopMonitor } from "@/components/ralph/LoopMonitor";
+import { useRalph } from "@/hooks/useRalph";
 import type { Skill } from "@/types/skill";
 
 interface MainPanelProps {
@@ -326,6 +336,58 @@ function SkillsView() {
   );
 }
 
+function RalphView() {
+  const {
+    loops,
+    analysis,
+    analyzing,
+    loading,
+    error,
+    analyzePrompt,
+    startLoop,
+    pauseLoop,
+    loadLoops,
+    clearAnalysis,
+  } = useRalph();
+
+  useEffect(() => {
+    loadLoops();
+  }, [loadLoops]);
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className="rounded-md border border-red-900 bg-red-950/50 px-4 py-3 text-sm text-red-400">
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <CommandCenter
+            analysis={analysis}
+            analyzing={analyzing}
+            loading={loading}
+            onAnalyze={analyzePrompt}
+            onStartLoop={startLoop}
+            onClearAnalysis={clearAnalysis}
+          />
+        </div>
+        <div className="lg:col-span-1">
+          <PromptAnalyzer analysis={analysis} />
+        </div>
+      </div>
+
+      <LoopMonitor
+        loops={loops}
+        loading={loading}
+        onPause={pauseLoop}
+        onRefresh={loadLoops}
+      />
+    </div>
+  );
+}
+
 function renderSection(section: string) {
   switch (section) {
     case "dashboard":
@@ -336,6 +398,8 @@ function renderSection(section: string) {
       return <ModulesView />;
     case "skills":
       return <SkillsView />;
+    case "ralph":
+      return <RalphView />;
     default:
       return (
         <div className="flex h-full items-center justify-center text-neutral-500">

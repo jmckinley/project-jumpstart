@@ -10,6 +10,7 @@
 //! - project - Project, HealthScore, DetectionResult types
 //! - module_doc - ModuleStatus, ModuleDoc types
 //! - skill - Skill, Pattern types
+//! - ralph - RalphLoop, PromptAnalysis, PromptCriterion types
 //!
 //! PATTERNS:
 //! - All models derive Serialize, Deserialize for Tauri IPC
@@ -23,3 +24,4 @@
 pub mod project;
 pub mod module_doc;
 pub mod skill;
+pub mod ralph;

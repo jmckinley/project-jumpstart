@@ -35,6 +35,10 @@
  * - deleteSkill - Delete a skill
  * - detectPatterns - Detect project patterns for skill suggestions
  * - incrementSkillUsage - Bump usage count for a skill
+ * - analyzeRalphPrompt - Analyze prompt quality for RALPH loops
+ * - startRalphLoop - Start a new RALPH loop
+ * - pauseRalphLoop - Pause an active RALPH loop
+ * - listRalphLoops - List loops for a project
  *
  * PATTERNS:
  * - Each function wraps a single Tauri command
@@ -53,6 +57,7 @@ import type { ClaudeMdInfo, DetectionResult, Project, ProjectSetup } from "@/typ
 import type { HealthScore } from "@/types/health";
 import type { ModuleStatus, ModuleDoc } from "@/types/module";
 import type { Skill, Pattern } from "@/types/skill";
+import type { RalphLoop, PromptAnalysis } from "@/types/ralph";
 
 export async function scanProject(path: string): Promise<DetectionResult> {
   return invoke<DetectionResult>("scan_project", { path });
@@ -162,4 +167,25 @@ export async function detectPatterns(projectPath: string): Promise<Pattern[]> {
 
 export async function incrementSkillUsage(id: string): Promise<number> {
   return invoke<number>("increment_skill_usage", { id });
+}
+
+export async function analyzeRalphPrompt(prompt: string): Promise<PromptAnalysis> {
+  return invoke<PromptAnalysis>("analyze_ralph_prompt", { prompt });
+}
+
+export async function startRalphLoop(
+  projectId: string,
+  prompt: string,
+  enhancedPrompt: string | null,
+  qualityScore: number,
+): Promise<RalphLoop> {
+  return invoke<RalphLoop>("start_ralph_loop", { projectId, prompt, enhancedPrompt, qualityScore });
+}
+
+export async function pauseRalphLoop(loopId: string): Promise<void> {
+  return invoke<void>("pause_ralph_loop", { loopId });
+}
+
+export async function listRalphLoops(projectId: string): Promise<RalphLoop[]> {
+  return invoke<RalphLoop[]>("list_ralph_loops", { projectId });
 }

@@ -11,6 +11,7 @@
  * - All types from module.ts
  * - All types from health.ts
  * - All types from skill.ts
+ * - All types from ralph.ts
  *
  * PATTERNS:
  * - Import from '@/types' for commonly used types
@@ -37,3 +38,4 @@ export type {
   TokenBreakdown,
 } from "./health";
 export type { Skill, Pattern } from "./skill";
+export type { RalphLoop, PromptAnalysis, PromptCriterion } from "./ralph";

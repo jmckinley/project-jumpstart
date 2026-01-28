@@ -11,7 +11,7 @@
 //! - tauri::Manager - Trait for app.manage() state injection
 //! - tauri_plugin_opener - System URL/file opener
 //! - tauri_plugin_dialog - Native file/folder dialogs
-//! - commands - IPC command handlers (onboarding, project, claude_md, modules, freshness, skills)
+//! - commands - IPC command handlers (onboarding, project, claude_md, modules, freshness, skills, ralph)
 //! - core - Business logic modules (scanner, generator, health, analyzer, freshness)
 //! - models - Data structures
 //! - db - Database layer and AppState
@@ -44,6 +44,9 @@ use commands::freshness::{check_freshness, get_stale_files};
 use commands::modules::{apply_module_doc, batch_generate_docs, generate_module_doc, scan_modules};
 use commands::onboarding::{save_project, scan_project};
 use commands::project::{get_project, list_projects, remove_project};
+use commands::ralph::{
+    analyze_ralph_prompt, list_ralph_loops, pause_ralph_loop, start_ralph_loop,
+};
 use commands::skills::{
     create_skill, delete_skill, detect_patterns, increment_skill_usage, list_skills, update_skill,
 };
@@ -82,6 +85,10 @@ pub fn run() {
             delete_skill,
             detect_patterns,
             increment_skill_usage,
+            analyze_ralph_prompt,
+            start_ralph_loop,
+            pause_ralph_loop,
+            list_ralph_loops,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
