@@ -250,7 +250,7 @@ export function AgentEditor({ agent, onSave, onCancel }: AgentEditorProps) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Unit Test Writer"
-            className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 placeholder-neutral-600 outline-none transition-colors focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+            className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 placeholder-neutral-400 outline-none transition-colors focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
           />
         </div>
 
@@ -265,7 +265,7 @@ export function AgentEditor({ agent, onSave, onCancel }: AgentEditorProps) {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Brief description of what this agent does"
-            className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 placeholder-neutral-600 outline-none transition-colors focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+            className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 placeholder-neutral-400 outline-none transition-colors focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
           />
         </div>
 
@@ -315,7 +315,7 @@ export function AgentEditor({ agent, onSave, onCancel }: AgentEditorProps) {
             onChange={(e) => setInstructions(e.target.value)}
             placeholder="Write agent instructions in markdown..."
             rows={10}
-            className="w-full resize-y rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 font-mono text-sm text-neutral-200 placeholder-neutral-600 outline-none transition-colors focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+            className="w-full resize-y rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 font-mono text-sm text-neutral-200 placeholder-neutral-400 outline-none transition-colors focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
           />
         </div>
 
@@ -515,7 +515,7 @@ export function AgentEditor({ agent, onSave, onCancel }: AgentEditorProps) {
                   onChange={(e) => setTriggerInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTriggerPattern())}
                   placeholder="Type pattern and press Enter"
-                  className="flex-1 rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 placeholder-neutral-600 outline-none focus:border-blue-600"
+                  className="flex-1 rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 placeholder-neutral-400 outline-none focus:border-blue-600"
                 />
                 <button
                   onClick={addTriggerPattern}

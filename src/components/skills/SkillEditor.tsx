@@ -93,7 +93,7 @@ export function SkillEditor({ skill, onSave, onCancel }: SkillEditorProps) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. React Component Generator"
-            className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 placeholder-neutral-600 outline-none transition-colors focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+            className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 placeholder-neutral-400 outline-none transition-colors focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
           />
         </div>
 
@@ -111,7 +111,7 @@ export function SkillEditor({ skill, onSave, onCancel }: SkillEditorProps) {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Brief description of what this skill does"
-            className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 placeholder-neutral-600 outline-none transition-colors focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+            className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 placeholder-neutral-400 outline-none transition-colors focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
           />
         </div>
 
@@ -129,7 +129,7 @@ export function SkillEditor({ skill, onSave, onCancel }: SkillEditorProps) {
             onChange={(e) => setContent(e.target.value)}
             placeholder="Write your skill instructions in markdown..."
             rows={12}
-            className="w-full resize-y rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 font-mono text-sm text-neutral-200 placeholder-neutral-600 outline-none transition-colors focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+            className="w-full resize-y rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 font-mono text-sm text-neutral-200 placeholder-neutral-400 outline-none transition-colors focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
           />
         </div>
 

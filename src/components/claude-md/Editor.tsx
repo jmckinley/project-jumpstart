@@ -179,7 +179,7 @@ export function Editor() {
               onChange={handleDraftChange}
               placeholder="# Project Name\n\nDescribe your project here..."
               spellCheck={false}
-              className="flex-1 resize-none bg-neutral-950 p-4 font-mono text-sm leading-relaxed text-neutral-100 placeholder-neutral-600 focus:outline-none"
+              className="flex-1 resize-none bg-neutral-950 p-4 font-mono text-sm leading-relaxed text-neutral-100 placeholder-neutral-400 focus:outline-none"
             />
           </div>
 

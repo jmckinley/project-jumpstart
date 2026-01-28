@@ -171,14 +171,14 @@ export function HealthMonitor({
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="Checkpoint label (e.g., 'Before refactor')"
-              className="w-full rounded border border-neutral-600 bg-neutral-900 px-2 py-1.5 text-sm text-neutral-200 placeholder-neutral-600 focus:border-blue-600 focus:outline-none"
+              className="w-full rounded border border-neutral-600 bg-neutral-900 px-2 py-1.5 text-sm text-neutral-200 placeholder-neutral-400 focus:border-blue-600 focus:outline-none"
             />
             <input
               type="text"
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
               placeholder="Brief summary (optional)"
-              className="w-full rounded border border-neutral-600 bg-neutral-900 px-2 py-1.5 text-sm text-neutral-200 placeholder-neutral-600 focus:border-blue-600 focus:outline-none"
+              className="w-full rounded border border-neutral-600 bg-neutral-900 px-2 py-1.5 text-sm text-neutral-200 placeholder-neutral-400 focus:border-blue-600 focus:outline-none"
             />
             <button
               onClick={handleCreate}
