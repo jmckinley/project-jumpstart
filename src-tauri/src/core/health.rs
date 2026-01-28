@@ -25,9 +25,11 @@
 //! - Weights: CLAUDE.md=25, Modules=25, Freshness=15, Skills=15, Context=10, Enforcement=10
 //! - Phase 5 added freshness scoring via core::freshness engine
 //! - Phase 6 added skills scoring: min(skill_count * 3, 15)
+//! - Phase 9 added enforcement scoring: 5 for hooks + 5 for CI config
 //! - Freshness score is the average freshness of all documented files, scaled to weight
 //! - Context rot risk: low (>=70), medium (40-69), high (<40)
 
+use crate::commands::enforcement;
 use crate::core::freshness;
 use crate::models::project::{HealthComponents, HealthScore, QuickWin};
 use std::path::Path;
@@ -49,9 +51,9 @@ pub fn calculate_health(project_path: &str, skill_count: u32) -> HealthScore {
     let module_docs_score = calculate_module_docs_score(path);
     let freshness_score = calculate_freshness_score(project_path);
     let skills_score = calculate_skills_score(skill_count);
-    // These will be properly implemented in later phases
+    // Context score will be fully implemented with live session data
     let context_score: u32 = 0;
-    let enforcement_score: u32 = 0;
+    let enforcement_score = enforcement::calculate_enforcement_score(project_path);
 
     let total = claude_md_score + module_docs_score + freshness_score + skills_score
         + context_score + enforcement_score;
@@ -246,7 +248,7 @@ fn generate_quick_wins(
     module_docs: u32,
     freshness: u32,
     skills: u32,
-    _enforcement: u32,
+    enforcement: u32,
 ) -> Vec<QuickWin> {
     let mut wins = Vec::new();
 
@@ -313,6 +315,22 @@ fn generate_quick_wins(
             title: "Add more skills".to_string(),
             description: "More skills mean better pattern coverage. Use the pattern detector to find opportunities.".to_string(),
             impact: WEIGHT_SKILLS - skills,
+            effort: "low".to_string(),
+        });
+    }
+
+    if enforcement == 0 {
+        wins.push(QuickWin {
+            title: "Set up enforcement".to_string(),
+            description: "Install git hooks and CI checks to prevent undocumented code from being committed.".to_string(),
+            impact: WEIGHT_ENFORCEMENT,
+            effort: "low".to_string(),
+        });
+    } else if enforcement < WEIGHT_ENFORCEMENT {
+        wins.push(QuickWin {
+            title: "Add CI documentation checks".to_string(),
+            description: "Add CI integration to enforce documentation on pull requests.".to_string(),
+            impact: WEIGHT_ENFORCEMENT - enforcement,
             effort: "low".to_string(),
         });
     }

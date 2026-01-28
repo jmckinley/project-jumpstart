@@ -12,6 +12,7 @@
 //! - skill - Skill, Pattern types
 //! - ralph - RalphLoop, PromptAnalysis, PromptCriterion types
 //! - context - ContextHealth, TokenBreakdown, McpServerStatus, Checkpoint types
+//! - enforcement - EnforcementEvent, HookStatus, CiSnippet types
 //!
 //! PATTERNS:
 //! - All models derive Serialize, Deserialize for Tauri IPC
@@ -27,3 +28,4 @@ pub mod module_doc;
 pub mod skill;
 pub mod ralph;
 pub mod context;
+pub mod enforcement;

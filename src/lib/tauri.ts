@@ -43,6 +43,10 @@
  * - getMcpStatus - Get MCP server status and recommendations
  * - createCheckpoint - Create a context checkpoint
  * - listCheckpoints - List checkpoints for a project
+ * - installGitHooks - Install pre-commit hook for doc enforcement
+ * - getHookStatus - Check if hooks are installed
+ * - getEnforcementEvents - List recent enforcement events
+ * - getCiSnippets - Generate CI integration templates
  *
  * PATTERNS:
  * - Each function wraps a single Tauri command
@@ -62,6 +66,7 @@ import type { HealthScore, ContextHealth, McpServerStatus, Checkpoint } from "@/
 import type { ModuleStatus, ModuleDoc } from "@/types/module";
 import type { Skill, Pattern } from "@/types/skill";
 import type { RalphLoop, PromptAnalysis } from "@/types/ralph";
+import type { EnforcementEvent, HookStatus, CiSnippet } from "@/types/enforcement";
 
 export async function scanProject(path: string): Promise<DetectionResult> {
   return invoke<DetectionResult>("scan_project", { path });
@@ -213,4 +218,23 @@ export async function createCheckpoint(
 
 export async function listCheckpoints(projectId: string): Promise<Checkpoint[]> {
   return invoke<Checkpoint[]>("list_checkpoints", { projectId });
+}
+
+export async function installGitHooks(projectPath: string, mode: string): Promise<HookStatus> {
+  return invoke<HookStatus>("install_git_hooks", { projectPath, mode });
+}
+
+export async function getHookStatus(projectPath: string): Promise<HookStatus> {
+  return invoke<HookStatus>("get_hook_status", { projectPath });
+}
+
+export async function getEnforcementEvents(
+  projectId: string,
+  limit?: number,
+): Promise<EnforcementEvent[]> {
+  return invoke<EnforcementEvent[]>("get_enforcement_events", { projectId, limit: limit ?? null });
+}
+
+export async function getCiSnippets(projectPath: string): Promise<CiSnippet[]> {
+  return invoke<CiSnippet[]>("get_ci_snippets", { projectPath });
 }

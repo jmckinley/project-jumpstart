@@ -27,11 +27,14 @@
  * - @/components/context/HealthMonitor - Context health overview with checkpoints
  * - @/components/context/TokenBreakdown - Token usage breakdown chart
  * - @/components/context/McpOptimizer - MCP server status and recommendations
+ * - @/components/enforcement/GitHookSetup - Git hook installation and status
+ * - @/components/enforcement/CISetup - CI integration templates
  * - @/hooks/useHealth - Health score data and refresh action
  * - @/hooks/useModules - Module scanning and generation actions
  * - @/hooks/useSkills - Skills CRUD and pattern detection actions
  * - @/hooks/useRalph - RALPH loop and prompt analysis actions
  * - @/hooks/useContextHealth - Context health and MCP monitoring actions
+ * - @/hooks/useEnforcement - Enforcement hook/CI status and actions
  * - @/stores/projectStore - Active project for display name
  *
  * EXPORTS:
@@ -45,6 +48,7 @@
  * - "skills" section renders skills list, skill editor, and pattern detector
  * - "ralph" section renders command center, prompt analyzer, and loop monitor
  * - "context" section renders health monitor, token breakdown, and MCP optimizer
+ * - "enforcement" section renders git hook setup and CI integration templates
  * - Other sections show a placeholder message
  * - useHealth().refresh() is called in useEffect when dashboard is active
  * - useSkills().loadSkills() and detectProjectPatterns() are called in useEffect when skills is active
@@ -87,6 +91,9 @@ import { HealthMonitor } from "@/components/context/HealthMonitor";
 import { TokenBreakdownChart } from "@/components/context/TokenBreakdown";
 import { McpOptimizer } from "@/components/context/McpOptimizer";
 import { useContextHealth } from "@/hooks/useContextHealth";
+import { GitHookSetup } from "@/components/enforcement/GitHookSetup";
+import { CISetup } from "@/components/enforcement/CISetup";
+import { useEnforcement } from "@/hooks/useEnforcement";
 import type { Skill } from "@/types/skill";
 
 interface MainPanelProps {
@@ -442,6 +449,49 @@ function ContextView() {
   );
 }
 
+function EnforcementView() {
+  const {
+    hookStatus,
+    snippets,
+    loading,
+    installing,
+    error,
+    refreshHookStatus,
+    installHooks,
+    loadSnippets,
+  } = useEnforcement();
+
+  useEffect(() => {
+    refreshHookStatus();
+    loadSnippets();
+  }, [refreshHookStatus, loadSnippets]);
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className="rounded-md border border-red-900 bg-red-950/50 px-4 py-3 text-sm text-red-400">
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <GitHookSetup
+          hookStatus={hookStatus}
+          loading={loading}
+          installing={installing}
+          onInstall={installHooks}
+          onRefresh={refreshHookStatus}
+        />
+        <CISetup
+          snippets={snippets}
+          loading={loading}
+          onLoadSnippets={loadSnippets}
+        />
+      </div>
+    </div>
+  );
+}
+
 function renderSection(section: string) {
   switch (section) {
     case "dashboard":
@@ -456,6 +506,8 @@ function renderSection(section: string) {
       return <RalphView />;
     case "context":
       return <ContextView />;
+    case "enforcement":
+      return <EnforcementView />;
     default:
       return (
         <div className="flex h-full items-center justify-center text-neutral-500">
