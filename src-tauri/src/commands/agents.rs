@@ -306,11 +306,16 @@ pub fn count_agents_sync(db: &rusqlite::Connection, project_id: &str) -> Result<
 }
 
 /// Enhance an agent's instructions using AI.
+/// Optionally includes project context for more relevant enhancement.
 #[tauri::command]
 pub async fn enhance_agent_instructions(
     name: String,
     description: String,
     instructions: String,
+    tier: Option<String>,
+    category: Option<String>,
+    project_language: Option<String>,
+    project_framework: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     // Get API key from settings
@@ -319,26 +324,157 @@ pub async fn enhance_agent_instructions(
         crate::core::ai::get_api_key(&db)?
     };
 
-    let system = "You are an expert at writing Claude Code agents. \
-        An agent is a specialized configuration that tells Claude how to \
-        perform a specific category of task (testing, debugging, etc.). \
-        Agents should be clear, actionable, and include: a brief description \
-        of when to use the agent, step-by-step instructions, templates or \
-        examples if applicable, and important rules to follow. \
-        Format as markdown. Keep the enhanced version concise but thorough. \
-        Return ONLY the enhanced agent instructions as markdown, no preamble.";
+    let tier_str = tier.as_deref().unwrap_or("standard");
+    let category_str = category.as_deref().unwrap_or("general");
 
-    let prompt = format!(
-        "Enhance this Claude Code agent:\n\n\
-         Name: {}\nDescription: {}\n\nCurrent instructions:\n{}\n\n\
-         Improve the instructions to be more useful, add structure \
-         (## Purpose, ## Instructions, ## Template, ## Rules), \
-         fill in any gaps, and make the instructions clearer and more actionable. \
-         Keep the same intent and scope.",
-        name, description, instructions
+    let system = format!(
+        "You are an expert at writing Claude Code agents. An agent is a specialized \
+        configuration that tells Claude how to perform a specific category of task. \
+        \
+        AGENT TIERS: \
+        - Basic: Simple, focused agents for routine tasks. 50-150 words. Single clear purpose. \
+        - Standard: Balanced agents with workflow steps. 150-300 words. Include decision points. \
+        - Advanced: Comprehensive agents with tool integration. 300-500 words. Include error handling. \
+        \
+        CATEGORY-SPECIFIC GUIDANCE: \
+        - testing: Include test file naming, assertion patterns, coverage expectations \
+        - debugging: Include diagnostic steps, logging patterns, common pitfalls \
+        - documentation: Include format templates, update triggers, examples \
+        - refactoring: Include safety checks, scope boundaries, rollback steps \
+        - code-review: Include checklist items, severity levels, feedback format \
+        - api-design: Include REST/GraphQL patterns, versioning, error responses \
+        \
+        REQUIRED STRUCTURE: \
+        ## Purpose \
+        One paragraph explaining when to use this agent and what it accomplishes. \
+        \
+        ## Instructions \
+        Numbered steps the AI should follow. Be specific about tools, commands, and decisions. \
+        \
+        ## Template (if applicable) \
+        Code template or output format the agent should produce. \
+        \
+        ## Rules \
+        - Critical constraints (what NOT to do) \
+        - Quality requirements \
+        - Edge case handling \
+        \
+        EXAMPLE OF A WELL-STRUCTURED {} TIER AGENT: \
+        {} \
+        \
+        Return ONLY the enhanced markdown, no preamble or explanation.",
+        tier_str.to_uppercase(),
+        get_tier_example(tier_str, category_str)
     );
 
-    crate::core::ai::call_claude(&state.http_client, &api_key, system, &prompt).await
+    // Build context-aware prompt
+    let mut prompt = format!(
+        "Enhance this Claude Code agent:\n\n\
+         **Name:** {}\n\
+         **Description:** {}\n\
+         **Tier:** {}\n\
+         **Category:** {}\n",
+        name, description, tier_str, category_str
+    );
+
+    // Add project context if available
+    if let Some(ref lang) = project_language {
+        prompt.push_str(&format!("**Project Language:** {}\n", lang));
+    }
+    if let Some(ref fw) = project_framework {
+        prompt.push_str(&format!("**Project Framework:** {}\n", fw));
+    }
+
+    prompt.push_str(&format!(
+        "\n**Current Instructions:**\n{}\n\n\
+         Enhance these instructions following the {} tier guidelines. \
+         Make them specific to {} projects if applicable. \
+         Add missing sections, improve clarity, and ensure actionability.",
+        instructions,
+        tier_str,
+        project_language.as_deref().unwrap_or("any")
+    ));
+
+    crate::core::ai::call_claude(&state.http_client, &api_key, &system, &prompt).await
+}
+
+/// Get a tier-appropriate example for agent enhancement.
+fn get_tier_example(tier: &str, category: &str) -> &'static str {
+    match (tier, category) {
+        ("basic", _) => r#"
+## Purpose
+Run unit tests for modified files and report failures clearly.
+
+## Instructions
+1. Identify files changed in the current session
+2. Run the project's test command (npm test, cargo test, pytest)
+3. Report failures with file:line references
+4. Suggest fixes for common failure patterns
+
+## Rules
+- Only run tests, never modify test files
+- Stop after 3 consecutive failures"#,
+
+        ("advanced", "testing") => r#"
+## Purpose
+Comprehensive test coverage agent that writes, runs, and validates tests for new code.
+
+## Instructions
+1. Analyze the target function/component for testable behaviors
+2. Identify edge cases: null inputs, empty arrays, boundary values, error conditions
+3. Generate test file following project conventions (*.test.ts, *_test.py, etc.)
+4. Write tests using the project's testing framework (detect from package.json/Cargo.toml)
+5. Run tests and iterate on failures up to 3 times
+6. Calculate coverage delta and report uncovered paths
+
+## Template
+```typescript
+describe('[ComponentName]', () => {
+  it('should [expected behavior] when [condition]', () => {
+    // Arrange
+    // Act
+    // Assert
+  });
+});
+```
+
+## Rules
+- Match existing test style in the project
+- Include at least one error/edge case test
+- Never mock external services unless explicitly requested
+- Add JSDoc/docstring explaining test intent"#,
+
+        ("advanced", _) => r#"
+## Purpose
+[Clear statement of what this agent does and when to use it]
+
+## Instructions
+1. [First step with specific tool or command]
+2. [Decision point: if X then Y, else Z]
+3. [Validation step]
+4. [Output or handoff step]
+
+## Template
+[Code or output template if applicable]
+
+## Rules
+- [Critical constraint]
+- [Quality requirement]
+- [Error handling approach]"#,
+
+        _ => r#"
+## Purpose
+[One paragraph explaining the agent's role]
+
+## Instructions
+1. [Step 1]
+2. [Step 2]
+3. [Step 3]
+
+## Rules
+- [Key constraint]
+- [Quality standard]"#,
+    }
 }
 
 // ---------------------------------------------------------------------------

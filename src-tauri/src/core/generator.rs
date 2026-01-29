@@ -49,7 +49,7 @@ pub fn generate_claude_md_content(project: &Project) -> String {
 }
 
 /// Generate a CLAUDE.md file using the Claude API for richer, AI-powered content.
-/// Falls back gracefully if the API call fails.
+/// Includes actual file content sampling for better context understanding.
 pub async fn generate_claude_md_with_ai(
     project: &Project,
     client: &reqwest::Client,
@@ -59,34 +59,75 @@ pub async fn generate_claude_md_with_ai(
         persistent developer documentation that helps AI coding assistants understand the project \
         even after context compaction. The information in CLAUDE.md survives long coding sessions. \
         \
+        YOU HAVE BEEN GIVEN ACTUAL FILE CONTENTS - USE THEM! \
+        The user has provided real code samples from their project. Analyze them to: \
+        - Identify the ACTUAL libraries used (look at imports) \
+        - Understand the REAL data models and their fields \
+        - See the ACTUAL patterns and conventions used \
+        - Find the REAL API endpoints, auth flows, state management \
+        \
         CRITICAL REQUIREMENTS FOR QUALITY: \
-        - The Overview must explain WHAT the app does, WHO uses it, and the CORE USER FLOW (not just 'a web app') \
-        - Architectural Decisions must have SPECIFIC rationale, never placeholders like '[Add rationale]' \
-        - Infer patterns and conventions from the actual source files provided \
-        - Identify key integrations (auth providers, APIs, external services) from imports and code \
+        - The Overview must explain WHAT the app does based on the code you see, not generic descriptions \
+        - If you see a Task type with fields, describe what tasks are in this app \
+        - If you see Supabase imports, explain the Supabase integration specifically \
+        - If you see useState/useEffect, note it's React with hooks \
+        - Architectural Decisions must reference ACTUAL code patterns you observed \
         \
-        Include these sections in order: \
-        1. Overview - Project name as H1, then 2-3 sentences explaining: what the app does, \
-           who the target users are, and the core user flow (e.g., 'Users sign up, create projects, invite collaborators') \
-        2. Tech Stack - Markdown table with Component | Technology | Notes columns. \
-           Include ALL detected technologies from the source files (auth libraries, data fetching, etc.) \
-        3. Project Structure - Code block showing directory tree with brief inline comments for key directories \
-        4. Commands - Code block with common dev commands. IMPORTANT: Check package.json/Cargo.toml to use the correct package manager (npm/pnpm/yarn) \
-        5. Module Documentation Format - Show the exact format for file headers with @module, \
-           @description, PURPOSE, DEPENDENCIES, EXPORTS, PATTERNS, CLAUDE NOTES sections \
-        6. Code Patterns - Bullet points of coding conventions INFERRED from the actual code (naming, file organization, state management approach) \
-        7. Current Focus - Status: Active development, Working on: [current feature based on recent files], Next up: [logical next step] \
-        8. Architectural Decisions - At least 3 decisions with SPECIFIC rationale based on what you see in the code. \
-           Example: 'Supabase for auth: Provides row-level security, real-time subscriptions, and integrates with their PostgreSQL hosting' \
-        9. Key Integrations - List external services, APIs, auth providers detected in the code with brief notes on how they're used \
-        10. CLAUDE NOTES - Important reminders organized by topic. Include SPECIFIC gotchas inferred from the code \
-            (e.g., 'Tasks have two states: pending-tasks from email sync, tasks that are user-confirmed') \
+        SECTIONS TO INCLUDE (in order): \
         \
-        BE SPECIFIC. Avoid generic descriptions. If you see SWR imports, mention SWR. If you see Supabase auth, explain the auth flow. \
-        The goal is that an AI reading this file can immediately understand the project without reading source code.";
+        1. **Overview** (H1 project name, then 2-3 sentences) \
+           - WHAT: Specific app purpose derived from the code (e.g., 'Task management app for students tracking assignments') \
+           - WHO: Target users inferred from features \
+           - FLOW: Core user journey based on components/routes you see \
+        \
+        2. **Tech Stack** (table: Component | Technology | Notes) \
+           - List EVERY library you see imported in the code samples \
+           - Include auth, data fetching, state management, UI libraries \
+           - Add notes about how each is used based on the code \
+        \
+        3. **Project Structure** (code block with tree) \
+           - Show the directory structure from the file list \
+           - Add inline comments explaining what each directory contains \
+        \
+        4. **Key Types & Data Models** \
+           - Extract interfaces/types from the code samples \
+           - Explain what each model represents \
+           - Note relationships between models \
+        \
+        5. **Commands** (code block) \
+           - Use the CORRECT package manager from package.json (npm/pnpm/yarn) \
+           - Include all scripts from package.json if provided \
+        \
+        6. **Module Documentation Format** \
+           - Show the exact @module header format for this language \
+        \
+        7. **Code Patterns** (bullet points) \
+           - INFERRED from actual code: naming conventions, file organization \
+           - State management approach (Zustand/Redux/Context) \
+           - Data fetching patterns (SWR/React Query/fetch) \
+           - Component patterns (functional, hooks usage) \
+        \
+        8. **Key Integrations** \
+           - List external services FOUND in imports (Supabase, Firebase, Stripe, etc.) \
+           - Explain how each is used based on the code \
+        \
+        9. **Architectural Decisions** (at least 3) \
+           - Each must reference SPECIFIC code you saw \
+           - Include WHY based on the patterns (infer rationale) \
+        \
+        10. **CLAUDE NOTES** (organized by topic) \
+           - Specific gotchas from the code \
+           - Non-obvious relationships \
+           - Important constants or magic values \
+        \
+        BE EXTREMELY SPECIFIC. Reference actual type names, function names, and patterns from the provided code.";
 
-    // Collect source file listing (top 100 files)
-    let file_list = collect_source_files(&project.path, 100);
+    // Collect source file listing (top 50 files)
+    let file_list = collect_source_files(&project.path, 50);
+
+    // Sample key file contents for better AI understanding
+    let file_samples = collect_key_file_contents(&project.path);
+
     let file_section = if file_list.is_empty() {
         "No source files detected yet.".to_string()
     } else {
@@ -95,6 +136,7 @@ pub async fn generate_claude_md_with_ai(
 
     let prompt = format!(
         "Generate a CLAUDE.md file for this project:\n\n\
+        ## Project Metadata\n\
         - Name: {}\n\
         - Path: {}\n\
         - Language: {}\n\
@@ -104,8 +146,14 @@ pub async fn generate_claude_md_with_ai(
         - Styling: {}\n\
         - Type: {}\n\
         - Description: {}\n\n\
-        Source files:\n{}\n\n\
-        Generate a complete CLAUDE.md with all sections. Output ONLY the markdown content, no extra explanation.",
+        ## File List\n\
+        ```\n{}\n```\n\n\
+        ## Key File Contents\n\
+        Below are actual contents of key files. USE THESE to understand the project:\n\n\
+        {}\n\n\
+        Generate a complete, SPECIFIC CLAUDE.md based on the actual code above. \
+        Reference real type names, imports, and patterns you see. \
+        Output ONLY the markdown content, no preamble.",
         project.name,
         project.path,
         project.language,
@@ -116,9 +164,147 @@ pub async fn generate_claude_md_with_ai(
         project.project_type,
         if project.description.is_empty() { "Not provided" } else { &project.description },
         file_section,
+        file_samples,
     );
 
     ai::call_claude(client, api_key, system, &prompt).await
+}
+
+/// Collect contents of key files for AI context.
+/// Samples: package.json, main types, main component, config files.
+fn collect_key_file_contents(project_path: &str) -> String {
+    let mut samples = Vec::new();
+    let root = std::path::Path::new(project_path);
+
+    // Priority files to sample (in order)
+    let priority_files = [
+        // Config files (full content, usually small)
+        ("package.json", 3000),
+        ("Cargo.toml", 2000),
+        ("pyproject.toml", 2000),
+        ("go.mod", 1000),
+        // Type definitions (critical for understanding data models)
+        ("src/types/index.ts", 2500),
+        ("src/types.ts", 2500),
+        ("types.ts", 2500),
+        ("src/types/index.d.ts", 2500),
+        ("types/index.ts", 2500),
+        // Main app/entry files
+        ("src/App.tsx", 2000),
+        ("src/App.ts", 2000),
+        ("src/main.tsx", 1500),
+        ("src/index.tsx", 1500),
+        ("app/page.tsx", 2000),
+        ("app/layout.tsx", 1500),
+        ("src/lib.rs", 2000),
+        ("src/main.rs", 2000),
+        ("main.py", 2000),
+        ("app.py", 2000),
+        ("main.go", 2000),
+        // Database/schema files
+        ("prisma/schema.prisma", 2000),
+        ("src/db/schema.ts", 2000),
+        ("drizzle/schema.ts", 2000),
+        // State management
+        ("src/stores/index.ts", 1500),
+        ("src/store/index.ts", 1500),
+        ("src/context/index.tsx", 1500),
+        // API routes
+        ("src/api/index.ts", 1500),
+        ("app/api/route.ts", 1500),
+        ("src/routes/index.ts", 1500),
+    ];
+
+    let mut total_chars = 0;
+    const MAX_TOTAL_CHARS: usize = 15000; // Leave room for system prompt
+
+    for (rel_path, max_chars) in priority_files.iter() {
+        if total_chars >= MAX_TOTAL_CHARS {
+            break;
+        }
+
+        let full_path = root.join(rel_path);
+        if full_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&full_path) {
+                let truncated: String = content.chars().take(*max_chars).collect();
+                let was_truncated = content.len() > *max_chars;
+
+                samples.push(format!(
+                    "### {}{}\n```\n{}\n```\n",
+                    rel_path,
+                    if was_truncated { " (truncated)" } else { "" },
+                    truncated
+                ));
+
+                total_chars += truncated.len();
+            }
+        }
+    }
+
+    // If we haven't found enough, scan for type files
+    if samples.len() < 3 {
+        if let Ok(types_found) = find_type_files(root) {
+            for type_file in types_found.iter().take(3) {
+                if total_chars >= MAX_TOTAL_CHARS {
+                    break;
+                }
+                if let Ok(content) = std::fs::read_to_string(type_file) {
+                    let truncated: String = content.chars().take(2000).collect();
+                    let rel = type_file.strip_prefix(root).unwrap_or(type_file);
+                    samples.push(format!(
+                        "### {} (types)\n```\n{}\n```\n",
+                        rel.display(),
+                        truncated
+                    ));
+                    total_chars += truncated.len();
+                }
+            }
+        }
+    }
+
+    if samples.is_empty() {
+        "No key files found to sample.".to_string()
+    } else {
+        samples.join("\n")
+    }
+}
+
+/// Find TypeScript/Rust/Python type definition files.
+fn find_type_files(root: &std::path::Path) -> Result<Vec<std::path::PathBuf>, std::io::Error> {
+    let mut results = Vec::new();
+
+    fn walk_for_types(dir: &std::path::Path, results: &mut Vec<std::path::PathBuf>, depth: usize) {
+        if depth > 4 || results.len() >= 5 {
+            return;
+        }
+
+        let skip_dirs = ["node_modules", "target", ".git", "dist", "build", ".next"];
+
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let name = entry.file_name().to_string_lossy().to_string();
+
+                if path.is_dir() && !skip_dirs.contains(&name.as_str()) && !name.starts_with('.') {
+                    walk_for_types(&path, results, depth + 1);
+                } else if path.is_file() {
+                    // Look for type-heavy files
+                    let is_type_file = name.contains("type")
+                        || name.contains("model")
+                        || name.contains("schema")
+                        || name.contains("interface")
+                        || (name.ends_with(".d.ts"));
+
+                    if is_type_file && (name.ends_with(".ts") || name.ends_with(".rs") || name.ends_with(".py")) {
+                        results.push(path);
+                    }
+                }
+            }
+        }
+    }
+
+    walk_for_types(root, &mut results, 0);
+    Ok(results)
 }
 
 /// Collect source file paths from a project directory (relative paths, limited to max_files).

@@ -4,20 +4,22 @@
  *
  * PURPOSE:
  * - Manage RALPH loop state with loading/error tracking
- * - Analyze prompt quality before starting loops
+ * - Analyze prompt quality before starting loops (with optional AI enhancement)
  * - Start and pause RALPH loops
  * - Track loop history for the active project
  *
  * DEPENDENCIES:
- * - @/lib/tauri - analyzeRalphPrompt, startRalphLoop, pauseRalphLoop, listRalphLoops IPC calls
+ * - @/lib/tauri - analyzeRalphPrompt, analyzeRalphPromptWithAi, startRalphLoop, pauseRalphLoop, listRalphLoops IPC calls
  * - @/stores/projectStore - Active project for scoping loops
+ * - @/stores/settingsStore - hasApiKey to determine if AI analysis is available
  * - @/types/ralph - RalphLoop, PromptAnalysis types
  *
  * EXPORTS:
  * - useRalph - Hook returning RALPH state and actions
  *
  * PATTERNS:
- * - Call analyzePrompt() to score prompt quality before starting
+ * - Call analyzePrompt(prompt, useAi) to score prompt quality before starting
+ * - When useAi=true and API key is configured, uses AI for deeper analysis
  * - Call startLoop() to begin a RALPH loop (requires analysis first)
  * - Call pauseLoop() to pause an active loop
  * - Call loadLoops() to refresh loop history
@@ -25,6 +27,7 @@
  *
  * CLAUDE NOTES:
  * - analyzePrompt sets the analysis state for display in PromptAnalyzer
+ * - AI analysis includes project context (language, framework, files) for smarter suggestions
  * - startLoop uses the last analysis result's enhanced prompt if available
  * - Loops are scoped to the active project
  * - clearAnalysis resets the analysis state for fresh prompt entry
@@ -32,11 +35,14 @@
 
 import { useCallback, useState } from "react";
 import { useProjectStore } from "@/stores/projectStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 import {
   analyzeRalphPrompt,
+  analyzeRalphPromptWithAi,
   startRalphLoop,
   pauseRalphLoop,
   listRalphLoops,
+  scanModules,
 } from "@/lib/tauri";
 import type { RalphLoop, PromptAnalysis } from "@/types/ralph";
 
@@ -50,6 +56,7 @@ interface RalphState {
 
 export function useRalph() {
   const activeProject = useProjectStore((s) => s.activeProject);
+  const hasApiKey = useSettingsStore((s) => s.hasApiKey);
 
   const [state, setState] = useState<RalphState>({
     loops: [],
@@ -74,10 +81,38 @@ export function useRalph() {
     }
   }, [activeProject]);
 
-  const analyzePrompt = useCallback(async (prompt: string) => {
+  /**
+   * Analyze prompt quality with optional AI enhancement.
+   * @param prompt - The prompt to analyze
+   * @param useAi - If true and API key is available, uses AI for deeper analysis
+   */
+  const analyzePrompt = useCallback(async (prompt: string, useAi = false) => {
     setState((s) => ({ ...s, analyzing: true, error: null }));
     try {
-      const analysis = await analyzeRalphPrompt(prompt);
+      let analysis: PromptAnalysis;
+
+      if (useAi && hasApiKey && activeProject) {
+        // Get project files for context
+        let projectFiles: string[] = [];
+        try {
+          const modules = await scanModules(activeProject.path);
+          projectFiles = modules.slice(0, 30).map((m) => m.path);
+        } catch {
+          // Ignore file scanning errors, proceed without file context
+        }
+
+        analysis = await analyzeRalphPromptWithAi(
+          prompt,
+          activeProject.name,
+          activeProject.language,
+          activeProject.framework ?? null,
+          projectFiles.length > 0 ? projectFiles : null,
+        );
+      } else {
+        // Use fast heuristic analysis
+        analysis = await analyzeRalphPrompt(prompt);
+      }
+
       setState((s) => ({ ...s, analysis, analyzing: false }));
       return analysis;
     } catch (err) {
@@ -88,7 +123,7 @@ export function useRalph() {
       }));
       return null;
     }
-  }, []);
+  }, [hasApiKey, activeProject]);
 
   const startLoop = useCallback(
     async (prompt: string) => {

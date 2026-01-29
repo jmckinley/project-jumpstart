@@ -35,7 +35,8 @@
  * - deleteSkill - Delete a skill
  * - detectPatterns - Detect project patterns for skill suggestions
  * - incrementSkillUsage - Bump usage count for a skill
- * - analyzeRalphPrompt - Analyze prompt quality for RALPH loops
+ * - analyzeRalphPrompt - Analyze prompt quality for RALPH loops (heuristic)
+ * - analyzeRalphPromptWithAi - AI-powered prompt analysis with project context
  * - startRalphLoop - Start a new RALPH loop
  * - pauseRalphLoop - Pause an active RALPH loop
  * - listRalphLoops - List loops for a project
@@ -188,6 +189,22 @@ export async function incrementSkillUsage(id: string): Promise<number> {
 
 export async function analyzeRalphPrompt(prompt: string): Promise<PromptAnalysis> {
   return invoke<PromptAnalysis>("analyze_ralph_prompt", { prompt });
+}
+
+export async function analyzeRalphPromptWithAi(
+  prompt: string,
+  projectName: string | null,
+  projectLanguage: string | null,
+  projectFramework: string | null,
+  projectFiles: string[] | null,
+): Promise<PromptAnalysis> {
+  return invoke<PromptAnalysis>("analyze_ralph_prompt_with_ai", {
+    prompt,
+    projectName,
+    projectLanguage,
+    projectFramework,
+    projectFiles,
+  });
 }
 
 export async function startRalphLoop(
@@ -346,6 +363,18 @@ export async function enhanceAgentInstructions(
   name: string,
   description: string,
   instructions: string,
+  tier?: string | null,
+  category?: string | null,
+  projectLanguage?: string | null,
+  projectFramework?: string | null,
 ): Promise<string> {
-  return invoke<string>("enhance_agent_instructions", { name, description, instructions });
+  return invoke<string>("enhance_agent_instructions", {
+    name,
+    description,
+    instructions,
+    tier: tier ?? null,
+    category: category ?? null,
+    projectLanguage: projectLanguage ?? null,
+    projectFramework: projectFramework ?? null,
+  });
 }

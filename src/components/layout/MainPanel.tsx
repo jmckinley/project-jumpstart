@@ -14,6 +14,7 @@
  * - @/components/dashboard/QuickWins - Improvement suggestions list
  * - @/components/dashboard/ContextRotAlert - Staleness risk alert banner
  * - @/components/dashboard/RecentActivity - Activity timeline
+ * - @/components/dashboard/RefreshDocsButton - One-click documentation refresh button
  * - @/components/claude-md/Editor - CLAUDE.md editor view
  * - @/components/modules/FileTree - Module file tree with status icons
  * - @/components/modules/DocStatus - Coverage statistics bar
@@ -66,6 +67,8 @@
  * - The dashboard layout uses a 2-column grid for HealthScore and QuickWins
  * - ContextRotAlert is placed at the top of the dashboard and returns null for "low" risk
  * - RecentActivity is rendered full-width below the grid with real data from getRecentActivities
+ * - RefreshDocsButton in dashboard header triggers CLAUDE.md + stale module docs regeneration
+ * - handleRefreshComplete callback refreshes health score and activities after docs refresh
  * - The Editor component manages its own state via useClaudeMd hook
  * - SkillsView manages selectedSkill and editing state locally
  * - SkillsView uses a 2-column grid (SkillsList left, SkillEditor right) with PatternDetector below
@@ -80,6 +83,7 @@ import { HealthScore } from "@/components/dashboard/HealthScore";
 import { QuickWins } from "@/components/dashboard/QuickWins";
 import { ContextRotAlert } from "@/components/dashboard/ContextRotAlert";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
+import { RefreshDocsButton } from "@/components/dashboard/RefreshDocsButton";
 import type { Activity } from "@/components/dashboard/RecentActivity";
 import { getRecentActivities, startFileWatcher, stopFileWatcher } from "@/lib/tauri";
 import { Editor } from "@/components/claude-md/Editor";
@@ -158,8 +162,23 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
     return () => clearInterval(interval);
   }, [refresh, fetchActivities]);
 
+  const handleRefreshComplete = useCallback(() => {
+    refresh();
+    fetchActivities();
+  }, [refresh, fetchActivities]);
+
   return (
     <div className="space-y-6">
+      {/* Dashboard Header with Refresh Button */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium uppercase tracking-wider text-neutral-400">
+          Project Overview
+        </h3>
+        {activeProject && (
+          <RefreshDocsButton onComplete={handleRefreshComplete} />
+        )}
+      </div>
+
       <ContextRotAlert
         risk={contextRotRisk}
         onReview={() => onNavigate?.("modules")}

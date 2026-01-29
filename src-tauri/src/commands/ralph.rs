@@ -6,6 +6,7 @@
 //! - Start and pause RALPH loops with DB persistence
 //! - List loop history for the active project
 //! - Provide auto-enhanced prompts based on quality analysis
+//! - AI-powered prompt enhancement when API key is available
 //!
 //! DEPENDENCIES:
 //! - tauri - Command macro and State
@@ -13,15 +14,18 @@
 //! - models::ralph - RalphLoop, PromptAnalysis, PromptCriterion types
 //! - uuid - Loop ID generation
 //! - chrono - Timestamp handling
+//! - core::ai - Claude API for AI-powered enhancement
 //!
 //! EXPORTS:
-//! - analyze_ralph_prompt - Score prompt quality and generate suggestions
+//! - analyze_ralph_prompt - Score prompt quality and generate suggestions (heuristic)
+//! - analyze_ralph_prompt_with_ai - AI-powered prompt analysis and enhancement
 //! - start_ralph_loop - Create a new RALPH loop record
 //! - pause_ralph_loop - Pause an active loop
 //! - list_ralph_loops - Get loops for a project
 //!
 //! PATTERNS:
-//! - analyze_ralph_prompt evaluates prompt quality before starting a loop
+//! - analyze_ralph_prompt uses fast heuristics for immediate feedback
+//! - analyze_ralph_prompt_with_ai uses Claude for deeper analysis (when API key available)
 //! - start_ralph_loop stores the loop in the DB with "running" status
 //! - pause_ralph_loop transitions "running" to "paused"
 //! - Loop statuses: idle -> running -> paused/completed/failed
@@ -29,12 +33,14 @@
 //! CLAUDE NOTES:
 //! - RALPH = Review, Analyze, List, Plan, Handoff
 //! - Quality score is sum of 4 criteria (clarity, specificity, context, scope), each 0-25
-//! - Auto-enhance prepends structured RALPH instructions to the prompt
+//! - Heuristic analysis is instant; AI analysis takes 2-5 seconds
+//! - AI enhancement provides project-aware suggestions when context is provided
 //! - Safety settings control loop boundaries
 
 use chrono::Utc;
 use tauri::State;
 
+use crate::core::ai;
 use crate::db::{self, AppState};
 use crate::models::ralph::{PromptAnalysis, PromptCriterion, RalphLoop};
 
@@ -77,6 +83,169 @@ pub async fn analyze_ralph_prompt(prompt: String) -> Result<PromptAnalysis, Stri
         suggestions,
         enhanced_prompt,
     })
+}
+
+/// AI-powered prompt analysis and enhancement.
+/// Provides deeper analysis and project-aware suggestions when context is provided.
+/// Falls back to heuristic analysis if API call fails.
+#[tauri::command]
+pub async fn analyze_ralph_prompt_with_ai(
+    prompt: String,
+    project_name: Option<String>,
+    project_language: Option<String>,
+    project_framework: Option<String>,
+    project_files: Option<Vec<String>>,
+    state: State<'_, AppState>,
+) -> Result<PromptAnalysis, String> {
+    // Try to get API key
+    let api_key = {
+        let db = state.db.lock().map_err(|e| format!("DB lock error: {}", e))?;
+        ai::get_api_key(&db).ok()
+    };
+
+    // If no API key, fall back to heuristic analysis
+    let Some(api_key) = api_key else {
+        return analyze_ralph_prompt(prompt).await;
+    };
+
+    let system = r#"You are an expert at analyzing prompts for AI coding assistants. Your job is to:
+1. Score the prompt quality (0-100) based on clarity, specificity, context, and scope
+2. Provide specific, actionable suggestions to improve weak areas
+3. Generate an enhanced version of the prompt that would get better results
+
+SCORING CRITERIA (each 0-25 points):
+
+**Clarity (0-25):** Does the prompt clearly state what needs to be done?
+- 20-25: Clear action verb, specific outcome, well-structured
+- 10-19: Has action but vague about outcome or approach
+- 0-9: Unclear what is being requested
+
+**Specificity (0-25):** Does the prompt reference specific code elements?
+- 20-25: Names files, functions, types, or line numbers
+- 10-19: Mentions general areas but not specific elements
+- 0-9: No code references, too abstract
+
+**Context (0-25):** Does the prompt explain the current state and motivation?
+- 20-25: Explains why the change is needed, current behavior, constraints
+- 10-19: Some context but missing motivation or current state
+- 0-9: No context about why or what exists
+
+**Scope (0-25):** Are boundaries and deliverables defined?
+- 20-25: Clear boundaries (what to change AND what not to change), expected outcome
+- 10-19: Some boundaries but incomplete
+- 0-9: Open-ended, no boundaries
+
+OUTPUT FORMAT (JSON only, no markdown fences):
+{
+  "qualityScore": <0-100>,
+  "criteria": [
+    {"name": "Clarity", "score": <0-25>, "maxScore": 25, "feedback": "<specific feedback>"},
+    {"name": "Specificity", "score": <0-25>, "maxScore": 25, "feedback": "<specific feedback>"},
+    {"name": "Context", "score": <0-25>, "maxScore": 25, "feedback": "<specific feedback>"},
+    {"name": "Scope", "score": <0-25>, "maxScore": 25, "feedback": "<specific feedback>"}
+  ],
+  "suggestions": ["<actionable suggestion 1>", "<actionable suggestion 2>"],
+  "enhancedPrompt": "<the improved version of the prompt with RALPH structure>"
+}
+
+ENHANCED PROMPT REQUIREMENTS:
+- Keep the original intent but add structure
+- Add specific file references if the project context mentions relevant files
+- Include a "Review" step to examine relevant code first
+- Include explicit scope boundaries (what NOT to change)
+- End with verification/handoff step"#;
+
+    // Build context-aware prompt
+    let mut user_prompt = format!("Analyze this prompt for a RALPH coding loop:\n\n```\n{}\n```\n", prompt);
+
+    // Add project context if available
+    if project_name.is_some() || project_language.is_some() || project_framework.is_some() {
+        user_prompt.push_str("\n## Project Context\n");
+        if let Some(ref name) = project_name {
+            user_prompt.push_str(&format!("- Project: {}\n", name));
+        }
+        if let Some(ref lang) = project_language {
+            user_prompt.push_str(&format!("- Language: {}\n", lang));
+        }
+        if let Some(ref fw) = project_framework {
+            user_prompt.push_str(&format!("- Framework: {}\n", fw));
+        }
+    }
+
+    // Add relevant files if provided
+    if let Some(ref files) = project_files {
+        if !files.is_empty() {
+            user_prompt.push_str("\n## Relevant Project Files\n");
+            for file in files.iter().take(20) {
+                user_prompt.push_str(&format!("- {}\n", file));
+            }
+            user_prompt.push_str("\nUse these file paths in your enhanced prompt if relevant.\n");
+        }
+    }
+
+    user_prompt.push_str("\nProvide your analysis as JSON only.");
+
+    // Call Claude API
+    let response = match ai::call_claude(&state.http_client, &api_key, system, &user_prompt).await {
+        Ok(r) => r,
+        Err(_) => {
+            // Fall back to heuristic on API error
+            return analyze_ralph_prompt(prompt).await;
+        }
+    };
+
+    // Parse AI response
+    match serde_json::from_str::<serde_json::Value>(&response) {
+        Ok(val) => {
+            let quality_score = val.get("qualityScore")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(50) as u32;
+
+            let criteria = val.get("criteria")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter().map(|c| PromptCriterion {
+                        name: c.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string(),
+                        score: c.get("score").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+                        max_score: 25,
+                        feedback: c.get("feedback").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    }).collect()
+                })
+                .unwrap_or_else(|| {
+                    // Fallback criteria
+                    vec![
+                        PromptCriterion { name: "Clarity".to_string(), score: quality_score / 4, max_score: 25, feedback: "AI analysis".to_string() },
+                        PromptCriterion { name: "Specificity".to_string(), score: quality_score / 4, max_score: 25, feedback: "AI analysis".to_string() },
+                        PromptCriterion { name: "Context".to_string(), score: quality_score / 4, max_score: 25, feedback: "AI analysis".to_string() },
+                        PromptCriterion { name: "Scope".to_string(), score: quality_score / 4, max_score: 25, feedback: "AI analysis".to_string() },
+                    ]
+                });
+
+            let suggestions = val.get("suggestions")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|s| s.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let enhanced_prompt = val.get("enhancedPrompt")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+
+            Ok(PromptAnalysis {
+                quality_score,
+                criteria,
+                suggestions,
+                enhanced_prompt,
+            })
+        }
+        Err(_) => {
+            // AI returned non-JSON, fall back to heuristic
+            analyze_ralph_prompt(prompt).await
+        }
+    }
 }
 
 /// Start a new RALPH loop for a project.

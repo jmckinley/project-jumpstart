@@ -42,6 +42,7 @@ import type { Agent, AgentTier, AgentCategory, AgentWorkflowStep, AgentTool } fr
 import { AGENT_CATEGORIES } from "@/data/agentCategories";
 import { enhanceAgentInstructions } from "@/lib/tauri";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { useProjectStore } from "@/stores/projectStore";
 
 interface AgentEditorProps {
   agent: Agent | null;
@@ -77,6 +78,7 @@ export function AgentEditor({ agent, onSave, onCancel }: AgentEditorProps) {
   const [enhanceError, setEnhanceError] = useState<string | null>(null);
 
   const hasApiKey = useSettingsStore((s) => s.hasApiKey);
+  const activeProject = useProjectStore((s) => s.activeProject);
 
   // Sync form state when the selected agent changes
   useEffect(() => {
@@ -142,7 +144,15 @@ export function AgentEditor({ agent, onSave, onCancel }: AgentEditorProps) {
     setOriginalContent(instructions);
 
     try {
-      const enhanced = await enhanceAgentInstructions(name, description, instructions);
+      const enhanced = await enhanceAgentInstructions(
+        name,
+        description,
+        instructions,
+        tier,
+        category,
+        activeProject?.language ?? null,
+        activeProject?.framework ?? null,
+      );
       setEnhancedContent(enhanced);
       setInstructions(enhanced);
       setShowingEnhanced(true);

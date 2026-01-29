@@ -47,7 +47,7 @@ use commands::modules::{apply_module_doc, batch_generate_docs, generate_module_d
 use commands::onboarding::{save_project, scan_project};
 use commands::project::{get_project, list_projects, remove_project};
 use commands::ralph::{
-    analyze_ralph_prompt, list_ralph_loops, pause_ralph_loop, start_ralph_loop,
+    analyze_ralph_prompt, analyze_ralph_prompt_with_ai, list_ralph_loops, pause_ralph_loop, start_ralph_loop,
 };
 use commands::enforcement::{
     get_ci_snippets, get_enforcement_events, get_hook_status, install_git_hooks,
@@ -104,6 +104,7 @@ pub fn run() {
             increment_agent_usage,
             enhance_agent_instructions,
             analyze_ralph_prompt,
+            analyze_ralph_prompt_with_ai,
             start_ralph_loop,
             pause_ralph_loop,
             list_ralph_loops,
