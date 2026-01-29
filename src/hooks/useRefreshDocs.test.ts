@@ -43,8 +43,13 @@ const mockProject = {
   id: "test-project-id",
   name: "Test Project",
   path: "/test/project/path",
+  description: "A test project",
+  projectType: "Web App",
   language: "typescript",
   framework: "react",
+  database: null,
+  testing: "Vitest",
+  styling: "Tailwind CSS",
   healthScore: 50,
   createdAt: "2024-01-01T00:00:00Z",
 };

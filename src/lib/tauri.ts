@@ -19,6 +19,7 @@
  * - getProject - Fetch a single project by ID
  * - removeProject - Delete a project record
  * - pickFolder - Open native folder picker dialog
+ * - openUrl - Open a URL in the default browser
  * - readClaudeMd - Read CLAUDE.md file with metadata
  * - writeClaudeMd - Write content to CLAUDE.md file
  * - generateClaudeMd - Generate CLAUDE.md from project template
@@ -69,6 +70,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { openUrl as tauriOpenUrl } from "@tauri-apps/plugin-opener";
 import type { ClaudeMdInfo, DetectionResult, Project, ProjectSetup } from "@/types/project";
 import type { HealthScore, ContextHealth, McpServerStatus, Checkpoint } from "@/types/health";
 import type { ModuleStatus, ModuleDoc } from "@/types/module";
@@ -100,6 +102,10 @@ export async function removeProject(id: string): Promise<void> {
 export async function pickFolder(): Promise<string | null> {
   const result = await open({ directory: true, multiple: false });
   return result as string | null;
+}
+
+export async function openUrl(url: string): Promise<void> {
+  return tauriOpenUrl(url);
 }
 
 export async function readClaudeMd(projectPath: string): Promise<ClaudeMdInfo> {
