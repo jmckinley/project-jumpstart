@@ -22,15 +22,18 @@
  * - Project field values are normalized to TechTag via TECH_TAG_MAP
  * - Scoring: 30 base + 20 per match (cap 60) + 10 specificity bonus
  * - Universal skills always score 75 (recommended, ranked with 2-match skills)
+ * - Language-patterns skills score 85 when matching project language (priority)
+ * - Mobile skills get +15 bonus when language implies mobile (Kotlin→Android, Swift→iOS)
  * - isRecommended = score >= 50
  * - Max 5 skills can be recommended (prevents context bloat)
  * - Sorting: recommended first (descending score), then alphabetical
  *
  * CLAUDE NOTES:
  * - Add new mappings to TECH_TAG_MAP when project options expand
- * - Score outcomes: 0 (no match), 50-60 (1 match), 70-80 (2 matches), 90-100 (3+ matches)
+ * - Score outcomes: 0 (no match), 50-60 (1 match), 70-80 (2 matches), 85 (language pattern), 90-100 (3+ matches)
  * - Specificity bonus rewards focused skills without penalizing comprehensive ones
  * - Match count is primary driver, not match ratio
+ * - Kotlin/Java projects auto-match Android skills; Swift projects auto-match iOS skills
  */
 
 import type { Project } from "@/types/project";
@@ -58,8 +61,10 @@ const TECH_TAG_MAP: Record<string, TechTag> = {
   rust: "rust",
   go: "go",
   java: "java",
+  kotlin: "kotlin",
+  swift: "swift",
 
-  // Frameworks
+  // Web Frameworks
   react: "react",
   "next.js": "nextjs",
   nextjs: "nextjs",
@@ -74,6 +79,15 @@ const TECH_TAG_MAP: Record<string, TechTag> = {
   flask: "flask",
   tauri: "tauri",
   electron: "electron",
+
+  // Mobile Frameworks
+  android: "android",
+  "android sdk": "android",
+  ios: "ios",
+  swiftui: "swiftui",
+  uikit: "ios",
+  "jetpack compose": "android",
+  "compose multiplatform": "kotlin",
 
   // Testing
   vitest: "vitest",
@@ -129,12 +143,36 @@ export function getProjectTags(project: Project | null): TechTag[] {
   return tags;
 }
 
+/** Language tags that map to language-patterns skills */
+const LANGUAGE_TAGS: TechTag[] = [
+  "typescript",
+  "javascript",
+  "python",
+  "rust",
+  "go",
+  "java",
+  "kotlin",
+  "swift",
+];
+
+/** Mobile platform tags */
+const MOBILE_TAGS: TechTag[] = ["android", "ios", "swiftui"];
+
+/** Languages that imply mobile development */
+const MOBILE_LANGUAGE_MAP: Record<string, TechTag[]> = {
+  kotlin: ["android"],
+  java: ["android"],
+  swift: ["ios", "swiftui"],
+};
+
 /**
  * Calculate relevance score for a skill based on project tags.
  * Returns score (0-100), isRecommended flag, and matched tags.
  *
  * Scoring formula:
  * - Universal skills: 75 (always recommended, ranked with 2-match skills)
+ * - Language-patterns skills: 85 when matching project's language (high priority)
+ * - Mobile skills: bonus when project language implies mobile (Kotlin/Java → Android, Swift → iOS)
  * - Others: 30 base + 20 per match (capped at 60) + 10 specificity bonus
  * - Specificity bonus: awarded if ≥50% of skill's tags are matched
  *
@@ -143,6 +181,7 @@ export function getProjectTags(project: Project | null): TechTag[] {
  * - 1 match, low specificity: 50 (borderline recommended)
  * - 1 match, high specificity: 60 (recommended)
  * - 2 matches: 70-80 (highly recommended)
+ * - Language patterns match: 85 (high priority)
  * - 3+ matches: 90-100 (top recommended)
  */
 export function scoreSkillRelevance(
@@ -158,24 +197,59 @@ export function scoreSkillRelevance(
   // Find matching tags
   const matchedTags = skill.tags.filter((tag) => projectTags.includes(tag));
 
+  // Check for implied mobile tags based on language
+  // e.g., Kotlin project should match Android skills even if "android" isn't explicit
+  const impliedMobileTags: TechTag[] = [];
+  for (const tag of projectTags) {
+    const implied = MOBILE_LANGUAGE_MAP[tag];
+    if (implied) {
+      for (const mobileTag of implied) {
+        if (skill.tags.includes(mobileTag) && !matchedTags.includes(mobileTag)) {
+          impliedMobileTags.push(mobileTag);
+        }
+      }
+    }
+  }
+
+  // Combine explicit and implied matches
+  const allMatchedTags = [...matchedTags, ...impliedMobileTags];
+
   // No matches = not relevant
-  if (matchedTags.length === 0) {
+  if (allMatchedTags.length === 0) {
     return { score: 0, isRecommended: false, matchedTags: [] };
   }
 
+  // Language-patterns skills get priority when matching project language
+  const isLanguagePatternSkill = skill.category === "language-patterns";
+  const matchesProjectLanguage = skill.tags.some(
+    (tag) => LANGUAGE_TAGS.includes(tag) && projectTags.includes(tag),
+  );
+
+  if (isLanguagePatternSkill && matchesProjectLanguage) {
+    // Language patterns always score 85 - above universal, ensures they're recommended
+    return { score: 85, isRecommended: true, matchedTags: allMatchedTags };
+  }
+
+  // Mobile skills get a bonus when implied by language
+  const isMobileSkill = skill.tags.some((tag) => MOBILE_TAGS.includes(tag));
+  const hasMobileImplication = impliedMobileTags.length > 0;
+
   // Base score + match bonus (20 per match, capped at 60 for 3+ matches)
-  const matchBonus = Math.min(matchedTags.length * 20, 60);
+  const matchBonus = Math.min(allMatchedTags.length * 20, 60);
 
   // Specificity bonus: +10 if skill is focused (≥50% of its tags matched)
-  const matchRatio = matchedTags.length / skill.tags.length;
+  const matchRatio = allMatchedTags.length / skill.tags.length;
   const specificityBonus = matchRatio >= 0.5 ? 10 : 0;
 
-  const score = 30 + matchBonus + specificityBonus;
+  // Mobile implication bonus: +15 for mobile skills when language implies mobile
+  const mobileBonus = isMobileSkill && hasMobileImplication ? 15 : 0;
+
+  const score = 30 + matchBonus + specificityBonus + mobileBonus;
 
   return {
     score: Math.min(score, 100),
     isRecommended: score >= 50,
-    matchedTags,
+    matchedTags: allMatchedTags,
   };
 }
 

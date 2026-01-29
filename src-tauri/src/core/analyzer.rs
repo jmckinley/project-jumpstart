@@ -27,15 +27,19 @@
 //! PATTERNS:
 //! - Uses pattern-based detection (regex-like string matching), not tree-sitter AST
 //! - Skips node_modules, target, dist, build, .git, __pycache__ directories
-//! - Recognizes .ts, .tsx, .js, .jsx, .rs, .py, .go extensions
+//! - Recognizes .ts, .tsx, .js, .jsx, .rs, .py, .go, .java, .kt, .swift extensions
 //! - Doc status: "current" (fresh), "outdated" (stale docs), "missing" (no header)
 //! - Phase 5 freshness detection is integrated via core::freshness
 //! - AI generation truncates file content to ~8k chars to stay within prompt limits
 //!
 //! CLAUDE NOTES:
-//! - TypeScript doc headers use /** ... */ with @module/@description
+//! - TypeScript/JS doc headers use /** ... */ with @module/@description (JSDoc)
 //! - Rust doc headers use //! with @module/@description
 //! - Python doc headers use triple-quote docstrings with @module/@description
+//! - Go doc headers use // with @module/@description
+//! - Java doc headers use /** ... */ with @module/@description (Javadoc)
+//! - Kotlin doc headers use /** ... */ with @module/@description (KDoc)
+//! - Swift doc headers use /// with @module/@description (Swift markup)
 //! - The header_area is the first 40 lines of a file
 //! - Exports detection is approximate — pattern-based, not tree-sitter
 //! - walk_for_modules delegates to freshness::check_file_freshness for accurate status
@@ -63,7 +67,7 @@ const IGNORE_DIRS: &[&str] = &[
 
 /// Extensions that should have documentation headers.
 const DOC_EXTENSIONS: &[&str] = &[
-    ".ts", ".tsx", ".js", ".jsx", ".rs", ".py", ".go",
+    ".ts", ".tsx", ".js", ".jsx", ".rs", ".py", ".go", ".java", ".kt", ".swift",
 ];
 
 /// Files to skip even if they have a documentable extension.
@@ -595,6 +599,148 @@ pub fn detect_exports(content: &str, ext: &str) -> Vec<String> {
                 }
             }
         }
+        "java" => {
+            for line in content.lines() {
+                let trimmed = line.trim();
+
+                // public class ClassName
+                if trimmed.contains("class ") && trimmed.starts_with("public ") {
+                    if let Some(name) = extract_word_after(trimmed, "class ") {
+                        exports.push(name);
+                    }
+                }
+                // public interface InterfaceName
+                else if trimmed.contains("interface ") && trimmed.starts_with("public ") {
+                    if let Some(name) = extract_word_after(trimmed, "interface ") {
+                        exports.push(name);
+                    }
+                }
+                // public enum EnumName
+                else if trimmed.contains("enum ") && trimmed.starts_with("public ") {
+                    if let Some(name) = extract_word_after(trimmed, "enum ") {
+                        exports.push(name);
+                    }
+                }
+                // public method declarations
+                else if trimmed.starts_with("public ") && trimmed.contains("(") && !trimmed.contains("class ") {
+                    // Extract method name before (
+                    let without_public = trimmed.trim_start_matches("public ");
+                    let without_modifiers = without_public
+                        .trim_start_matches("static ")
+                        .trim_start_matches("final ")
+                        .trim_start_matches("abstract ")
+                        .trim_start_matches("synchronized ");
+                    // Skip return type to get method name
+                    if let Some(paren_pos) = without_modifiers.find('(') {
+                        let before_paren = &without_modifiers[..paren_pos];
+                        if let Some(name) = before_paren.split_whitespace().last() {
+                            if !name.is_empty() {
+                                exports.push(name.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "kt" => {
+            for line in content.lines() {
+                let trimmed = line.trim();
+
+                // fun functionName(
+                if trimmed.starts_with("fun ") || trimmed.contains(" fun ") {
+                    let after = if trimmed.starts_with("fun ") {
+                        trimmed.trim_start_matches("fun ")
+                    } else if let Some(pos) = trimmed.find(" fun ") {
+                        &trimmed[pos + 5..]
+                    } else {
+                        continue;
+                    };
+                    if let Some(paren_pos) = after.find('(') {
+                        let name = after[..paren_pos].trim();
+                        // Skip extension functions with receiver type
+                        if !name.contains('.') && !name.is_empty() {
+                            exports.push(name.to_string());
+                        }
+                    }
+                }
+                // class ClassName
+                else if trimmed.starts_with("class ") || trimmed.contains(" class ") {
+                    if let Some(name) = extract_word_after(trimmed, "class ") {
+                        let name = name.trim_end_matches('(').trim_end_matches(':');
+                        exports.push(name.to_string());
+                    }
+                }
+                // data class DataClassName
+                else if trimmed.contains("data class ") {
+                    if let Some(name) = extract_word_after(trimmed, "data class ") {
+                        let name = name.trim_end_matches('(');
+                        exports.push(name.to_string());
+                    }
+                }
+                // object ObjectName
+                else if trimmed.starts_with("object ") {
+                    if let Some(name) = extract_word_after(trimmed, "object ") {
+                        exports.push(name);
+                    }
+                }
+                // interface InterfaceName
+                else if trimmed.starts_with("interface ") || trimmed.contains(" interface ") {
+                    if let Some(name) = extract_word_after(trimmed, "interface ") {
+                        exports.push(name);
+                    }
+                }
+            }
+        }
+        "swift" => {
+            for line in content.lines() {
+                let trimmed = line.trim();
+
+                // func functionName(
+                if trimmed.starts_with("func ") || trimmed.contains(" func ") {
+                    let after = if trimmed.starts_with("func ") {
+                        trimmed.trim_start_matches("func ")
+                    } else if let Some(pos) = trimmed.find(" func ") {
+                        &trimmed[pos + 6..]
+                    } else {
+                        continue;
+                    };
+                    if let Some(paren_pos) = after.find('(') {
+                        let name = after[..paren_pos].trim();
+                        if !name.is_empty() {
+                            exports.push(name.to_string());
+                        }
+                    }
+                }
+                // class ClassName
+                else if trimmed.starts_with("class ") || trimmed.contains(" class ") {
+                    if let Some(name) = extract_word_after(trimmed, "class ") {
+                        let name = name.trim_end_matches(':').trim_end_matches('{');
+                        exports.push(name.trim().to_string());
+                    }
+                }
+                // struct StructName
+                else if trimmed.starts_with("struct ") || trimmed.contains(" struct ") {
+                    if let Some(name) = extract_word_after(trimmed, "struct ") {
+                        let name = name.trim_end_matches(':').trim_end_matches('{');
+                        exports.push(name.trim().to_string());
+                    }
+                }
+                // enum EnumName
+                else if trimmed.starts_with("enum ") || trimmed.contains(" enum ") {
+                    if let Some(name) = extract_word_after(trimmed, "enum ") {
+                        let name = name.trim_end_matches(':').trim_end_matches('{');
+                        exports.push(name.trim().to_string());
+                    }
+                }
+                // protocol ProtocolName
+                else if trimmed.starts_with("protocol ") {
+                    if let Some(name) = extract_word_after(trimmed, "protocol ") {
+                        let name = name.trim_end_matches(':').trim_end_matches('{');
+                        exports.push(name.trim().to_string());
+                    }
+                }
+            }
+        }
         _ => {}
     }
 
@@ -669,6 +815,45 @@ pub fn detect_imports(content: &str, ext: &str) -> Vec<String> {
                 }
             }
         }
+        "java" | "kt" => {
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with("import ") {
+                    let import_path = trimmed
+                        .trim_start_matches("import ")
+                        .trim_start_matches("static ")
+                        .trim_end_matches(';')
+                        .trim();
+                    // Skip java.* and kotlin.* standard library imports
+                    if !import_path.starts_with("java.")
+                        && !import_path.starts_with("javax.")
+                        && !import_path.starts_with("kotlin.")
+                        && !import_path.starts_with("kotlinx.")
+                    {
+                        imports.push(import_path.to_string());
+                    }
+                }
+            }
+        }
+        "swift" => {
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with("import ") {
+                    let import_path = trimmed
+                        .trim_start_matches("import ")
+                        .trim();
+                    // Skip Foundation, UIKit, SwiftUI standard imports
+                    if !import_path.is_empty()
+                        && import_path != "Foundation"
+                        && import_path != "UIKit"
+                        && import_path != "SwiftUI"
+                        && import_path != "Combine"
+                    {
+                        imports.push(import_path.to_string());
+                    }
+                }
+            }
+        }
         _ => {}
     }
 
@@ -685,6 +870,9 @@ fn format_doc_header(doc: &ModuleDoc, ext: &str) -> String {
         "rs" => format_rust_doc_header(doc),
         "py" => format_python_doc_header(doc),
         "go" => format_go_doc_header(doc),
+        "java" => format_java_doc_header(doc),
+        "kt" => format_kotlin_doc_header(doc),
+        "swift" => format_swift_doc_header(doc),
         _ => format_ts_doc_header(doc), // fallback
     }
 }
@@ -853,14 +1041,164 @@ fn format_go_doc_header(doc: &ModuleDoc) -> String {
     lines.join("\n")
 }
 
+fn format_java_doc_header(doc: &ModuleDoc) -> String {
+    let mut lines = Vec::new();
+    lines.push("/**".to_string());
+    lines.push(format!(" * @module {}", doc.module_path));
+    lines.push(format!(" * @description {}", doc.description));
+    lines.push(" *".to_string());
+
+    if !doc.purpose.is_empty() {
+        lines.push(" * PURPOSE:".to_string());
+        for item in &doc.purpose {
+            lines.push(format!(" * - {}", item));
+        }
+        lines.push(" *".to_string());
+    }
+
+    if !doc.dependencies.is_empty() {
+        lines.push(" * DEPENDENCIES:".to_string());
+        for item in &doc.dependencies {
+            lines.push(format!(" * - {}", item));
+        }
+        lines.push(" *".to_string());
+    }
+
+    if !doc.exports.is_empty() {
+        lines.push(" * EXPORTS:".to_string());
+        for item in &doc.exports {
+            lines.push(format!(" * - {}", item));
+        }
+        lines.push(" *".to_string());
+    }
+
+    if !doc.patterns.is_empty() {
+        lines.push(" * PATTERNS:".to_string());
+        for item in &doc.patterns {
+            lines.push(format!(" * - {}", item));
+        }
+        lines.push(" *".to_string());
+    }
+
+    if !doc.claude_notes.is_empty() {
+        lines.push(" * CLAUDE NOTES:".to_string());
+        for item in &doc.claude_notes {
+            lines.push(format!(" * - {}", item));
+        }
+    }
+
+    lines.push(" */".to_string());
+    lines.join("\n")
+}
+
+fn format_kotlin_doc_header(doc: &ModuleDoc) -> String {
+    // KDoc uses the same format as Javadoc
+    let mut lines = Vec::new();
+    lines.push("/**".to_string());
+    lines.push(format!(" * @module {}", doc.module_path));
+    lines.push(format!(" * @description {}", doc.description));
+    lines.push(" *".to_string());
+
+    if !doc.purpose.is_empty() {
+        lines.push(" * PURPOSE:".to_string());
+        for item in &doc.purpose {
+            lines.push(format!(" * - {}", item));
+        }
+        lines.push(" *".to_string());
+    }
+
+    if !doc.dependencies.is_empty() {
+        lines.push(" * DEPENDENCIES:".to_string());
+        for item in &doc.dependencies {
+            lines.push(format!(" * - {}", item));
+        }
+        lines.push(" *".to_string());
+    }
+
+    if !doc.exports.is_empty() {
+        lines.push(" * EXPORTS:".to_string());
+        for item in &doc.exports {
+            lines.push(format!(" * - {}", item));
+        }
+        lines.push(" *".to_string());
+    }
+
+    if !doc.patterns.is_empty() {
+        lines.push(" * PATTERNS:".to_string());
+        for item in &doc.patterns {
+            lines.push(format!(" * - {}", item));
+        }
+        lines.push(" *".to_string());
+    }
+
+    if !doc.claude_notes.is_empty() {
+        lines.push(" * CLAUDE NOTES:".to_string());
+        for item in &doc.claude_notes {
+            lines.push(format!(" * - {}", item));
+        }
+    }
+
+    lines.push(" */".to_string());
+    lines.join("\n")
+}
+
+fn format_swift_doc_header(doc: &ModuleDoc) -> String {
+    // Swift uses /// style documentation comments
+    let mut lines = Vec::new();
+    lines.push(format!("/// @module {}", doc.module_path));
+    lines.push(format!("/// @description {}", doc.description));
+    lines.push("///".to_string());
+
+    if !doc.purpose.is_empty() {
+        lines.push("/// PURPOSE:".to_string());
+        for item in &doc.purpose {
+            lines.push(format!("/// - {}", item));
+        }
+        lines.push("///".to_string());
+    }
+
+    if !doc.dependencies.is_empty() {
+        lines.push("/// DEPENDENCIES:".to_string());
+        for item in &doc.dependencies {
+            lines.push(format!("/// - {}", item));
+        }
+        lines.push("///".to_string());
+    }
+
+    if !doc.exports.is_empty() {
+        lines.push("/// EXPORTS:".to_string());
+        for item in &doc.exports {
+            lines.push(format!("/// - {}", item));
+        }
+        lines.push("///".to_string());
+    }
+
+    if !doc.patterns.is_empty() {
+        lines.push("/// PATTERNS:".to_string());
+        for item in &doc.patterns {
+            lines.push(format!("/// - {}", item));
+        }
+        lines.push("///".to_string());
+    }
+
+    if !doc.claude_notes.is_empty() {
+        lines.push("/// CLAUDE NOTES:".to_string());
+        for item in &doc.claude_notes {
+            lines.push(format!("/// - {}", item));
+        }
+    }
+
+    lines.join("\n")
+}
+
 /// Replace an existing doc header in a file with a new one.
 fn replace_doc_header(content: &str, new_header: &str, ext: &str) -> String {
     let lines: Vec<&str> = content.lines().collect();
 
     // Find the end of the existing doc header
     let header_end = match ext {
-        "ts" | "tsx" | "js" | "jsx" => {
-            // Find closing */
+        "ts" | "tsx" | "js" | "jsx" | "java" | "kt" => {
+            // Find closing */ (Javadoc/KDoc/JSDoc style)
             lines
                 .iter()
                 .position(|l| l.trim() == "*/")
@@ -873,6 +1211,19 @@ fn replace_doc_header(content: &str, new_header: &str, ext: &str) -> String {
             for (i, line) in lines.iter().enumerate() {
                 let trimmed = line.trim();
                 if trimmed.starts_with("//!") {
+                    last_doc = i + 1;
+                } else if !trimmed.is_empty() {
+                    break;
+                }
+            }
+            last_doc
+        }
+        "swift" => {
+            // Find last consecutive /// line
+            let mut last_doc = 0;
+            for (i, line) in lines.iter().enumerate() {
+                let trimmed = line.trim();
+                if trimmed.starts_with("///") {
                     last_doc = i + 1;
                 } else if !trimmed.is_empty() {
                     break;

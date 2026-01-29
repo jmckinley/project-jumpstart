@@ -50,6 +50,8 @@ export type TechTag =
   | "rust"
   | "go"
   | "java"
+  | "kotlin"
+  | "swift"
   | "react"
   | "nextjs"
   | "vue"
@@ -63,6 +65,9 @@ export type TechTag =
   | "flask"
   | "tauri"
   | "electron"
+  | "android"
+  | "ios"
+  | "swiftui"
   | "vitest"
   | "jest"
   | "pytest"
@@ -91,7 +96,9 @@ export type SkillCategory =
   | "code-review"
   | "refactoring"
   | "debugging"
-  | "database";
+  | "database"
+  | "language-patterns"
+  | "ui-ux";
 
 /**
  * Metadata for a skill category (for UI display).

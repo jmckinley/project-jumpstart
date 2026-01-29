@@ -13,7 +13,7 @@
  * - SKILL_CATEGORIES - Array of SkillCategoryInfo objects for all categories
  *
  * PATTERNS:
- * - Categories are ordered by typical usage frequency
+ * - Categories are ordered: Language Patterns, UI/UX first, then by typical usage
  * - Each category has a human-readable label and description
  *
  * CLAUDE NOTES:
@@ -24,6 +24,16 @@
 import type { SkillCategoryInfo } from "@/types/skill";
 
 export const SKILL_CATEGORIES: SkillCategoryInfo[] = [
+  {
+    id: "language-patterns",
+    label: "Language Patterns",
+    description: "Language-specific idioms, conventions, and best practices.",
+  },
+  {
+    id: "ui-ux",
+    label: "UI/UX",
+    description: "User interface and experience patterns for better usability.",
+  },
   {
     id: "documentation",
     label: "Documentation",

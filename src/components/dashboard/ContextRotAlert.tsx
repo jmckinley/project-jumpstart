@@ -119,7 +119,7 @@ export function ContextRotAlert({
         <WarningIcon className={`shrink-0 ${config.iconColor}`} />
         <div>
           <p className={`text-sm font-medium ${config.textColor}`}>
-            {risk === "high" ? "Context Rot Detected" : "Context Rot Warning"}
+            {risk === "high" ? "Context Rot Risk Detected" : "Context Rot Warning"}
           </p>
           <p className={`mt-0.5 text-xs ${config.subtextColor}`}>{message}</p>
         </div>

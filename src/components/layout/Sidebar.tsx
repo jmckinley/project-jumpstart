@@ -55,6 +55,7 @@ const sections = [
   { id: "context", label: "Context" },
   { id: "enforcement", label: "Enforcement" },
   { id: "settings", label: "Settings" },
+  { id: "help", label: "Help" },
 ];
 
 function CheckIcon() {

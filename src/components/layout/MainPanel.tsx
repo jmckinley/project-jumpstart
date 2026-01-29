@@ -114,6 +114,7 @@ import { GitHookSetup } from "@/components/enforcement/GitHookSetup";
 import { CISetup } from "@/components/enforcement/CISetup";
 import { useEnforcement } from "@/hooks/useEnforcement";
 import { SettingsView } from "@/components/settings/SettingsView";
+import { HelpView } from "@/components/help/HelpView";
 import type { Skill } from "@/types/skill";
 
 interface MainPanelProps {
@@ -831,6 +832,8 @@ function renderSection(
       return <EnforcementView onHooksInstalled={onCompletionChange} />;
     case "settings":
       return <SettingsView />;
+    case "help":
+      return <HelpView />;
     default:
       return (
         <div className="flex h-full items-center justify-center text-neutral-500">

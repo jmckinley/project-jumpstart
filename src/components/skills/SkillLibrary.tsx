@@ -106,6 +106,8 @@ export function SkillLibrary({
       refactoring: 0,
       debugging: 0,
       database: 0,
+      "language-patterns": 0,
+      "ui-ux": 0,
     };
     let recommendedCount = 0;
 
