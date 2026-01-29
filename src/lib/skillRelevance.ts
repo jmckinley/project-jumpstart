@@ -12,9 +12,10 @@
  * - @/types/skill - LibrarySkill, TechTag types
  *
  * EXPORTS:
+ * - MAX_RECOMMENDED_SKILLS - Cap on recommended skills (5)
  * - getProjectTags - Extract TechTags from a project
  * - scoreSkillRelevance - Calculate relevance score for a skill
- * - rankLibrarySkills - Sort skills by relevance with scores
+ * - rankLibrarySkills - Sort skills by relevance with scores (capped)
  * - ScoredSkill - A LibrarySkill with relevance score and recommendation flag
  *
  * PATTERNS:
@@ -22,6 +23,7 @@
  * - Scoring: 30 base + 20 per match (cap 60) + 10 specificity bonus
  * - Universal skills always score 75 (recommended, ranked with 2-match skills)
  * - isRecommended = score >= 50
+ * - Max 5 skills can be recommended (prevents context bloat)
  * - Sorting: recommended first (descending score), then alphabetical
  *
  * CLAUDE NOTES:
@@ -33,6 +35,9 @@
 
 import type { Project } from "@/types/project";
 import type { LibrarySkill, TechTag } from "@/types/skill";
+
+/** Maximum number of skills that can be recommended to prevent context bloat */
+export const MAX_RECOMMENDED_SKILLS = 5;
 
 export interface ScoredSkill {
   skill: LibrarySkill;
@@ -177,6 +182,7 @@ export function scoreSkillRelevance(
 /**
  * Rank library skills by relevance to a project.
  * Returns skills sorted: recommended first (by score desc), then non-recommended alphabetically.
+ * Only the top MAX_RECOMMENDED_SKILLS skills are marked as recommended to prevent context bloat.
  */
 export function rankLibrarySkills(
   skills: LibrarySkill[],
@@ -192,7 +198,22 @@ export function rankLibrarySkills(
     return { skill, score, isRecommended, matchedTags };
   });
 
-  // Sort: recommended first (by score desc), then non-recommended alphabetically
+  // Sort by score descending first to determine top recommendations
+  scored.sort((a, b) => b.score - a.score);
+
+  // Cap recommendations at MAX_RECOMMENDED_SKILLS
+  let recommendedCount = 0;
+  for (const item of scored) {
+    if (item.isRecommended) {
+      if (recommendedCount >= MAX_RECOMMENDED_SKILLS) {
+        item.isRecommended = false; // Demote to non-recommended
+      } else {
+        recommendedCount++;
+      }
+    }
+  }
+
+  // Re-sort: recommended first (by score desc), then non-recommended alphabetically
   return scored.sort((a, b) => {
     // Recommended comes first
     if (a.isRecommended && !b.isRecommended) return -1;

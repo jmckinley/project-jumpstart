@@ -14,27 +14,32 @@
  * - @/lib/skillRelevance - getProjectTags for extracting project tags
  *
  * EXPORTS:
+ * - MAX_RECOMMENDED_AGENTS - Cap on recommended agents (5)
  * - scoreAgentRelevance - Calculate relevance score for an agent
- * - rankLibraryAgents - Sort agents by relevance with scores
+ * - rankLibraryAgents - Sort agents by relevance with scores (capped)
  * - ScoredAgent - A LibraryAgent with relevance score and recommendation flag
  *
  * PATTERNS:
  * - Reuses getProjectTags from skillRelevance for consistency
- * - "universal" agents always get score 60 (recommended)
- * - Other agents: 40 + (matchedCount / totalTags) * 60 if any match, else 0
+ * - Scoring: 30 base + 20 per match (cap 60) + 10 specificity bonus
+ * - Universal agents always score 75 (recommended, ranked with 2-match agents)
  * - isRecommended = score >= 50
+ * - Max 5 agents can be recommended (prevents context bloat)
  * - Sorting: recommended first (descending score), then alphabetical
  *
  * CLAUDE NOTES:
- * - Score range is 0-100, but only 0, 60, or 40-100 are produced
- * - Universal agents are always recommended but sorted below exact matches
- * - This is nearly identical to skillRelevance.ts - intentionally parallel
+ * - Score outcomes: 0 (no match), 50-60 (1 match), 70-80 (2 matches), 90-100 (3+ matches)
+ * - Universal agents score 75, ranking with 2-match agents
+ * - Scoring formula is identical to skillRelevance.ts for consistency
  */
 
 import type { Project } from "@/types/project";
 import type { LibraryAgent } from "@/types/agent";
 import type { TechTag } from "@/types/skill";
 import { getProjectTags } from "./skillRelevance";
+
+/** Maximum number of agents that can be recommended to prevent context bloat */
+export const MAX_RECOMMENDED_AGENTS = 5;
 
 export interface ScoredAgent {
   agent: LibraryAgent;
@@ -46,14 +51,27 @@ export interface ScoredAgent {
 /**
  * Calculate relevance score for an agent based on project tags.
  * Returns score (0-100), isRecommended flag, and matched tags.
+ *
+ * Scoring formula (identical to skillRelevance):
+ * - Universal agents: 75 (always recommended, ranked with 2-match agents)
+ * - Others: 30 base + 20 per match (capped at 60) + 10 specificity bonus
+ * - Specificity bonus: awarded if ≥50% of agent's tags are matched
+ *
+ * Score outcomes:
+ * - 0 matches: 0 (not recommended)
+ * - 1 match, low specificity: 50 (borderline recommended)
+ * - 1 match, high specificity: 60 (recommended)
+ * - 2 matches: 70-80 (highly recommended)
+ * - 3+ matches: 90-100 (top recommended)
  */
 export function scoreAgentRelevance(
   agent: LibraryAgent,
   projectTags: TechTag[],
 ): { score: number; isRecommended: boolean; matchedTags: TechTag[] } {
-  // Universal agents always score 60
+  // Universal agents always score 75 - high enough to be recommended,
+  // but below 2+ match tech-specific agents
   if (agent.tags.includes("universal")) {
-    return { score: 60, isRecommended: true, matchedTags: ["universal"] };
+    return { score: 75, isRecommended: true, matchedTags: ["universal"] };
   }
 
   // Find matching tags
@@ -64,12 +82,17 @@ export function scoreAgentRelevance(
     return { score: 0, isRecommended: false, matchedTags: [] };
   }
 
-  // Score: 40 base + up to 60 based on match ratio
+  // Base score + match bonus (20 per match, capped at 60 for 3+ matches)
+  const matchBonus = Math.min(matchedTags.length * 20, 60);
+
+  // Specificity bonus: +10 if agent is focused (≥50% of its tags matched)
   const matchRatio = matchedTags.length / agent.tags.length;
-  const score = Math.round(40 + matchRatio * 60);
+  const specificityBonus = matchRatio >= 0.5 ? 10 : 0;
+
+  const score = 30 + matchBonus + specificityBonus;
 
   return {
-    score,
+    score: Math.min(score, 100),
     isRecommended: score >= 50,
     matchedTags,
   };
@@ -78,6 +101,7 @@ export function scoreAgentRelevance(
 /**
  * Rank library agents by relevance to a project.
  * Returns agents sorted: recommended first (by score desc), then non-recommended alphabetically.
+ * Only the top MAX_RECOMMENDED_AGENTS agents are marked as recommended to prevent context bloat.
  */
 export function rankLibraryAgents(
   agents: LibraryAgent[],
@@ -93,7 +117,22 @@ export function rankLibraryAgents(
     return { agent, score, isRecommended, matchedTags };
   });
 
-  // Sort: recommended first (by score desc), then non-recommended alphabetically
+  // Sort by score descending first to determine top recommendations
+  scored.sort((a, b) => b.score - a.score);
+
+  // Cap recommendations at MAX_RECOMMENDED_AGENTS
+  let recommendedCount = 0;
+  for (const item of scored) {
+    if (item.isRecommended) {
+      if (recommendedCount >= MAX_RECOMMENDED_AGENTS) {
+        item.isRecommended = false; // Demote to non-recommended
+      } else {
+        recommendedCount++;
+      }
+    }
+  }
+
+  // Re-sort: recommended first (by score desc), then non-recommended alphabetically
   return scored.sort((a, b) => {
     // Recommended comes first
     if (a.isRecommended && !b.isRecommended) return -1;

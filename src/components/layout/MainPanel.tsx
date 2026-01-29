@@ -362,7 +362,7 @@ function SkillsView() {
   const handleAddFromLibrary = useCallback(
     async (librarySkill: LibrarySkill) => {
       await addSkill(librarySkill.name, librarySkill.description, librarySkill.content);
-      setActiveTab("my-skills");
+      // Stay on library tab so user can continue browsing
     },
     [addSkill],
   );
@@ -540,7 +540,7 @@ function AgentsView() {
   const handleAddFromLibrary = useCallback(
     async (libraryAgent: LibraryAgent) => {
       await addFromLibrary(libraryAgent);
-      setActiveTab("my-agents");
+      // Stay on library tab so user can continue browsing
     },
     [addFromLibrary],
   );
