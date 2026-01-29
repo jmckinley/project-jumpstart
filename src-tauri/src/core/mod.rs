@@ -12,6 +12,7 @@
 //! - generator - AI-powered content generation
 //! - freshness - Documentation staleness detection
 //! - health - Health score calculation
+//! - crypto - API key encryption/decryption
 //!
 //! PATTERNS:
 //! - Core modules contain business logic, not IPC handling
@@ -20,6 +21,7 @@
 //! CLAUDE NOTES:
 //! - Core is the heart of the application; commands are thin wrappers
 //! - Each module should be independently testable
+//! - App name: Project Jumpstart
 
 pub mod ai;
 pub mod scanner;
@@ -28,3 +30,4 @@ pub mod analyzer;
 pub mod generator;
 pub mod freshness;
 pub mod health;
+pub mod crypto;

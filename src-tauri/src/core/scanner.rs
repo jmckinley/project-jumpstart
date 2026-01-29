@@ -29,6 +29,7 @@
 //! - All detected values include a "source" string explaining how they were found
 //! - CDN detection scans .html files in project root for known CDN URLs
 //! - Extension confidence uses proportion: (lang_count / total_source_files) * 0.85
+//! - Chrome Extension detection: manifest.json with manifest_version field
 //! - See spec Part 5.1 for full scanner specification
 
 use std::collections::HashMap;
@@ -398,7 +399,29 @@ fn detect_framework(path: &Path, language: &Option<DetectedValue>) -> Option<Det
 }
 
 fn detect_js_framework(path: &Path) -> Option<DetectedValue> {
-    // Also check for Tauri (structural signal, independent of package.json)
+    // Check for Chrome Extension (manifest.json with manifest_version)
+    let manifest_path = path.join("manifest.json");
+    if manifest_path.exists() {
+        if let Ok(content) = fs::read_to_string(&manifest_path) {
+            if let Ok(manifest) = serde_json::from_str::<serde_json::Value>(&content) {
+                // Chrome extensions have manifest_version (2 or 3)
+                if manifest.get("manifest_version").is_some() {
+                    let version = manifest
+                        .get("manifest_version")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
+                    let source = format!("manifest.json with manifest_version {}", version);
+                    return Some(DetectedValue {
+                        value: "Chrome Extension".to_string(),
+                        confidence: 0.95,
+                        source,
+                    });
+                }
+            }
+        }
+    }
+
+    // Check for Tauri (structural signal, independent of package.json)
     if path.join("src-tauri").exists() {
         return Some(DetectedValue {
             value: "Tauri".to_string(),
@@ -904,6 +927,7 @@ fn detect_project_type(
         "Flutter" => return Some("Mobile".to_string()),
         "Tauri" | "Electron" => return Some("Desktop".to_string()),
         "Leptos" | "Yew" | "Dioxus" => return Some("Web App".to_string()),
+        "Chrome Extension" => return Some("Extension".to_string()),
         _ => {}
     }
 
@@ -989,5 +1013,28 @@ mod tests {
         assert!(deps.contains_key("typescript"));
         assert!(deps.contains_key("vitest"));
         assert!(!deps.contains_key("lodash"));
+    }
+
+    #[test]
+    fn test_chrome_extension_detection() {
+        // Test the Chrome Extension detection with the test project
+        let result = scan_project_dir("/Users/johnmckinley/test-chrome-extension");
+        assert!(result.is_ok(), "Failed to scan test-chrome-extension");
+        let det = result.unwrap();
+
+        println!("Detection result:");
+        println!("  Language: {:?}", det.language);
+        println!("  Framework: {:?}", det.framework);
+        println!("  Project Type: {:?}", det.project_type);
+
+        // Should detect Chrome Extension framework
+        assert!(det.framework.is_some(), "Framework not detected");
+        assert_eq!(det.framework.as_ref().unwrap().value, "Chrome Extension",
+            "Expected Chrome Extension, got {:?}", det.framework);
+
+        // Should detect Extension project type
+        assert!(det.project_type.is_some(), "Project type not detected");
+        assert_eq!(det.project_type.as_ref().unwrap(), "Extension",
+            "Expected Extension project type, got {:?}", det.project_type);
     }
 }

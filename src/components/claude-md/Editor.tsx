@@ -16,6 +16,7 @@
  *
  * EXPORTS:
  * - Editor - Main CLAUDE.md editor component
+ * - EditorProps - Props interface with optional onSave callback
  *
  * PATTERNS:
  * - Calls loadContent() on mount via useEffect to fetch current CLAUDE.md
@@ -40,7 +41,11 @@ import { useProjectStore } from "@/stores/projectStore";
 import { Preview } from "./Preview";
 import { Suggestions } from "./Suggestions";
 
-export function Editor() {
+interface EditorProps {
+  onSave?: () => void;
+}
+
+export function Editor({ onSave }: EditorProps) {
   const activeProject = useProjectStore((s) => s.activeProject);
   const {
     exists,
@@ -84,12 +89,13 @@ export function Editor() {
     try {
       await saveContent(draft);
       setDirty(false);
+      onSave?.();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to save";
       setSaveError(message);
       console.error("Failed to save CLAUDE.md:", err);
     }
-  }, [draft, saveContent]);
+  }, [draft, saveContent, onSave]);
 
   const handleGenerateClick = useCallback(() => {
     // If content exists, show confirmation first

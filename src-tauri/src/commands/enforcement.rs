@@ -65,9 +65,9 @@ pub async fn install_git_hooks(
 
     let hook_script = format!(
         r#"#!/bin/sh
-# Claude Code Copilot — Documentation Enforcement Hook
+# Project Jumpstart — Documentation Enforcement Hook
 # Mode: {mode}
-# Auto-generated. Edit via Claude Code Copilot settings.
+# Auto-generated. Edit via Project Jumpstart settings.
 
 MISSING_DOCS=0
 EXTENSIONS="ts tsx js jsx rs py go"
@@ -89,7 +89,7 @@ done
 if [ $MISSING_DOCS -gt 0 ]; then
     echo ""
     echo "Found $MISSING_DOCS file(s) without documentation headers."
-    echo "Run Claude Code Copilot to generate missing docs."
+    echo "Run Project Jumpstart to generate missing docs."
     exit {exit_code}
 fi
 
@@ -157,8 +157,9 @@ pub async fn get_hook_status(project_path: String) -> Result<HookStatus, String>
     let content = std::fs::read_to_string(&hook_path)
         .map_err(|e| format!("Failed to read hook: {}", e))?;
 
-    let is_copilot_hook = content.contains("Claude Code Copilot");
-    let mode = if !is_copilot_hook {
+    // Check for our hook (support both old and new app names)
+    let is_jumpstart_hook = content.contains("Project Jumpstart") || content.contains("Claude Code Copilot");
+    let mode = if !is_jumpstart_hook {
         "external".to_string()
     } else if content.contains("Mode: block") {
         "block".to_string()
@@ -167,7 +168,7 @@ pub async fn get_hook_status(project_path: String) -> Result<HookStatus, String>
     };
 
     Ok(HookStatus {
-        installed: is_copilot_hook,
+        installed: is_jumpstart_hook,
         hook_path: hook_path.to_string_lossy().to_string(),
         mode,
         has_husky,
@@ -262,7 +263,7 @@ pub fn calculate_enforcement_score(project_path: &str) -> u32 {
     let hook_path = path.join(".git").join("hooks").join("pre-commit");
     if hook_path.exists() {
         if let Ok(content) = std::fs::read_to_string(&hook_path) {
-            if content.contains("Claude Code Copilot") || content.contains("@module") {
+            if content.contains("Project Jumpstart") || content.contains("Claude Code Copilot") || content.contains("@module") {
                 score += 5;
             } else {
                 // External hook still gets partial credit

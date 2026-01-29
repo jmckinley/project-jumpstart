@@ -59,6 +59,8 @@
  * - DashboardView polls activities every 15 seconds
  * - MainPanel starts/stops file watcher when active project changes
  * - File change events from the backend trigger a state counter increment for re-renders
+ * - onCompletionChange callback is passed to views and called when actions complete
+ * - This allows the sidebar to show checkmarks for completed sections
  *
  * CLAUDE NOTES:
  * - The dashboard layout uses a 2-column grid for HealthScore and QuickWins
@@ -117,6 +119,7 @@ import type { Skill } from "@/types/skill";
 interface MainPanelProps {
   activeSection: string;
   onNavigate?: (section: string) => void;
+  onCompletionChange?: () => void;
 }
 
 function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void }) {
@@ -182,7 +185,7 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
   );
 }
 
-function ModulesView() {
+function ModulesView({ onDocApplied }: { onDocApplied?: () => void }) {
   const {
     modules,
     totalFiles,
@@ -225,15 +228,17 @@ function ModulesView() {
     const absolutePath = `${activeProject.path}/${selectedPath}`;
     await applyDoc(absolutePath, previewDoc);
     setPreviewLoading(false);
-  }, [selectedPath, previewDoc, activeProject, applyDoc]);
+    onDocApplied?.();
+  }, [selectedPath, previewDoc, activeProject, applyDoc, onDocApplied]);
 
   const handleBatchGenerate = useCallback(
     async (paths: string[]) => {
       if (!activeProject) return;
       const absolutePaths = paths.map((p) => `${activeProject.path}/${p}`);
       await batchGenerate(absolutePaths);
+      onDocApplied?.();
     },
-    [activeProject, batchGenerate],
+    [activeProject, batchGenerate, onDocApplied],
   );
 
   if (loading && modules.length === 0) {
@@ -280,7 +285,7 @@ function ModulesView() {
   );
 }
 
-function SkillsView() {
+function SkillsView({ onSkillsChange }: { onSkillsChange?: () => void }) {
   const {
     skills,
     patterns,
@@ -319,11 +324,12 @@ function SkillsView() {
         await editSkill(selectedSkill.id, name, description, content);
       } else {
         await addSkill(name, description, content);
+        onSkillsChange?.();
       }
       setSelectedSkill(null);
       setEditing(false);
     },
-    [selectedSkill, editSkill, addSkill],
+    [selectedSkill, editSkill, addSkill, onSkillsChange],
   );
 
   const handleCancel = useCallback(() => {
@@ -362,9 +368,10 @@ function SkillsView() {
   const handleAddFromLibrary = useCallback(
     async (librarySkill: LibrarySkill) => {
       await addSkill(librarySkill.name, librarySkill.description, librarySkill.content);
+      onSkillsChange?.();
       // Stay on library tab so user can continue browsing
     },
-    [addSkill],
+    [addSkill, onSkillsChange],
   );
 
   const handleSwitchToExpert = useCallback((librarySkill: LibrarySkill) => {
@@ -469,7 +476,7 @@ function SkillsView() {
   );
 }
 
-function AgentsView() {
+function AgentsView({ onAgentsChange }: { onAgentsChange?: () => void }) {
   const {
     agents,
     loading,
@@ -514,11 +521,12 @@ function AgentsView() {
         await editAgent(selectedAgent.id, name, description, tier, category, instructions, workflow, tools, triggerPatterns);
       } else {
         await addAgent(name, description, tier, category, instructions, workflow, tools, triggerPatterns);
+        onAgentsChange?.();
       }
       setSelectedAgent(null);
       setEditing(false);
     },
-    [selectedAgent, editAgent, addAgent],
+    [selectedAgent, editAgent, addAgent, onAgentsChange],
   );
 
   const handleCancel = useCallback(() => {
@@ -540,9 +548,10 @@ function AgentsView() {
   const handleAddFromLibrary = useCallback(
     async (libraryAgent: LibraryAgent) => {
       await addFromLibrary(libraryAgent);
+      onAgentsChange?.();
       // Stay on library tab so user can continue browsing
     },
-    [addFromLibrary],
+    [addFromLibrary, onAgentsChange],
   );
 
   const handleSwitchToExpert = useCallback((libraryAgent: LibraryAgent) => {
@@ -643,7 +652,7 @@ function AgentsView() {
   );
 }
 
-function RalphView() {
+function RalphView({ onLoopStarted }: { onLoopStarted?: () => void }) {
   const {
     loops,
     analysis,
@@ -661,6 +670,14 @@ function RalphView() {
     loadLoops();
   }, [loadLoops]);
 
+  const handleStartLoop = useCallback(
+    async (prompt: string) => {
+      await startLoop(prompt);
+      onLoopStarted?.();
+    },
+    [startLoop, onLoopStarted],
+  );
+
   return (
     <div className="space-y-6">
       {error && (
@@ -676,7 +693,7 @@ function RalphView() {
             analyzing={analyzing}
             loading={loading}
             onAnalyze={analyzePrompt}
-            onStartLoop={startLoop}
+            onStartLoop={handleStartLoop}
             onClearAnalysis={clearAnalysis}
           />
         </div>
@@ -739,7 +756,7 @@ function ContextView() {
   );
 }
 
-function EnforcementView() {
+function EnforcementView({ onHooksInstalled }: { onHooksInstalled?: () => void }) {
   const {
     hookStatus,
     snippets,
@@ -756,6 +773,14 @@ function EnforcementView() {
     loadSnippets();
   }, [refreshHookStatus, loadSnippets]);
 
+  const handleInstall = useCallback(
+    async (mode: "warn" | "block") => {
+      await installHooks(mode);
+      onHooksInstalled?.();
+    },
+    [installHooks, onHooksInstalled],
+  );
+
   return (
     <div className="space-y-6">
       {error && (
@@ -769,7 +794,7 @@ function EnforcementView() {
           hookStatus={hookStatus}
           loading={loading}
           installing={installing}
-          onInstall={installHooks}
+          onInstall={handleInstall}
           onRefresh={refreshHookStatus}
         />
         <CISetup
@@ -782,24 +807,28 @@ function EnforcementView() {
   );
 }
 
-function renderSection(section: string, onNavigate?: (section: string) => void) {
+function renderSection(
+  section: string,
+  onNavigate?: (section: string) => void,
+  onCompletionChange?: () => void,
+) {
   switch (section) {
     case "dashboard":
       return <DashboardView onNavigate={onNavigate} />;
     case "claude-md":
-      return <Editor />;
+      return <Editor onSave={onCompletionChange} />;
     case "modules":
-      return <ModulesView />;
+      return <ModulesView onDocApplied={onCompletionChange} />;
     case "skills":
-      return <SkillsView />;
+      return <SkillsView onSkillsChange={onCompletionChange} />;
     case "agents":
-      return <AgentsView />;
+      return <AgentsView onAgentsChange={onCompletionChange} />;
     case "ralph":
-      return <RalphView />;
+      return <RalphView onLoopStarted={onCompletionChange} />;
     case "context":
       return <ContextView />;
     case "enforcement":
-      return <EnforcementView />;
+      return <EnforcementView onHooksInstalled={onCompletionChange} />;
     case "settings":
       return <SettingsView />;
     default:
@@ -811,7 +840,7 @@ function renderSection(section: string, onNavigate?: (section: string) => void) 
   }
 }
 
-export function MainPanel({ activeSection, onNavigate }: MainPanelProps) {
+export function MainPanel({ activeSection, onNavigate, onCompletionChange }: MainPanelProps) {
   const activeProject = useProjectStore((s) => s.activeProject);
   const [, setFileChangeCounter] = useState(0);
 
@@ -851,7 +880,9 @@ export function MainPanel({ activeSection, onNavigate }: MainPanelProps) {
           )}
         </div>
       </header>
-      <main className="flex-1 overflow-auto p-6">{renderSection(activeSection, onNavigate)}</main>
+      <main className="flex-1 overflow-auto p-6">
+        {renderSection(activeSection, onNavigate, onCompletionChange)}
+      </main>
     </div>
   );
 }

@@ -271,7 +271,7 @@ export function SettingsView() {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-neutral-400">Application</span>
-              <span className="text-neutral-200">Claude Code Copilot</span>
+              <span className="text-neutral-200">Project Jumpstart</span>
             </div>
             <div className="flex justify-between">
               <span className="text-neutral-400">Version</span>
@@ -280,10 +280,10 @@ export function SettingsView() {
             <div className="flex justify-between">
               <span className="text-neutral-400">Specification</span>
               <a
-                href="claude-code-copilot-desktop-spec-v2.md"
+                href="project-jumpstart-spec.md"
                 className="text-blue-400 hover:text-blue-300 hover:underline"
               >
-                claude-code-copilot-desktop-spec-v2.md
+                project-jumpstart-spec.md
               </a>
             </div>
           </div>

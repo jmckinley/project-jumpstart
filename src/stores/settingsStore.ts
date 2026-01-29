@@ -6,6 +6,7 @@
  * - Store user preferences (theme, notifications, etc.)
  * - Track API key configuration status (NOT the key itself)
  * - Manage enforcement settings
+ * - Track first-use welcome screen state
  *
  * DEPENDENCIES:
  * - zustand - State management
@@ -15,12 +16,14 @@
  *
  * PATTERNS:
  * - Settings are persisted to SQLite via Tauri commands
- * - API key is stored securely in the system keychain, never in state
+ * - API key is stored securely via encrypted settings, never in state
+ * - hasSeenWelcome tracks first-use experience completion
  *
  * CLAUDE NOTES:
  * - NEVER store API keys in the store or local storage
  * - Settings load from SQLite on app startup
  * - Theme defaults to system preference
+ * - App name: Project Jumpstart
  */
 
 import { create } from "zustand";

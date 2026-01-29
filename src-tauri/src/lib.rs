@@ -1,5 +1,5 @@
 //! @module lib
-//! @description Core library entry point for Claude Code Copilot Tauri application
+//! @description Core library entry point for Project Jumpstart Tauri application
 //!
 //! PURPOSE:
 //! - Configure and launch the Tauri application

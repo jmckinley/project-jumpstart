@@ -1,10 +1,10 @@
-# Claude Code Copilot
+# Project Jumpstart
 
 ## Overview
 
 Desktop application (Tauri 2.0 + React) that automatically applies and enforces Claude Code best practices. The core mission is **preventing context rot** through persistent documentation.
 
-**Full Specification**: `claude-code-copilot-desktop-spec-v2.md`
+**Full Specification**: `project-jumpstart-spec.md`
 
 ---
 
@@ -28,7 +28,7 @@ Desktop application (Tauri 2.0 + React) that automatically applies and enforces 
 ## Project Structure
 
 ```
-claude-code-copilot/
+project-jumpstart/
 ├── src-tauri/                      # Rust backend
 │   ├── src/
 │   │   ├── main.rs                 # Entry point, Tauri setup
@@ -130,7 +130,7 @@ claude-code-copilot/
 ├── tsconfig.json
 ├── tailwind.config.js
 ├── vite.config.ts
-├── claude-code-copilot-desktop-spec-v2.md
+├── project-jumpstart-spec.md
 └── CLAUDE.md                       # This file
 ```
 
@@ -155,7 +155,7 @@ pnpm lint                 # Run ESLint
 cargo clippy              # Run Rust linter
 
 # Database
-# SQLite DB is at: ~/.claude-code-copilot/copilot.db
+# SQLite DB is at: ~/.project-jumpstart/copilot.db
 ```
 
 ---
@@ -558,7 +558,7 @@ interface DetectionResult {
 - Prefer composition over prop drilling
 
 ### Database
-- SQLite database location: `~/.claude-code-copilot/copilot.db`
+- SQLite database location: `~/.project-jumpstart/copilot.db`
 - Use migrations for schema changes
 - All timestamps in UTC
 
@@ -571,7 +571,7 @@ interface DetectionResult {
 
 ## Spec Reference
 
-The full product specification is in `claude-code-copilot-desktop-spec-v2.md`. Key sections:
+The full product specification is in `project-jumpstart-spec.md`. Key sections:
 
 - **Part 2**: Onboarding flow with wireframes
 - **Part 3**: Main UI wireframes

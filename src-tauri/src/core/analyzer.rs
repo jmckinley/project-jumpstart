@@ -137,6 +137,7 @@ pub fn parse_doc_header(content: &str) -> Option<ModuleDoc> {
 
 /// Generate a template ModuleDoc for a source file.
 /// Reads the file, detects exports/imports, and builds a documentation template.
+/// Uses smart inference based on file paths, naming conventions, and code patterns.
 pub fn generate_module_doc_for_file(
     file_path: &str,
     project_path: &str,
@@ -152,7 +153,6 @@ pub fn generate_module_doc_for_file(
 
     let exports = detect_exports(&content, ext);
     let imports = detect_imports(&content, ext);
-    let description = infer_description(&rel_path, &exports);
 
     // Build a module path (e.g., "components/dashboard/HealthScore")
     let module_path = rel_path
@@ -161,26 +161,26 @@ pub fn generate_module_doc_for_file(
         .trim_end_matches(&format!(".{}", ext))
         .to_string();
 
+    // Smart inference based on file location and content
+    let description = infer_description(&rel_path, &exports, &content);
+    let purpose = infer_purpose(&rel_path, &exports, &content);
+    let patterns = infer_patterns(&rel_path, ext, &exports, &content);
+    let claude_notes = infer_claude_notes(&rel_path, ext, &exports, &imports);
+
     Ok(ModuleDoc {
         module_path,
         description,
-        purpose: vec![format!(
-            "TODO: Describe the main responsibility of {}",
-            Path::new(file_path)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("this module")
-        )],
+        purpose,
         dependencies: imports
             .into_iter()
-            .map(|i| format!("{} - TODO: why needed", i))
+            .map(|i| infer_dependency_description(&i))
             .collect(),
         exports: exports
             .into_iter()
-            .map(|e| format!("{} - TODO: what it does", e))
+            .map(|e| infer_export_description(&e, &rel_path))
             .collect(),
-        patterns: vec!["TODO: Describe usage patterns".to_string()],
-        claude_notes: vec!["TODO: Add important context for Claude".to_string()],
+        patterns,
+        claude_notes,
     })
 }
 
@@ -211,14 +211,20 @@ pub async fn generate_module_doc_with_ai(
     let truncated_content: String = content.chars().take(8000).collect();
 
     let system = "You generate structured module documentation for source code files. \
-        Return a JSON object with these fields: \
-        description (string, one-line), \
-        purpose (array of strings), \
-        dependencies (array of strings in format 'path - reason'), \
-        exports (array of strings in format 'name - description'), \
-        patterns (array of strings), \
-        claude_notes (array of strings). \
-        Be concise and practical. Output ONLY valid JSON, no markdown fences or explanation.";
+        The documentation will be placed at the top of source files to help AI coding assistants \
+        understand the module quickly without reading all the code. \
+        \
+        Return a JSON object with these exact fields: \
+        - description: string, one-line summary of what this module does (concise, starts with verb) \
+        - purpose: array of strings, each explaining a main responsibility (2-4 items) \
+        - dependencies: array of strings in format 'import/path - why this dependency is needed' \
+        - exports: array of strings in format 'functionName - brief description of what it does' \
+        - patterns: array of strings describing how to use this module correctly (usage examples, conventions) \
+        - claude_notes: array of strings with important context an AI should always remember \
+          (gotchas, related files to check, common mistakes to avoid) \
+        \
+        Be concise and practical. Focus on information that survives context compaction. \
+        Output ONLY valid JSON, no markdown fences or explanation.";
 
     let prompt = format!(
         "Generate module documentation for this file:\n\n\
@@ -967,26 +973,440 @@ fn extract_word_after(line: &str, prefix: &str) -> Option<String> {
     }
 }
 
-fn infer_description(rel_path: &str, exports: &[String]) -> String {
+// ---------------------------------------------------------------------------
+// Smart inference functions for template-based doc generation
+// ---------------------------------------------------------------------------
+
+/// Infer a meaningful description from file path, exports, and content.
+fn infer_description(rel_path: &str, exports: &[String], content: &str) -> String {
     let file_stem = Path::new(rel_path)
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("module");
 
+    // Check for specific file patterns
+    if rel_path.contains("/hooks/") || file_stem.starts_with("use") {
+        let hook_name = file_stem.strip_prefix("use").unwrap_or(file_stem);
+        return format!("Custom React hook for {} state and actions", camel_to_words(hook_name));
+    }
+
+    if rel_path.contains("/components/") {
+        if exports.len() == 1 {
+            return format!("{} UI component", exports[0]);
+        }
+        return format!("{} UI component with related utilities", pascal_to_words(file_stem));
+    }
+
+    if rel_path.contains("/stores/") || file_stem.ends_with("Store") {
+        let store_name = file_stem.strip_suffix("Store").unwrap_or(file_stem);
+        return format!("Zustand store for {} state management", camel_to_words(store_name));
+    }
+
+    if rel_path.contains("/lib/") || rel_path.contains("/utils/") {
+        return format!("Utility functions for {}", camel_to_words(file_stem));
+    }
+
+    if rel_path.contains("/types/") {
+        return format!("TypeScript type definitions for {}", camel_to_words(file_stem));
+    }
+
+    if rel_path.contains("/commands/") {
+        return format!("Tauri IPC command handlers for {}", camel_to_words(file_stem));
+    }
+
+    if rel_path.contains("/core/") {
+        return format!("Core {} business logic", camel_to_words(file_stem));
+    }
+
+    if rel_path.contains("/models/") {
+        return format!("Data models and types for {}", camel_to_words(file_stem));
+    }
+
+    if rel_path.contains("/db/") {
+        return format!("Database operations for {}", camel_to_words(file_stem));
+    }
+
+    // Check content for clues
+    if content.contains("async fn") || content.contains("async function") {
+        if content.contains("Result<") || content.contains("Promise<") {
+            if exports.len() == 1 {
+                return format!("Async {} operations", camel_to_words(&exports[0]));
+            }
+        }
+    }
+
+    // Fallback based on exports
     if exports.len() == 1 {
-        format!(
-            "Module providing {} functionality",
-            exports[0].replace('_', " ")
-        )
+        format!("{} implementation", pascal_to_words(&exports[0]))
     } else if exports.is_empty() {
-        format!("TODO: Describe what {} does", file_stem)
+        format!("{} module", pascal_to_words(file_stem))
     } else {
         format!(
-            "Module providing {} and {} more exports",
-            exports[0].replace('_', " "),
+            "{} with {} related exports",
+            pascal_to_words(&exports[0]),
             exports.len() - 1
         )
     }
+}
+
+/// Infer purpose bullet points from file location and exports.
+fn infer_purpose(rel_path: &str, exports: &[String], content: &str) -> Vec<String> {
+    let mut purposes = Vec::new();
+    let file_stem = Path::new(rel_path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("module");
+
+    // Hook-specific purposes
+    if rel_path.contains("/hooks/") || file_stem.starts_with("use") {
+        purposes.push("Encapsulate related state logic".to_string());
+        if content.contains("useState") {
+            purposes.push("Manage local component state".to_string());
+        }
+        if content.contains("useEffect") {
+            purposes.push("Handle side effects and lifecycle".to_string());
+        }
+        if content.contains("useCallback") || content.contains("useMemo") {
+            purposes.push("Optimize re-renders with memoization".to_string());
+        }
+        if content.contains("invoke(") || content.contains("invoke<") {
+            purposes.push("Bridge frontend to Tauri backend via IPC".to_string());
+        }
+    }
+    // Component-specific purposes
+    else if rel_path.contains("/components/") {
+        purposes.push(format!("Render {} UI elements", pascal_to_words(file_stem)));
+        if content.contains("onClick") || content.contains("onSubmit") || content.contains("onChange") {
+            purposes.push("Handle user interactions".to_string());
+        }
+        if content.contains("props") || content.contains("Props") {
+            purposes.push("Accept configuration via props".to_string());
+        }
+    }
+    // Store-specific purposes
+    else if rel_path.contains("/stores/") || file_stem.ends_with("Store") {
+        purposes.push("Provide global state container".to_string());
+        purposes.push("Expose actions for state mutations".to_string());
+        if content.contains("persist") {
+            purposes.push("Persist state across sessions".to_string());
+        }
+    }
+    // Command-specific purposes (Tauri)
+    else if rel_path.contains("/commands/") {
+        purposes.push("Handle IPC calls from frontend".to_string());
+        if content.contains("State<") {
+            purposes.push("Access shared application state".to_string());
+        }
+        if content.contains("db.") || content.contains("database") {
+            purposes.push("Perform database operations".to_string());
+        }
+    }
+    // Core logic purposes
+    else if rel_path.contains("/core/") {
+        purposes.push(format!("Implement {} business logic", camel_to_words(file_stem)));
+        if content.contains("pub fn") || content.contains("export function") {
+            purposes.push("Expose public API for other modules".to_string());
+        }
+    }
+    // Type definition purposes
+    else if rel_path.contains("/types/") {
+        purposes.push("Define TypeScript interfaces and types".to_string());
+        purposes.push("Ensure type safety across the codebase".to_string());
+    }
+    // Utility purposes
+    else if rel_path.contains("/lib/") || rel_path.contains("/utils/") {
+        purposes.push("Provide reusable helper functions".to_string());
+        if content.contains("export const") {
+            purposes.push("Export shared constants".to_string());
+        }
+    }
+
+    // Generic fallback based on exports
+    if purposes.is_empty() {
+        for export in exports.iter().take(3) {
+            purposes.push(format!("Provide {} functionality", camel_to_words(export)));
+        }
+    }
+
+    if purposes.is_empty() {
+        purposes.push(format!("Implement {} logic", pascal_to_words(file_stem)));
+    }
+
+    purposes
+}
+
+/// Infer usage patterns from file type and content.
+fn infer_patterns(rel_path: &str, ext: &str, exports: &[String], content: &str) -> Vec<String> {
+    let mut patterns = Vec::new();
+    let file_stem = Path::new(rel_path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("module");
+
+    // Hook patterns
+    if rel_path.contains("/hooks/") || file_stem.starts_with("use") {
+        patterns.push(format!("Call {}() at the top of functional components", file_stem));
+        patterns.push("Destructure returned values for state and actions".to_string());
+    }
+    // Component patterns
+    else if rel_path.contains("/components/") {
+        if let Some(main_export) = exports.first() {
+            patterns.push(format!("Import and render <{} /> in parent components", main_export));
+        }
+        if content.contains("interface") && content.contains("Props") {
+            patterns.push("Pass required props as defined in the Props interface".to_string());
+        }
+    }
+    // Store patterns
+    else if rel_path.contains("/stores/") || file_stem.ends_with("Store") {
+        if let Some(main_export) = exports.first() {
+            patterns.push(format!("Use {}(selector) to subscribe to specific state slices", main_export));
+        }
+        patterns.push("Call actions directly from the store hook".to_string());
+    }
+    // Tauri command patterns
+    else if rel_path.contains("/commands/") {
+        patterns.push("Commands are async and return Result<T, String>".to_string());
+        patterns.push("Use State<AppState> for shared application state".to_string());
+        patterns.push("Map errors to strings with .map_err(|e| e.to_string())".to_string());
+    }
+
+    // Language-specific patterns
+    match ext {
+        "ts" | "tsx" => {
+            if content.contains("export default") {
+                patterns.push("Use default import for the main export".to_string());
+            } else if !exports.is_empty() {
+                patterns.push("Use named imports: { ... } from".to_string());
+            }
+        }
+        "rs" => {
+            if content.contains("Result<") {
+                patterns.push("Handle Results with ? operator or match".to_string());
+            }
+            if content.contains("async fn") {
+                patterns.push("Await async functions or spawn as tasks".to_string());
+            }
+        }
+        "py" => {
+            if content.contains("async def") {
+                patterns.push("Use await when calling async functions".to_string());
+            }
+            if content.contains("class ") {
+                patterns.push("Instantiate classes before calling methods".to_string());
+            }
+        }
+        _ => {}
+    }
+
+    if patterns.is_empty() {
+        patterns.push("Import and use exports as needed".to_string());
+    }
+
+    patterns
+}
+
+/// Infer Claude-specific notes from code characteristics.
+fn infer_claude_notes(rel_path: &str, ext: &str, exports: &[String], imports: &[String]) -> Vec<String> {
+    let mut notes = Vec::new();
+    let file_stem = Path::new(rel_path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("module");
+
+    // Note about file location
+    if rel_path.contains("/components/") {
+        notes.push("This is a React component - prefer composition over prop drilling".to_string());
+    } else if rel_path.contains("/hooks/") {
+        notes.push("Custom hooks should follow Rules of Hooks".to_string());
+    } else if rel_path.contains("/commands/") {
+        notes.push("Tauri commands are registered in lib.rs invoke_handler".to_string());
+    } else if rel_path.contains("/core/") {
+        notes.push("Core modules should be framework-agnostic when possible".to_string());
+    }
+
+    // Note about exports count
+    if exports.len() > 5 {
+        notes.push(format!("Large module with {} exports - consider splitting", exports.len()));
+    }
+
+    // Note about dependencies
+    if imports.len() > 8 {
+        notes.push(format!("Has {} imports - high coupling, review dependencies", imports.len()));
+    }
+
+    // Language-specific notes
+    match ext {
+        "ts" | "tsx" => {
+            if file_stem.starts_with("use") {
+                notes.push("Hook names must start with 'use' for React rules".to_string());
+            }
+        }
+        "rs" => {
+            notes.push("Run cargo clippy before committing changes".to_string());
+        }
+        "py" => {
+            notes.push("Follow PEP 8 style guidelines".to_string());
+        }
+        _ => {}
+    }
+
+    // Always add a reminder
+    if notes.is_empty() {
+        notes.push(format!("Update this documentation when {} changes significantly", file_stem));
+    }
+
+    notes
+}
+
+/// Infer a description for a dependency based on its import path.
+fn infer_dependency_description(import_path: &str) -> String {
+    // Common import patterns
+    if import_path.contains("/stores/") {
+        return format!("{} - Global state management", import_path);
+    }
+    if import_path.contains("/hooks/") {
+        return format!("{} - Custom hook utilities", import_path);
+    }
+    if import_path.contains("/lib/") || import_path.contains("/utils/") {
+        return format!("{} - Utility functions", import_path);
+    }
+    if import_path.contains("/types/") {
+        return format!("{} - Type definitions", import_path);
+    }
+    if import_path.contains("/components/ui/") {
+        return format!("{} - UI primitive component", import_path);
+    }
+    if import_path.contains("/components/") {
+        return format!("{} - UI component", import_path);
+    }
+    if import_path.starts_with("@tauri-apps/") {
+        return format!("{} - Tauri API binding", import_path);
+    }
+    if import_path.starts_with("@/") {
+        return format!("{} - Internal module", import_path);
+    }
+    if import_path.starts_with("crate::") {
+        let module = import_path.trim_start_matches("crate::");
+        return format!("{} - Internal crate module", module);
+    }
+
+    format!("{} - Imported dependency", import_path)
+}
+
+/// Infer a description for an export based on naming conventions.
+fn infer_export_description(export_name: &str, rel_path: &str) -> String {
+    let name_lower = export_name.to_lowercase();
+
+    // Hook exports
+    if export_name.starts_with("use") {
+        let hook_purpose = export_name.strip_prefix("use").unwrap_or(export_name);
+        return format!("{} - React hook for {} state/actions", export_name, camel_to_words(hook_purpose));
+    }
+
+    // Interface/Type exports
+    if export_name.ends_with("Props") {
+        let component = export_name.strip_suffix("Props").unwrap_or(export_name);
+        return format!("{} - Props interface for {} component", export_name, component);
+    }
+    if export_name.ends_with("State") {
+        let domain = export_name.strip_suffix("State").unwrap_or(export_name);
+        return format!("{} - State shape for {}", export_name, domain);
+    }
+    if export_name.ends_with("Config") || export_name.ends_with("Options") {
+        return format!("{} - Configuration type", export_name);
+    }
+
+    // Constants
+    if export_name.chars().all(|c| c.is_uppercase() || c == '_') {
+        return format!("{} - Constant value", export_name);
+    }
+
+    // Common function patterns
+    if name_lower.starts_with("get") {
+        let target = export_name.strip_prefix("get").unwrap_or(export_name);
+        return format!("{} - Retrieves {}", export_name, camel_to_words(target));
+    }
+    if name_lower.starts_with("set") {
+        let target = export_name.strip_prefix("set").unwrap_or(export_name);
+        return format!("{} - Updates {}", export_name, camel_to_words(target));
+    }
+    if name_lower.starts_with("create") {
+        let target = export_name.strip_prefix("create").unwrap_or(export_name);
+        return format!("{} - Creates new {}", export_name, camel_to_words(target));
+    }
+    if name_lower.starts_with("delete") || name_lower.starts_with("remove") {
+        return format!("{} - Removes item", export_name);
+    }
+    if name_lower.starts_with("update") {
+        let target = export_name.strip_prefix("update").unwrap_or(export_name);
+        return format!("{} - Modifies {}", export_name, camel_to_words(target));
+    }
+    if name_lower.starts_with("handle") {
+        let event = export_name.strip_prefix("handle").unwrap_or(export_name);
+        return format!("{} - Event handler for {}", export_name, camel_to_words(event));
+    }
+    if name_lower.starts_with("on") && export_name.len() > 2 {
+        let event = &export_name[2..];
+        return format!("{} - Callback for {} events", export_name, camel_to_words(event));
+    }
+    if name_lower.starts_with("is") || name_lower.starts_with("has") || name_lower.starts_with("can") {
+        return format!("{} - Boolean check", export_name);
+    }
+    if name_lower.starts_with("calculate") || name_lower.starts_with("compute") {
+        return format!("{} - Calculates derived value", export_name);
+    }
+    if name_lower.starts_with("parse") {
+        return format!("{} - Parses input data", export_name);
+    }
+    if name_lower.starts_with("format") {
+        return format!("{} - Formats output data", export_name);
+    }
+    if name_lower.starts_with("validate") {
+        return format!("{} - Validates input", export_name);
+    }
+    if name_lower.starts_with("fetch") || name_lower.starts_with("load") {
+        return format!("{} - Async data fetching", export_name);
+    }
+    if name_lower.starts_with("save") || name_lower.starts_with("store") {
+        return format!("{} - Persists data", export_name);
+    }
+
+    // Check if it's likely a component (PascalCase in components folder)
+    if rel_path.contains("/components/") && export_name.chars().next().map_or(false, |c| c.is_uppercase()) {
+        return format!("{} - React component", export_name);
+    }
+
+    // Default
+    format!("{} - Exported function/value", export_name)
+}
+
+/// Convert camelCase or PascalCase to lowercase words.
+fn camel_to_words(s: &str) -> String {
+    let mut result = String::new();
+    for (i, c) in s.chars().enumerate() {
+        if c.is_uppercase() && i > 0 {
+            result.push(' ');
+        }
+        result.push(c.to_ascii_lowercase());
+    }
+    result
+}
+
+/// Convert PascalCase to title case words.
+fn pascal_to_words(s: &str) -> String {
+    let mut result = String::new();
+    for (i, c) in s.chars().enumerate() {
+        if c.is_uppercase() && i > 0 {
+            result.push(' ');
+            result.push(c.to_ascii_lowercase());
+        } else if i == 0 {
+            result.push(c.to_ascii_uppercase());
+        } else {
+            result.push(c);
+        }
+    }
+    result
 }
 
 // ---------------------------------------------------------------------------

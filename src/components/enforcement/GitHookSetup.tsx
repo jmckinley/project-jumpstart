@@ -37,7 +37,7 @@ interface GitHookSetupProps {
   hookStatus: HookStatus | null;
   loading: boolean;
   installing: boolean;
-  onInstall: (mode: string) => void;
+  onInstall: (mode: "warn" | "block") => void;
   onRefresh: () => void;
 }
 

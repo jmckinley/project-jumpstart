@@ -87,7 +87,7 @@ export function ProjectSelect() {
 
         {/* Title & Description */}
         <h2 className="mb-2 text-2xl font-semibold text-neutral-100">
-          Welcome to Claude Code Copilot
+          Welcome to Project Jumpstart
         </h2>
         <p className="mb-8 text-sm leading-relaxed text-neutral-400">
           Select a project folder to get started. We'll scan your codebase to

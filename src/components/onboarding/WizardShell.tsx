@@ -5,7 +5,7 @@
  * PURPOSE:
  * - Render step indicator showing progress through steps 1-4
  * - Display the active step component based on current step
- * - Provide Back/Next navigation buttons at the bottom
+ * - Provide Back/Next/Cancel navigation buttons at the bottom
  * - Orchestrate the overall onboarding flow
  *
  * DEPENDENCIES:
@@ -23,11 +23,13 @@
  * - Step indicator highlights completed and current steps
  * - Back button disabled on step 1, Next button disabled when step is incomplete
  * - Step 4 hides Next button (ReviewGenerate has its own "Create Project" button)
+ * - Cancel button shown only when onCancel prop is provided (for adding new projects)
  *
  * CLAUDE NOTES:
  * - Steps: 1=ProjectSelect, 2=AnalysisResults, 3=GoalsSelect, 4=ReviewGenerate
  * - Back/Next buttons are hidden on steps that manage their own navigation (step 1 auto-advances)
  * - The onComplete callback should be passed through to ReviewGenerate
+ * - The onCancel callback is optional - shown when user is adding a new project (has existing projects)
  * - Step validation: step 1 needs projectPath, step 2 needs language+projectName, step 3 always valid
  */
 
@@ -47,9 +49,10 @@ const STEPS = [
 
 interface WizardShellProps {
   onComplete: (project: Project) => void;
+  onCancel?: () => void;
 }
 
-export function WizardShell({ onComplete }: WizardShellProps) {
+export function WizardShell({ onComplete, onCancel }: WizardShellProps) {
   const step = useOnboardingStore((s) => s.step);
   const setStep = useOnboardingStore((s) => s.setStep);
   const projectPath = useOnboardingStore((s) => s.projectPath);
@@ -155,17 +158,27 @@ export function WizardShell({ onComplete }: WizardShellProps) {
 
       {/* Navigation Buttons */}
       <div className="flex items-center justify-between border-t border-neutral-800 px-6 py-4">
-        <button
-          onClick={handleBack}
-          disabled={step <= 1}
-          className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-            step <= 1
-              ? "cursor-not-allowed text-neutral-600"
-              : "text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100"
-          }`}
-        >
-          Back
-        </button>
+        <div className="flex items-center gap-2">
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              className="rounded-md px-4 py-2 text-sm font-medium text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-neutral-100"
+            >
+              Cancel
+            </button>
+          )}
+          <button
+            onClick={handleBack}
+            disabled={step <= 1}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+              step <= 1
+                ? "cursor-not-allowed text-neutral-600"
+                : "text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100"
+            }`}
+          >
+            Back
+          </button>
+        </div>
 
         {step < 4 && (
           <button

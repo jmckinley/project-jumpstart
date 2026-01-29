@@ -23,7 +23,7 @@
 //! - chrono - Timestamp generation
 //!
 //! PATTERNS:
-//! - Database file location: ~/.claude-code-copilot/copilot.db
+//! - Database file location: ~/.project-jumpstart/jumpstart.db
 //! - Migrations run automatically on init_db()
 //! - AppState is managed via Tauri's State<AppState>
 //! - log_activity_db is called directly by commands, not via IPC
@@ -69,16 +69,16 @@ pub fn log_activity_db(
     Ok(())
 }
 
-/// Initialize the database at ~/.claude-code-copilot/copilot.db
+/// Initialize the database at ~/.project-jumpstart/jumpstart.db
 /// Creates the directory and database file if they don't exist.
 /// Runs all schema migrations.
 pub fn init_db() -> Result<Connection, String> {
     let home = dirs::home_dir().ok_or("Could not determine home directory")?;
-    let data_dir = home.join(".claude-code-copilot");
+    let data_dir = home.join(".project-jumpstart");
 
     fs::create_dir_all(&data_dir).map_err(|e| format!("Failed to create data directory: {}", e))?;
 
-    let db_path = data_dir.join("copilot.db");
+    let db_path = data_dir.join("jumpstart.db");
     let conn =
         Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
 

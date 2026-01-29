@@ -107,6 +107,7 @@ export const PROJECT_TYPES = [
   "CLI",
   "Library",
   "Monorepo",
+  "Extension",
 ] as const;
 
 export const FRAMEWORKS: Record<string, string[]> = {
@@ -124,6 +125,7 @@ export const FRAMEWORKS: Record<string, string[]> = {
     "Hono",
     "Tauri",
     "Electron",
+    "Chrome Extension",
   ],
   JavaScript: [
     "React",
@@ -135,6 +137,7 @@ export const FRAMEWORKS: Record<string, string[]> = {
     "Express",
     "Fastify",
     "Electron",
+    "Chrome Extension",
   ],
   Python: ["Django", "FastAPI", "Flask", "Starlette", "Tornado"],
   Rust: ["Tauri", "Actix Web", "Axum", "Rocket", "Warp", "Leptos", "Yew", "Dioxus"],
