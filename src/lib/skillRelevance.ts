@@ -114,6 +114,14 @@ const TECH_TAG_MAP: Record<string, TechTag> = {
   mysql: "mysql",
   sqlite: "sqlite",
   mongodb: "mongodb",
+  supabase: "supabase",
+  firebase: "firebase",
+  "firebase/firestore": "firebase",
+  firestore: "firebase",
+  prisma: "prisma",
+  "prisma orm": "prisma",
+  drizzle: "prisma", // Map to prisma as they're similar ORM patterns
+  "drizzle orm": "prisma",
 };
 
 /**

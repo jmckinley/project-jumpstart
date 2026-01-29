@@ -11,7 +11,7 @@
  * - @/types/skill - LibrarySkill type
  *
  * EXPORTS:
- * - SKILL_LIBRARY - Array of LibrarySkill objects (~41 skills)
+ * - SKILL_LIBRARY - Array of LibrarySkill objects (~46 skills)
  *
  * PATTERNS:
  * - Each skill has markdown content with sections: When to use, Instructions, Template, Rules
@@ -3045,5 +3045,639 @@ CREATE INDEX CONCURRENTLY idx_users_email ON users(email);
 - Test on copy of production data
 - Use transactions when possible
 - Add indexes concurrently on large tables`,
+  },
+  {
+    slug: "supabase-patterns",
+    name: "Supabase Patterns",
+    description: "Supabase authentication, database queries, and real-time subscriptions",
+    category: "database",
+    tags: ["typescript", "javascript", "react", "supabase"],
+    content: `## When to use
+Use when building apps with Supabase for auth, database, and real-time features.
+
+## Authentication Setup
+\`\`\`typescript
+// Initialize client
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+// With React (auth-helpers)
+import { SessionContextProvider } from '@supabase/auth-helpers-react';
+
+function App({ children }) {
+  return (
+    <SessionContextProvider supabaseClient={supabase}>
+      {children}
+    </SessionContextProvider>
+  );
+}
+
+// Use session in components
+import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
+
+function Profile() {
+  const session = useSession();
+  const supabase = useSupabaseClient();
+
+  if (!session) return <Login />;
+  return <div>Welcome {session.user.email}</div>;
+}
+\`\`\`
+
+## Database Queries
+\`\`\`typescript
+// Select with filters
+const { data, error } = await supabase
+  .from('tasks')
+  .select('id, title, due_date, course:courses(name)')
+  .eq('user_id', userId)
+  .gte('due_date', today)
+  .order('due_date', { ascending: true });
+
+// Insert
+const { data, error } = await supabase
+  .from('tasks')
+  .insert({ title, due_date, user_id: session.user.id })
+  .select()
+  .single();
+
+// Update
+const { error } = await supabase
+  .from('tasks')
+  .update({ completed: true })
+  .eq('id', taskId);
+
+// Delete
+const { error } = await supabase
+  .from('tasks')
+  .delete()
+  .eq('id', taskId);
+
+// Upsert (insert or update)
+const { data, error } = await supabase
+  .from('settings')
+  .upsert({ user_id: userId, theme: 'dark' })
+  .select()
+  .single();
+\`\`\`
+
+## Real-time Subscriptions
+\`\`\`typescript
+useEffect(() => {
+  const channel = supabase
+    .channel('tasks-changes')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'tasks', filter: \`user_id=eq.\${userId}\` },
+      (payload) => {
+        if (payload.eventType === 'INSERT') addTask(payload.new);
+        if (payload.eventType === 'UPDATE') updateTask(payload.new);
+        if (payload.eventType === 'DELETE') removeTask(payload.old.id);
+      }
+    )
+    .subscribe();
+
+  return () => { supabase.removeChannel(channel); };
+}, [userId]);
+\`\`\`
+
+## Row Level Security (RLS)
+\`\`\`sql
+-- Enable RLS
+ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+
+-- Users can only see their own tasks
+CREATE POLICY "Users view own tasks" ON tasks
+  FOR SELECT USING (auth.uid() = user_id);
+
+-- Users can only insert their own tasks
+CREATE POLICY "Users insert own tasks" ON tasks
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Users can only update their own tasks
+CREATE POLICY "Users update own tasks" ON tasks
+  FOR UPDATE USING (auth.uid() = user_id);
+\`\`\`
+
+## Rules
+- Always enable RLS on tables with user data
+- Use \`.single()\` when expecting one row
+- Handle errors from every query
+- Use typed client with \`Database\` generic for type safety`,
+  },
+  {
+    slug: "firebase-patterns",
+    name: "Firebase Patterns",
+    description: "Firebase authentication, Firestore queries, and real-time listeners",
+    category: "database",
+    tags: ["typescript", "javascript", "react", "firebase"],
+    content: `## When to use
+Use when building apps with Firebase for auth, Firestore database, and real-time sync.
+
+## Authentication Setup
+\`\`\`typescript
+// Initialize Firebase
+import { initializeApp } from 'firebase/app';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+
+const app = initializeApp({
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+});
+
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+
+// Auth state hook
+function useAuth() {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    return onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      setLoading(false);
+    });
+  }, []);
+
+  return { user, loading };
+}
+
+// Sign in
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+await signInWithPopup(auth, new GoogleAuthProvider());
+\`\`\`
+
+## Firestore Queries
+\`\`\`typescript
+import {
+  collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc,
+  query, where, orderBy, limit, onSnapshot
+} from 'firebase/firestore';
+
+// Get single document
+const docSnap = await getDoc(doc(db, 'users', odById));
+if (docSnap.exists()) {
+  const user = { id: docSnap.id, ...docSnap.data() };
+}
+
+// Query collection
+const q = query(
+  collection(db, 'tasks'),
+  where('userId', '==', currentUser.uid),
+  where('completed', '==', false),
+  orderBy('dueDate', 'asc'),
+  limit(50)
+);
+const snapshot = await getDocs(q);
+const tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+// Add document
+const docRef = await addDoc(collection(db, 'tasks'), {
+  title: 'New Task',
+  userId: currentUser.uid,
+  createdAt: serverTimestamp(),
+});
+
+// Update document
+await updateDoc(doc(db, 'tasks', taskId), {
+  completed: true,
+  completedAt: serverTimestamp(),
+});
+
+// Delete document
+await deleteDoc(doc(db, 'tasks', taskId));
+\`\`\`
+
+## Real-time Listeners
+\`\`\`typescript
+useEffect(() => {
+  const q = query(
+    collection(db, 'tasks'),
+    where('userId', '==', user.uid),
+    orderBy('createdAt', 'desc')
+  );
+
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const tasks = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    setTasks(tasks);
+  });
+
+  return () => unsubscribe();
+}, [user.uid]);
+\`\`\`
+
+## Security Rules
+\`\`\`javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /tasks/{taskId} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.userId;
+    }
+  }
+}
+\`\`\`
+
+## Rules
+- Always unsubscribe from listeners in cleanup
+- Use \`serverTimestamp()\` for consistent timestamps
+- Index compound queries in Firebase console
+- Keep documents under 1MB`,
+  },
+  {
+    slug: "prisma-patterns",
+    name: "Prisma Patterns",
+    description: "Prisma ORM for type-safe database queries and migrations",
+    category: "database",
+    tags: ["typescript", "prisma", "postgresql", "mysql", "sqlite"],
+    content: `## When to use
+Use Prisma for type-safe database access with auto-generated TypeScript types.
+
+## Schema Definition
+\`\`\`prisma
+// prisma/schema.prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  tasks     Task[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Task {
+  id        String   @id @default(cuid())
+  title     String
+  completed Boolean  @default(false)
+  dueDate   DateTime?
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([dueDate])
+}
+\`\`\`
+
+## Client Setup
+\`\`\`typescript
+// lib/prisma.ts
+import { PrismaClient } from '@prisma/client';
+
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+
+export const prisma = globalForPrisma.prisma || new PrismaClient();
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+\`\`\`
+
+## CRUD Operations
+\`\`\`typescript
+// Create
+const user = await prisma.user.create({
+  data: { email: 'user@example.com', name: 'John' },
+});
+
+// Read with relations
+const userWithTasks = await prisma.user.findUnique({
+  where: { id: userId },
+  include: { tasks: { where: { completed: false }, orderBy: { dueDate: 'asc' } } },
+});
+
+// Update
+const task = await prisma.task.update({
+  where: { id: taskId },
+  data: { completed: true },
+});
+
+// Delete
+await prisma.task.delete({ where: { id: taskId } });
+
+// Upsert
+const settings = await prisma.settings.upsert({
+  where: { userId },
+  update: { theme: 'dark' },
+  create: { userId, theme: 'dark' },
+});
+
+// Transaction
+const [task, user] = await prisma.$transaction([
+  prisma.task.create({ data: taskData }),
+  prisma.user.update({ where: { id: userId }, data: { taskCount: { increment: 1 } } }),
+]);
+\`\`\`
+
+## Advanced Queries
+\`\`\`typescript
+// Aggregation
+const stats = await prisma.task.aggregate({
+  where: { userId },
+  _count: true,
+  _avg: { priority: true },
+});
+
+// Group by
+const tasksByStatus = await prisma.task.groupBy({
+  by: ['completed'],
+  where: { userId },
+  _count: true,
+});
+
+// Raw SQL (when needed)
+const result = await prisma.$queryRaw\`
+  SELECT * FROM tasks WHERE due_date < NOW() AND completed = false
+\`;
+\`\`\`
+
+## Commands
+\`\`\`bash
+npx prisma generate    # Generate client after schema changes
+npx prisma migrate dev # Create and apply migration
+npx prisma studio      # Open visual database browser
+npx prisma db push     # Push schema without migration (dev only)
+\`\`\`
+
+## Rules
+- Run \`prisma generate\` after schema changes
+- Use singleton pattern to avoid connection pool exhaustion
+- Add indexes for frequently queried fields
+- Use transactions for related operations`,
+  },
+  {
+    slug: "drizzle-patterns",
+    name: "Drizzle Patterns",
+    description: "Drizzle ORM for lightweight, type-safe SQL queries",
+    category: "database",
+    tags: ["typescript", "postgresql", "mysql", "sqlite"],
+    content: `## When to use
+Use Drizzle for a lightweight, SQL-like TypeScript ORM with excellent performance.
+
+## Schema Definition
+\`\`\`typescript
+// db/schema.ts
+import { pgTable, text, boolean, timestamp, uuid } from 'drizzle-orm/pg-core';
+
+export const users = pgTable('users', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  email: text('email').notNull().unique(),
+  name: text('name'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const tasks = pgTable('tasks', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  title: text('title').notNull(),
+  completed: boolean('completed').default(false).notNull(),
+  dueDate: timestamp('due_date'),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Infer types from schema
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type Task = typeof tasks.$inferSelect;
+\`\`\`
+
+## Client Setup
+\`\`\`typescript
+// db/index.ts
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+import * as schema from './schema';
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const db = drizzle(pool, { schema });
+\`\`\`
+
+## CRUD Operations
+\`\`\`typescript
+import { eq, and, gte, desc } from 'drizzle-orm';
+import { db } from './db';
+import { users, tasks } from './db/schema';
+
+// Create
+const [user] = await db.insert(users)
+  .values({ email: 'user@example.com', name: 'John' })
+  .returning();
+
+// Read with conditions
+const userTasks = await db.select()
+  .from(tasks)
+  .where(and(
+    eq(tasks.userId, userId),
+    eq(tasks.completed, false)
+  ))
+  .orderBy(desc(tasks.dueDate));
+
+// Read with joins
+const tasksWithUser = await db.select({
+  task: tasks,
+  userName: users.name,
+})
+  .from(tasks)
+  .leftJoin(users, eq(tasks.userId, users.id))
+  .where(eq(tasks.userId, userId));
+
+// Update
+await db.update(tasks)
+  .set({ completed: true })
+  .where(eq(tasks.id, taskId));
+
+// Delete
+await db.delete(tasks)
+  .where(eq(tasks.id, taskId));
+\`\`\`
+
+## Transactions
+\`\`\`typescript
+await db.transaction(async (tx) => {
+  const [task] = await tx.insert(tasks)
+    .values({ title: 'New Task', userId })
+    .returning();
+
+  await tx.update(users)
+    .set({ taskCount: sql\`task_count + 1\` })
+    .where(eq(users.id, userId));
+
+  return task;
+});
+\`\`\`
+
+## Migrations
+\`\`\`bash
+# Generate migration from schema changes
+npx drizzle-kit generate:pg
+
+# Apply migrations
+npx drizzle-kit push:pg
+
+# Open Drizzle Studio
+npx drizzle-kit studio
+\`\`\`
+
+## Rules
+- Use \`$inferSelect\` and \`$inferInsert\` for type inference
+- Prefer \`returning()\` to get inserted/updated data
+- Use transactions for related operations
+- Drizzle is SQL-first - learn the SQL it generates`,
+  },
+  {
+    slug: "mongodb-patterns",
+    name: "MongoDB Patterns",
+    description: "MongoDB with Mongoose for document database operations",
+    category: "database",
+    tags: ["typescript", "javascript", "mongodb"],
+    content: `## When to use
+Use MongoDB/Mongoose for flexible document storage with JavaScript-native feel.
+
+## Schema Definition
+\`\`\`typescript
+// models/User.ts
+import mongoose, { Schema, Document } from 'mongoose';
+
+export interface IUser extends Document {
+  email: string;
+  name?: string;
+  tasks: mongoose.Types.ObjectId[];
+  createdAt: Date;
+}
+
+const userSchema = new Schema<IUser>({
+  email: { type: String, required: true, unique: true },
+  name: String,
+  tasks: [{ type: Schema.Types.ObjectId, ref: 'Task' }],
+}, { timestamps: true });
+
+export const User = mongoose.model<IUser>('User', userSchema);
+
+// models/Task.ts
+export interface ITask extends Document {
+  title: string;
+  completed: boolean;
+  dueDate?: Date;
+  user: mongoose.Types.ObjectId;
+}
+
+const taskSchema = new Schema<ITask>({
+  title: { type: String, required: true },
+  completed: { type: Boolean, default: false },
+  dueDate: Date,
+  user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+}, { timestamps: true });
+
+taskSchema.index({ user: 1, dueDate: 1 });
+
+export const Task = mongoose.model<ITask>('Task', taskSchema);
+\`\`\`
+
+## Connection Setup
+\`\`\`typescript
+// lib/mongodb.ts
+import mongoose from 'mongoose';
+
+const MONGODB_URI = process.env.MONGODB_URI!;
+
+let cached = global.mongoose;
+
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
+
+export async function connectDB() {
+  if (cached.conn) return cached.conn;
+
+  if (!cached.promise) {
+    cached.promise = mongoose.connect(MONGODB_URI);
+  }
+  cached.conn = await cached.promise;
+  return cached.conn;
+}
+\`\`\`
+
+## CRUD Operations
+\`\`\`typescript
+// Create
+const user = await User.create({ email: 'user@example.com', name: 'John' });
+
+// Read with population
+const userWithTasks = await User.findById(userId)
+  .populate({
+    path: 'tasks',
+    match: { completed: false },
+    options: { sort: { dueDate: 1 } }
+  });
+
+// Find with conditions
+const tasks = await Task.find({
+  user: userId,
+  completed: false,
+  dueDate: { $gte: new Date() }
+}).sort({ dueDate: 1 });
+
+// Update
+await Task.findByIdAndUpdate(taskId, { completed: true }, { new: true });
+
+// Update many
+await Task.updateMany(
+  { user: userId, dueDate: { $lt: new Date() } },
+  { $set: { overdue: true } }
+);
+
+// Delete
+await Task.findByIdAndDelete(taskId);
+\`\`\`
+
+## Aggregation Pipeline
+\`\`\`typescript
+const taskStats = await Task.aggregate([
+  { $match: { user: new mongoose.Types.ObjectId(userId) } },
+  { $group: {
+    _id: '$completed',
+    count: { $sum: 1 },
+    avgPriority: { $avg: '$priority' }
+  }},
+]);
+
+// Tasks grouped by date
+const tasksByDate = await Task.aggregate([
+  { $match: { user: new mongoose.Types.ObjectId(userId) } },
+  { $group: {
+    _id: { $dateToString: { format: '%Y-%m-%d', date: '$dueDate' } },
+    tasks: { $push: '$$ROOT' },
+    count: { $sum: 1 }
+  }},
+  { $sort: { '_id': 1 } }
+]);
+\`\`\`
+
+## Rules
+- Always add indexes for queried fields
+- Use \`lean()\` for read-only queries (better performance)
+- Avoid deep nesting; prefer references
+- Use transactions for multi-document operations`,
   },
 ];

@@ -81,7 +81,10 @@ export type TechTag =
   | "postgresql"
   | "mysql"
   | "sqlite"
-  | "mongodb";
+  | "mongodb"
+  | "supabase"
+  | "firebase"
+  | "prisma";
 
 /**
  * Categories for organizing skills in the library.

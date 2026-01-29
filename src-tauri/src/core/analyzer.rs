@@ -218,16 +218,34 @@ pub async fn generate_module_doc_with_ai(
         The documentation will be placed at the top of source files to help AI coding assistants \
         understand the module quickly without reading all the code. \
         \
-        Return a JSON object with these exact fields: \
-        - description: string, one-line summary of what this module does (concise, starts with verb) \
-        - purpose: array of strings, each explaining a main responsibility (2-4 items) \
-        - dependencies: array of strings in format 'import/path - why this dependency is needed' \
-        - exports: array of strings in format 'functionName - brief description of what it does' \
-        - patterns: array of strings describing how to use this module correctly (usage examples, conventions) \
-        - claude_notes: array of strings with important context an AI should always remember \
-          (gotchas, related files to check, common mistakes to avoid) \
+        CRITICAL QUALITY REQUIREMENTS: \
+        - description MUST be specific and actionable, NOT generic like 'Task module' or 'Implements X logic'. \
+          Good: 'Renders grouped task list with Past Due, Today, Tomorrow sections and handles completion/snooze actions' \
+          Bad: 'Task list module' or 'Implements task list logic' \
+        - exports MUST include the TYPE (function, interface, type, class, const, hook) and what it actually does. \
+          Good: 'Task (interface) - Shape of a task with id, title, due_date, completed fields' \
+          Bad: 'Task - Exported function/value' \
+        - claude_notes MUST contain REAL insights from the code, not placeholder text. \
+          Good: 'Tasks are grouped by comparing due_date to today/tomorrow; completed tasks always sort last' \
+          Bad: 'Update this documentation when X changes' \
         \
-        Be concise and practical. Focus on information that survives context compaction. \
+        Return a JSON object with these exact fields: \
+        - description: string, one-line summary that explains WHAT this module does and WHY it exists (be specific!) \
+        - purpose: array of 2-4 strings, each a specific responsibility. Start with verbs. Include HOW it does things. \
+          Example: 'Group tasks into Past Due, Today, Tomorrow, Upcoming based on due_date comparison' \
+        - dependencies: array of strings in format 'import/path - specific reason this is imported' \
+          Example: '@supabase/auth-helpers-react - Provides useSession hook for auth state' \
+        - exports: array of strings in format 'name (type) - description'. Types: function, interface, type, class, const, hook, component \
+          Example: 'useTaskManager (hook) - Returns tasks, loading state, and CRUD actions for task management' \
+        - patterns: array of strings describing HOW to use this module with specific examples \
+          Example: 'Call useTaskManager() at component top; destructure { tasks, isLoading, syncData }' \
+        - claude_notes: array of 2-4 strings with REAL insights an AI needs to know. Include: \
+          * Data flow or state management approach used \
+          * Non-obvious behavior or edge cases \
+          * Related files that work together with this one \
+          * Common mistakes or things to watch out for \
+        \
+        Analyze the actual code to provide accurate, helpful documentation. \
         Output ONLY valid JSON, no markdown fences or explanation.";
 
     let prompt = format!(

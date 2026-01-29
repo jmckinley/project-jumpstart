@@ -59,20 +59,31 @@ pub async fn generate_claude_md_with_ai(
         persistent developer documentation that helps AI coding assistants understand the project \
         even after context compaction. The information in CLAUDE.md survives long coding sessions. \
         \
+        CRITICAL REQUIREMENTS FOR QUALITY: \
+        - The Overview must explain WHAT the app does, WHO uses it, and the CORE USER FLOW (not just 'a web app') \
+        - Architectural Decisions must have SPECIFIC rationale, never placeholders like '[Add rationale]' \
+        - Infer patterns and conventions from the actual source files provided \
+        - Identify key integrations (auth providers, APIs, external services) from imports and code \
+        \
         Include these sections in order: \
-        1. Overview - Project name as H1, brief description \
-        2. Tech Stack - Markdown table with Component | Technology | Notes columns \
-        3. Project Structure - Code block showing directory tree (important dirs only) \
-        4. Commands - Code block with common dev commands (install, dev, build, test, lint) \
+        1. Overview - Project name as H1, then 2-3 sentences explaining: what the app does, \
+           who the target users are, and the core user flow (e.g., 'Users sign up, create projects, invite collaborators') \
+        2. Tech Stack - Markdown table with Component | Technology | Notes columns. \
+           Include ALL detected technologies from the source files (auth libraries, data fetching, etc.) \
+        3. Project Structure - Code block showing directory tree with brief inline comments for key directories \
+        4. Commands - Code block with common dev commands. IMPORTANT: Check package.json/Cargo.toml to use the correct package manager (npm/pnpm/yarn) \
         5. Module Documentation Format - Show the exact format for file headers with @module, \
            @description, PURPOSE, DEPENDENCIES, EXPORTS, PATTERNS, CLAUDE NOTES sections \
-        6. Code Patterns - Bullet points of coding conventions for this stack \
-        7. Current Focus - Status, working on, next up (with placeholder text) \
-        8. Architectural Decisions - Key decisions with rationale \
-        9. CLAUDE NOTES - Important reminders organized by topic (General, Language-specific, Framework-specific) \
+        6. Code Patterns - Bullet points of coding conventions INFERRED from the actual code (naming, file organization, state management approach) \
+        7. Current Focus - Status: Active development, Working on: [current feature based on recent files], Next up: [logical next step] \
+        8. Architectural Decisions - At least 3 decisions with SPECIFIC rationale based on what you see in the code. \
+           Example: 'Supabase for auth: Provides row-level security, real-time subscriptions, and integrates with their PostgreSQL hosting' \
+        9. Key Integrations - List external services, APIs, auth providers detected in the code with brief notes on how they're used \
+        10. CLAUDE NOTES - Important reminders organized by topic. Include SPECIFIC gotchas inferred from the code \
+            (e.g., 'Tasks have two states: pending-tasks from email sync, tasks that are user-confirmed') \
         \
-        Keep the output concise and practical. Use markdown formatting. \
-        The Module Documentation Format section is critical - it defines how all source files should be documented.";
+        BE SPECIFIC. Avoid generic descriptions. If you see SWR imports, mention SWR. If you see Supabase auth, explain the auth flow. \
+        The goal is that an AI reading this file can immediately understand the project without reading source code.";
 
     // Collect source file listing (top 100 files)
     let file_list = collect_source_files(&project.path, 100);

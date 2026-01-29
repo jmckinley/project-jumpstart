@@ -1,11 +1,11 @@
 /**
  * @module components/onboarding/FirstUseWelcome
- * @description Welcome screen shown on first app launch with app introduction and optional API key setup
+ * @description Welcome screen shown on first app launch with app introduction and API key setup (strongly recommended)
  *
  * PURPOSE:
  * - Introduce users to Project Jumpstart on first launch
  * - Explain the app's purpose and key features
- * - Allow immediate API key entry (optional)
+ * - Allow immediate API key entry (strongly recommended)
  * - Transition user to main app or onboarding wizard
  *
  * DEPENDENCIES:
@@ -17,7 +17,7 @@
  *
  * PATTERNS:
  * - Displayed only when has_seen_welcome setting is false/null
- * - API key entry is optional - user can skip
+ * - API key entry is strongly recommended but can be skipped
  * - On completion, sets has_seen_welcome to "true"
  *
  * CLAUDE NOTES:
@@ -131,7 +131,7 @@ export function FirstUseWelcome({ onComplete }: FirstUseWelcomeProps) {
         <div className="mb-6">
           <label className="mb-2 block text-sm font-medium text-neutral-300">
             Anthropic API Key{" "}
-            <span className="font-normal text-neutral-500">(optional)</span>
+            <span className="font-normal text-amber-500">(strongly recommended)</span>
           </label>
           <input
             type="password"
