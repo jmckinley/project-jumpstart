@@ -19,15 +19,16 @@
  *
  * PATTERNS:
  * - Project field values are normalized to TechTag via TECH_TAG_MAP
- * - "universal" skills always get score 60 (recommended)
- * - Other skills: 40 + (matchedCount / totalTags) * 60 if any match, else 0
+ * - Scoring: 30 base + 20 per match (cap 60) + 10 specificity bonus
+ * - Universal skills always score 75 (recommended, ranked with 2-match skills)
  * - isRecommended = score >= 50
  * - Sorting: recommended first (descending score), then alphabetical
  *
  * CLAUDE NOTES:
  * - Add new mappings to TECH_TAG_MAP when project options expand
- * - Score range is 0-100, but only 0, 60, or 40-100 are produced
- * - Universal skills are always recommended but sorted below exact matches
+ * - Score outcomes: 0 (no match), 50-60 (1 match), 70-80 (2 matches), 90-100 (3+ matches)
+ * - Specificity bonus rewards focused skills without penalizing comprehensive ones
+ * - Match count is primary driver, not match ratio
  */
 
 import type { Project } from "@/types/project";
@@ -126,14 +127,27 @@ export function getProjectTags(project: Project | null): TechTag[] {
 /**
  * Calculate relevance score for a skill based on project tags.
  * Returns score (0-100), isRecommended flag, and matched tags.
+ *
+ * Scoring formula:
+ * - Universal skills: 75 (always recommended, ranked with 2-match skills)
+ * - Others: 30 base + 20 per match (capped at 60) + 10 specificity bonus
+ * - Specificity bonus: awarded if ≥50% of skill's tags are matched
+ *
+ * Score outcomes:
+ * - 0 matches: 0 (not recommended)
+ * - 1 match, low specificity: 50 (borderline recommended)
+ * - 1 match, high specificity: 60 (recommended)
+ * - 2 matches: 70-80 (highly recommended)
+ * - 3+ matches: 90-100 (top recommended)
  */
 export function scoreSkillRelevance(
   skill: LibrarySkill,
   projectTags: TechTag[],
 ): { score: number; isRecommended: boolean; matchedTags: TechTag[] } {
-  // Universal skills always score 60
+  // Universal skills always score 75 - high enough to be recommended,
+  // but below 2+ match tech-specific skills
   if (skill.tags.includes("universal")) {
-    return { score: 60, isRecommended: true, matchedTags: ["universal"] };
+    return { score: 75, isRecommended: true, matchedTags: ["universal"] };
   }
 
   // Find matching tags
@@ -144,12 +158,17 @@ export function scoreSkillRelevance(
     return { score: 0, isRecommended: false, matchedTags: [] };
   }
 
-  // Score: 40 base + up to 60 based on match ratio
+  // Base score + match bonus (20 per match, capped at 60 for 3+ matches)
+  const matchBonus = Math.min(matchedTags.length * 20, 60);
+
+  // Specificity bonus: +10 if skill is focused (≥50% of its tags matched)
   const matchRatio = matchedTags.length / skill.tags.length;
-  const score = Math.round(40 + matchRatio * 60);
+  const specificityBonus = matchRatio >= 0.5 ? 10 : 0;
+
+  const score = 30 + matchBonus + specificityBonus;
 
   return {
-    score,
+    score: Math.min(score, 100),
     isRecommended: score >= 50,
     matchedTags,
   };
