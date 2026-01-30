@@ -62,16 +62,24 @@ pub fn calculate_health(project_path: &str, skill_count: u32) -> HealthScore {
     // Context rot risk is based on documentation-specific scores (CLAUDE.md + modules + freshness),
     // not the full composite. A project with perfect docs but no skills/enforcement shouldn't
     // show a rot warning.
-    let doc_score = claude_md_score + module_docs_stats.score + freshness_score;
-    let doc_max = WEIGHT_CLAUDE_MD + WEIGHT_MODULE_DOCS + WEIGHT_FRESHNESS; // 65
-    let doc_pct = if doc_max > 0 { doc_score as f64 / doc_max as f64 * 100.0 } else { 0.0 };
-
-    let context_rot_risk = if doc_pct >= 70.0 {
+    //
+    // Special case: For new/empty projects with no source files, context rot risk is "low"
+    // since there's nothing to maintain documentation for yet.
+    let context_rot_risk = if module_docs_stats.total_files == 0 {
+        // Empty project - no files to become stale
         "low".to_string()
-    } else if doc_pct >= 40.0 {
-        "medium".to_string()
     } else {
-        "high".to_string()
+        let doc_score = claude_md_score + module_docs_stats.score + freshness_score;
+        let doc_max = WEIGHT_CLAUDE_MD + WEIGHT_MODULE_DOCS + WEIGHT_FRESHNESS; // 65
+        let doc_pct = if doc_max > 0 { doc_score as f64 / doc_max as f64 * 100.0 } else { 0.0 };
+
+        if doc_pct >= 70.0 {
+            "low".to_string()
+        } else if doc_pct >= 40.0 {
+            "medium".to_string()
+        } else {
+            "high".to_string()
+        }
     };
 
     let quick_wins = generate_quick_wins(
@@ -543,7 +551,8 @@ mod tests {
     fn test_health_nonexistent_path() {
         let score = calculate_health("/nonexistent/path/12345", 0);
         assert_eq!(score.total, 0);
-        assert_eq!(score.context_rot_risk, "high");
+        // Empty/nonexistent projects have "low" risk since there's nothing to become stale
+        assert_eq!(score.context_rot_risk, "low");
         assert!(!score.quick_wins.is_empty());
     }
 

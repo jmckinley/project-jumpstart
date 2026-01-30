@@ -3,7 +3,7 @@
  * @description Skill relevance scoring based on project tech stack
  *
  * PURPOSE:
- * - Extract TechTags from a project's tech stack
+ * - Extract TechTags from a project's tech stack (including stackExtras)
  * - Score library skills based on tag matches
  * - Rank skills by relevance for display in the library
  *
@@ -34,6 +34,7 @@
  * - Specificity bonus rewards focused skills without penalizing comprehensive ones
  * - Match count is primary driver, not match ratio
  * - Kotlin/Java projects auto-match Android skills; Swift projects auto-match iOS skills
+ * - stackExtras fields (auth, hosting, payments, monitoring, email, cache) are also extracted
  */
 
 import type { Project } from "@/types/project";
@@ -122,6 +123,49 @@ const TECH_TAG_MAP: Record<string, TechTag> = {
   "prisma orm": "prisma",
   drizzle: "prisma", // Map to prisma as they're similar ORM patterns
   "drizzle orm": "prisma",
+
+  // Authentication
+  auth0: "auth0",
+  clerk: "clerk",
+  "nextauth.js": "nextauth",
+  nextauth: "nextauth",
+  "supabase auth": "supabase-auth",
+  "firebase auth": "firebase",
+  "custom jwt": "typescript", // Maps to general typescript skills
+
+  // Hosting
+  vercel: "vercel",
+  railway: "railway",
+  render: "render",
+  aws: "aws",
+  "fly.io": "fly",
+  netlify: "netlify",
+  cloudflare: "cloudflare",
+
+  // Payments
+  stripe: "stripe",
+  lemonsqueezy: "lemonsqueezy",
+  paddle: "paddle",
+
+  // Monitoring & Analytics
+  sentry: "sentry",
+  posthog: "posthog",
+  datadog: "datadog",
+  logrocket: "logrocket",
+
+  // Email
+  resend: "resend",
+  sendgrid: "sendgrid",
+  postmark: "postmark",
+  "aws ses": "aws-ses",
+
+  // Cache
+  redis: "redis",
+  upstash: "upstash",
+
+  // AI
+  openai: "openai",
+  anthropic: "anthropic",
 };
 
 /**
@@ -145,6 +189,27 @@ export function getProjectTags(project: Project | null): TechTag[] {
     const tag = TECH_TAG_MAP[normalized];
     if (tag && !tags.includes(tag)) {
       tags.push(tag);
+    }
+  }
+
+  // Extract tags from stackExtras
+  if (project.stackExtras) {
+    const extrasFields = [
+      project.stackExtras.auth,
+      project.stackExtras.hosting,
+      project.stackExtras.payments,
+      project.stackExtras.monitoring,
+      project.stackExtras.email,
+      project.stackExtras.cache,
+    ];
+
+    for (const field of extrasFields) {
+      if (!field) continue;
+      const normalized = field.toLowerCase();
+      const tag = TECH_TAG_MAP[normalized];
+      if (tag && !tags.includes(tag)) {
+        tags.push(tag);
+      }
     }
   }
 

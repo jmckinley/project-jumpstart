@@ -125,10 +125,14 @@ pub async fn generate_claude_md(
 
         let project = db
             .query_row(
-                "SELECT id, name, path, description, project_type, language, framework, database_tech, testing, styling, health_score, created_at FROM projects WHERE id = ?1",
+                "SELECT id, name, path, description, project_type, language, framework, database_tech, testing, styling, stack_extras, health_score, created_at FROM projects WHERE id = ?1",
                 rusqlite::params![project_id],
                 |row| {
-                    let created_str: String = row.get(11)?;
+                    let stack_extras_json: Option<String> = row.get(10)?;
+                    let stack_extras = stack_extras_json
+                        .and_then(|json| serde_json::from_str(&json).ok());
+
+                    let created_str: String = row.get(12)?;
                     let created_at = DateTime::parse_from_rfc3339(&created_str)
                         .map(|dt| dt.with_timezone(&chrono::Utc))
                         .unwrap_or_else(|_| chrono::Utc::now());
@@ -144,7 +148,8 @@ pub async fn generate_claude_md(
                         database: row.get(7)?,
                         testing: row.get(8)?,
                         styling: row.get(9)?,
-                        health_score: row.get(10)?,
+                        stack_extras,
+                        health_score: row.get(11)?,
                         created_at,
                     })
                 },

@@ -12,6 +12,7 @@
 //! - chrono - Timestamp handling
 //!
 //! EXPORTS:
+//! - StackExtras - Additional services configuration (auth, hosting, payments, etc.)
 //! - Project - Core project metadata stored in database
 //! - HealthScore - Overall project health with component breakdown
 //! - HealthComponents - Individual health component scores
@@ -34,6 +35,24 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+/// Additional services configuration (auth, hosting, payments, etc.)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct StackExtras {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auth: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hosting: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payments: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub monitoring: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
@@ -47,6 +66,7 @@ pub struct Project {
     pub database: Option<String>,
     pub testing: Option<String>,
     pub styling: Option<String>,
+    pub stack_extras: Option<StackExtras>,
     pub health_score: u32,
     pub created_at: DateTime<Utc>,
 }
@@ -116,6 +136,7 @@ pub struct ProjectSetup {
     pub database: Option<String>,
     pub testing: Option<String>,
     pub styling: Option<String>,
+    pub stack_extras: Option<StackExtras>,
     pub goals: Vec<String>,
     pub generate_module_docs: bool,
     pub setup_enforcement: bool,

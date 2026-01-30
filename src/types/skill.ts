@@ -44,6 +44,7 @@ export interface Pattern {
  */
 export type TechTag =
   | "universal"
+  // Languages
   | "typescript"
   | "javascript"
   | "python"
@@ -52,6 +53,7 @@ export type TechTag =
   | "java"
   | "kotlin"
   | "swift"
+  // Web Frameworks
   | "react"
   | "nextjs"
   | "vue"
@@ -65,26 +67,64 @@ export type TechTag =
   | "flask"
   | "tauri"
   | "electron"
+  // Mobile
   | "android"
   | "ios"
   | "swiftui"
+  // Testing
   | "vitest"
   | "jest"
   | "pytest"
   | "playwright"
+  // Styling
   | "tailwind"
   | "sass"
   | "css-modules"
+  // State Management
   | "zustand"
   | "redux"
   | "pinia"
+  // Databases
   | "postgresql"
   | "mysql"
   | "sqlite"
   | "mongodb"
   | "supabase"
   | "firebase"
-  | "prisma";
+  | "prisma"
+  // Authentication
+  | "auth0"
+  | "clerk"
+  | "nextauth"
+  | "supabase-auth"
+  // Hosting
+  | "vercel"
+  | "railway"
+  | "render"
+  | "aws"
+  | "fly"
+  | "netlify"
+  | "cloudflare"
+  // Payments
+  | "stripe"
+  | "lemonsqueezy"
+  | "paddle"
+  // Monitoring & Analytics
+  | "sentry"
+  | "posthog"
+  | "datadog"
+  | "logrocket"
+  // Email
+  | "resend"
+  | "sendgrid"
+  | "postmark"
+  | "aws-ses"
+  // Cache
+  | "redis"
+  | "upstash"
+  // AI
+  | "openai"
+  | "anthropic";
 
 /**
  * Categories for organizing skills in the library.

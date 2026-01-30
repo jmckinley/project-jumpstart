@@ -88,5 +88,9 @@ pub fn init_db() -> Result<Connection, String> {
 
     schema::create_tables(&conn).map_err(|e| format!("Failed to create tables: {}", e))?;
 
+    // Run migrations for existing databases
+    schema::migrate_add_stack_extras(&conn)
+        .map_err(|e| format!("Failed to migrate stack_extras: {}", e))?;
+
     Ok(conn)
 }

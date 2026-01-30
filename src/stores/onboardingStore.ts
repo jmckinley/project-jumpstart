@@ -7,10 +7,12 @@
  * - Store all user selections during setup (detection results, manual edits, goals)
  * - Manage generation progress state
  * - Provide computed values for the wizard flow
+ * - Support stack templates for quick project setup
  *
  * DEPENDENCIES:
  * - zustand - State management
- * - @/types/project - DetectionResult, ProjectSetup types
+ * - @/types/project - DetectionResult, ProjectSetup, StackExtras types
+ * - @/data/stackTemplates - StackTemplate type
  *
  * EXPORTS:
  * - useOnboardingStore - Zustand hook for onboarding state
@@ -19,15 +21,18 @@
  * - Step numbers correspond to wizard screens (1-7)
  * - Detection results are stored and user edits overlay them
  * - Reset state when onboarding completes or is cancelled
+ * - applyTemplate populates all fields from a stack template
  *
  * CLAUDE NOTES:
  * - Onboarding flow has two paths: existing project (auto-detect) and new project (guided)
  * - Step 1: Select folder, Step 2: Analysis/Manual, Step 3: Goals, Step 4: Review
+ * - Stack templates populate language, framework, database, testing, styling, and stackExtras
  * - See spec Part 2 for the full flow
  */
 
 import { create } from "zustand";
-import type { DetectionResult } from "@/types/project";
+import type { DetectionResult, StackExtras } from "@/types/project";
+import type { StackTemplate } from "@/data/stackTemplates";
 
 interface OnboardingState {
   active: boolean;
@@ -47,6 +52,7 @@ interface OnboardingState {
   database: string | null;
   testing: string | null;
   styling: string | null;
+  stackExtras: StackExtras | null;
   goals: string[];
   generateModuleDocs: boolean;
   setupEnforcement: boolean;
@@ -67,11 +73,13 @@ interface OnboardingState {
   setDatabase: (db: string | null) => void;
   setTesting: (testing: string | null) => void;
   setStyling: (styling: string | null) => void;
+  setStackExtras: (extras: StackExtras | null) => void;
   setGoals: (goals: string[]) => void;
   toggleGoal: (goal: string) => void;
   setGenerateModuleDocs: (generate: boolean) => void;
   setSetupEnforcement: (setup: boolean) => void;
   applyDetection: (result: DetectionResult) => void;
+  applyTemplate: (template: StackTemplate) => void;
   reset: () => void;
 }
 
@@ -91,6 +99,7 @@ const initialState = {
   database: null as string | null,
   testing: null as string | null,
   styling: null as string | null,
+  stackExtras: null as StackExtras | null,
   goals: ["features", "documentation"] as string[],
   generateModuleDocs: true,
   setupEnforcement: true,
@@ -114,6 +123,7 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
   setDatabase: (database) => set({ database }),
   setTesting: (testing) => set({ testing }),
   setStyling: (styling) => set({ styling }),
+  setStackExtras: (stackExtras) => set({ stackExtras }),
   setGoals: (goals) => set({ goals }),
   toggleGoal: (goal) =>
     set((state) => ({
@@ -134,6 +144,15 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
       testing: result.testing?.value ?? null,
       styling: result.styling?.value ?? null,
       projectType: result.projectType ?? "",
+    }),
+  applyTemplate: (template) =>
+    set({
+      language: template.language,
+      framework: template.framework,
+      database: template.database,
+      testing: template.testing,
+      styling: template.styling,
+      stackExtras: template.extras,
     }),
   reset: () => set(initialState),
 }));

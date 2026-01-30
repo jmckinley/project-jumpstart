@@ -48,9 +48,15 @@ pub async fn save_project(
     let now = Utc::now();
     let id = Uuid::new_v4().to_string();
 
+    // Serialize stack_extras to JSON if present
+    let extras_json: Option<String> = setup
+        .stack_extras
+        .as_ref()
+        .map(|e| serde_json::to_string(e).unwrap_or_default());
+
     db.execute(
-        "INSERT INTO projects (id, name, path, description, project_type, language, framework, database_tech, testing, styling, health_score, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+        "INSERT INTO projects (id, name, path, description, project_type, language, framework, database_tech, testing, styling, stack_extras, health_score, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
         rusqlite::params![
             &id,
             &setup.name,
@@ -62,6 +68,7 @@ pub async fn save_project(
             &setup.database,
             &setup.testing,
             &setup.styling,
+            &extras_json,
             0,
             now.to_rfc3339(),
         ],
@@ -79,6 +86,7 @@ pub async fn save_project(
         database: setup.database,
         testing: setup.testing,
         styling: setup.styling,
+        stack_extras: setup.stack_extras,
         health_score: 0,
         created_at: now,
     };

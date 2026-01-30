@@ -40,14 +40,17 @@ pub async fn list_projects(state: State<'_, AppState>) -> Result<Vec<Project>, S
 
     let mut stmt = db
         .prepare(
-            "SELECT id, name, path, description, project_type, language, framework, database_tech, testing, styling, health_score, created_at
+            "SELECT id, name, path, description, project_type, language, framework, database_tech, testing, styling, stack_extras, health_score, created_at
              FROM projects ORDER BY created_at DESC",
         )
         .map_err(|e| format!("Query prepare error: {}", e))?;
 
     let projects = stmt
         .query_map([], |row| {
-            let created_str: String = row.get(11)?;
+            let extras_str: Option<String> = row.get(10)?;
+            let stack_extras = extras_str.and_then(|s| serde_json::from_str(&s).ok());
+
+            let created_str: String = row.get(12)?;
             let created_at = DateTime::parse_from_rfc3339(&created_str)
                 .map(|dt| dt.with_timezone(&chrono::Utc))
                 .unwrap_or_else(|_| chrono::Utc::now());
@@ -63,7 +66,8 @@ pub async fn list_projects(state: State<'_, AppState>) -> Result<Vec<Project>, S
                 database: row.get(7)?,
                 testing: row.get(8)?,
                 styling: row.get(9)?,
-                health_score: row.get(10)?,
+                stack_extras,
+                health_score: row.get(11)?,
                 created_at,
             })
         })
@@ -80,13 +84,16 @@ pub async fn get_project(id: String, state: State<'_, AppState>) -> Result<Proje
 
     let mut stmt = db
         .prepare(
-            "SELECT id, name, path, description, project_type, language, framework, database_tech, testing, styling, health_score, created_at
+            "SELECT id, name, path, description, project_type, language, framework, database_tech, testing, styling, stack_extras, health_score, created_at
              FROM projects WHERE id = ?1",
         )
         .map_err(|e| format!("Query prepare error: {}", e))?;
 
     stmt.query_row(rusqlite::params![&id], |row| {
-        let created_str: String = row.get(11)?;
+        let extras_str: Option<String> = row.get(10)?;
+        let stack_extras = extras_str.and_then(|s| serde_json::from_str(&s).ok());
+
+        let created_str: String = row.get(12)?;
         let created_at = DateTime::parse_from_rfc3339(&created_str)
             .map(|dt| dt.with_timezone(&chrono::Utc))
             .unwrap_or_else(|_| chrono::Utc::now());
@@ -102,7 +109,8 @@ pub async fn get_project(id: String, state: State<'_, AppState>) -> Result<Proje
             database: row.get(7)?,
             testing: row.get(8)?,
             styling: row.get(9)?,
-            health_score: row.get(10)?,
+            stack_extras,
+            health_score: row.get(11)?,
             created_at,
         })
     })

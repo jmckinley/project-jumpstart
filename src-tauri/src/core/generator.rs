@@ -134,6 +134,26 @@ pub async fn generate_claude_md_with_ai(
         file_list.join("\n")
     };
 
+    // Build extras string for AI context
+    let extras_str = if let Some(ref extras) = project.stack_extras {
+        format!(
+            "- Authentication: {}\n\
+             - Hosting: {}\n\
+             - Payments: {}\n\
+             - Monitoring: {}\n\
+             - Email: {}\n\
+             - Cache: {}",
+            extras.auth.as_deref().unwrap_or("None"),
+            extras.hosting.as_deref().unwrap_or("None"),
+            extras.payments.as_deref().unwrap_or("None"),
+            extras.monitoring.as_deref().unwrap_or("None"),
+            extras.email.as_deref().unwrap_or("None"),
+            extras.cache.as_deref().unwrap_or("None"),
+        )
+    } else {
+        "No additional services configured".to_string()
+    };
+
     let prompt = format!(
         "Generate a CLAUDE.md file for this project:\n\n\
         ## Project Metadata\n\
@@ -146,6 +166,8 @@ pub async fn generate_claude_md_with_ai(
         - Styling: {}\n\
         - Type: {}\n\
         - Description: {}\n\n\
+        ## Additional Services\n\
+        {}\n\n\
         ## File List\n\
         ```\n{}\n```\n\n\
         ## Key File Contents\n\
@@ -153,6 +175,7 @@ pub async fn generate_claude_md_with_ai(
         {}\n\n\
         Generate a complete, SPECIFIC CLAUDE.md based on the actual code above. \
         Reference real type names, imports, and patterns you see. \
+        Include information about the additional services (auth, hosting, payments, etc.) in the relevant sections. \
         Output ONLY the markdown content, no preamble.",
         project.name,
         project.path,
@@ -163,6 +186,7 @@ pub async fn generate_claude_md_with_ai(
         project.styling.as_deref().unwrap_or("None"),
         project.project_type,
         if project.description.is_empty() { "Not provided" } else { &project.description },
+        extras_str,
         file_section,
         file_samples,
     );
@@ -403,6 +427,28 @@ fn generate_tech_stack(project: &Project) -> String {
 
     if !project.project_type.is_empty() {
         rows.push(format!("| **Type** | {} |", project.project_type));
+    }
+
+    // Add stack extras if present
+    if let Some(ref extras) = project.stack_extras {
+        if let Some(ref auth) = extras.auth {
+            rows.push(format!("| **Authentication** | {} |", auth));
+        }
+        if let Some(ref hosting) = extras.hosting {
+            rows.push(format!("| **Hosting** | {} |", hosting));
+        }
+        if let Some(ref payments) = extras.payments {
+            rows.push(format!("| **Payments** | {} |", payments));
+        }
+        if let Some(ref monitoring) = extras.monitoring {
+            rows.push(format!("| **Monitoring** | {} |", monitoring));
+        }
+        if let Some(ref email) = extras.email {
+            rows.push(format!("| **Email** | {} |", email));
+        }
+        if let Some(ref cache) = extras.cache {
+            rows.push(format!("| **Cache** | {} |", cache));
+        }
     }
 
     format!(
@@ -943,6 +989,7 @@ mod tests {
             database: Some("PostgreSQL".to_string()),
             testing: Some("Vitest".to_string()),
             styling: Some("Tailwind CSS".to_string()),
+            stack_extras: None,
             health_score: 0,
             created_at: Utc::now(),
         };
@@ -972,6 +1019,7 @@ mod tests {
             database: None,
             testing: None,
             styling: None,
+            stack_extras: None,
             health_score: 0,
             created_at: Utc::now(),
         };
@@ -980,5 +1028,46 @@ mod tests {
         assert!(content.contains("# Simple"));
         assert!(content.contains("Go"));
         assert!(content.contains("go build"));
+    }
+
+    #[test]
+    fn test_generate_project_with_extras() {
+        use crate::models::project::StackExtras;
+
+        let project = Project {
+            id: "test-id".to_string(),
+            name: "SaaS App".to_string(),
+            path: "/tmp/saas".to_string(),
+            description: "A B2B SaaS application".to_string(),
+            project_type: "Web App".to_string(),
+            language: "TypeScript".to_string(),
+            framework: Some("Next.js".to_string()),
+            database: Some("PostgreSQL".to_string()),
+            testing: Some("Vitest".to_string()),
+            styling: Some("Tailwind CSS".to_string()),
+            stack_extras: Some(StackExtras {
+                auth: Some("Clerk".to_string()),
+                hosting: Some("Vercel".to_string()),
+                payments: Some("Stripe".to_string()),
+                monitoring: Some("PostHog".to_string()),
+                email: Some("Resend".to_string()),
+                cache: None,
+            }),
+            health_score: 0,
+            created_at: Utc::now(),
+        };
+
+        let content = generate_claude_md_content(&project);
+        assert!(content.contains("# SaaS App"));
+        assert!(content.contains("Clerk"));
+        assert!(content.contains("Vercel"));
+        assert!(content.contains("Stripe"));
+        assert!(content.contains("PostHog"));
+        assert!(content.contains("Resend"));
+        assert!(content.contains("Authentication"));
+        assert!(content.contains("Hosting"));
+        assert!(content.contains("Payments"));
+        assert!(content.contains("Monitoring"));
+        assert!(content.contains("Email"));
     }
 }

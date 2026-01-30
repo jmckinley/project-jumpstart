@@ -6,15 +6,18 @@
  * - Define Project interface matching Rust model
  * - Define DetectionResult for project scanning
  * - Define ProjectSetup for onboarding wizard data
+ * - Define StackExtras for additional services (auth, hosting, payments, etc.)
  * - Define project-related option constants
  *
  * EXPORTS:
+ * - StackExtras - Additional services configuration (auth, hosting, payments, etc.)
  * - Project - Core project metadata
  * - DetectionResult - Auto-detection output from project scanning
  * - DetectedValue - A detected value with confidence level
  * - ClaudeMdInfo - Metadata about a CLAUDE.md file (exists, content, tokens)
  * - ProjectSetup - Configuration collected during onboarding
  * - LANGUAGES, FRAMEWORKS, DATABASES, etc. - Option lists for dropdowns
+ * - AUTH_OPTIONS, HOSTING_OPTIONS, PAYMENTS_OPTIONS, MONITORING_OPTIONS, EMAIL_OPTIONS - Stack extras options
  *
  * PATTERNS:
  * - Types mirror Rust structs in models/project.rs
@@ -24,7 +27,20 @@
  * - Keep in sync with Rust models in src-tauri/src/models/project.rs
  * - Tauri IPC automatically converts snake_case to camelCase
  * - ProjectSetup expanded in Phase 2 with full onboarding fields
+ * - StackExtras fields are all optional (user may not select any)
  */
+
+/**
+ * Stack extras for additional services (auth, hosting, payments, etc.)
+ */
+export interface StackExtras {
+  auth?: string;
+  hosting?: string;
+  payments?: string;
+  monitoring?: string;
+  email?: string;
+  cache?: string;
+}
 
 export interface Project {
   id: string;
@@ -37,6 +53,7 @@ export interface Project {
   database: string | null;
   testing: string | null;
   styling: string | null;
+  stackExtras: StackExtras | null;
   healthScore: number;
   createdAt: string;
 }
@@ -77,6 +94,7 @@ export interface ProjectSetup {
   database: string | null;
   testing: string | null;
   styling: string | null;
+  stackExtras: StackExtras | null;
   goals: string[];
   generateModuleDocs: boolean;
   setupEnforcement: boolean;
@@ -188,4 +206,43 @@ export const GOALS = [
   { id: "refactoring", label: "Refactoring", skill: "refactor-agent" },
   { id: "debugging", label: "Debugging", skill: "debug-agent" },
   { id: "documentation", label: "Documentation", skill: "docs-agent" },
+] as const;
+
+export const AUTH_OPTIONS = [
+  "Auth0",
+  "Clerk",
+  "NextAuth.js",
+  "Supabase Auth",
+  "Firebase Auth",
+  "Custom JWT",
+] as const;
+
+export const HOSTING_OPTIONS = [
+  "Vercel",
+  "Railway",
+  "Render",
+  "AWS",
+  "Fly.io",
+  "Netlify",
+  "Cloudflare",
+] as const;
+
+export const PAYMENTS_OPTIONS = [
+  "Stripe",
+  "LemonSqueezy",
+  "Paddle",
+] as const;
+
+export const MONITORING_OPTIONS = [
+  "Sentry",
+  "PostHog",
+  "Datadog",
+  "LogRocket",
+] as const;
+
+export const EMAIL_OPTIONS = [
+  "Resend",
+  "SendGrid",
+  "Postmark",
+  "AWS SES",
 ] as const;

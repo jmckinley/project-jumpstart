@@ -25,8 +25,23 @@
 //! - ralph_loops tracks RALPH loop execution with status (idle/running/paused/completed/failed)
 //! - See spec Part 6.2 for full table definitions
 //! - Add new tables here and call in create_tables()
+//! - stack_extras column stores JSON for additional services (auth, hosting, payments, etc.)
 
 use rusqlite::Connection;
+
+/// Migrate existing database to add stack_extras column if it doesn't exist.
+/// Called after create_tables to ensure the column exists for existing databases.
+pub fn migrate_add_stack_extras(conn: &Connection) -> Result<(), rusqlite::Error> {
+    // Check if column exists by trying to select from it
+    let has_column = conn
+        .prepare("SELECT stack_extras FROM projects LIMIT 1")
+        .is_ok();
+
+    if !has_column {
+        conn.execute("ALTER TABLE projects ADD COLUMN stack_extras TEXT", [])?;
+    }
+    Ok(())
+}
 
 pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
     conn.execute_batch(
@@ -42,6 +57,7 @@ pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
             database_tech   TEXT,
             testing         TEXT,
             styling         TEXT,
+            stack_extras    TEXT,
             health_score    INTEGER NOT NULL DEFAULT 0,
             created_at      TEXT NOT NULL
         );

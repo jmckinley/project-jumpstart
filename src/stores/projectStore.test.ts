@@ -20,6 +20,7 @@ const mockProject1: Project = {
   database: "PostgreSQL",
   testing: "Vitest",
   styling: "Tailwind CSS",
+  stackExtras: null,
   healthScore: 75,
   createdAt: "2024-01-01T00:00:00Z",
 };
@@ -35,6 +36,10 @@ const mockProject2: Project = {
   database: "PostgreSQL",
   testing: "pytest",
   styling: null,
+  stackExtras: {
+    auth: "Clerk",
+    payments: "Stripe",
+  },
   healthScore: 50,
   createdAt: "2024-01-02T00:00:00Z",
 };

@@ -3680,4 +3680,1027 @@ const tasksByDate = await Task.aggregate([
 - Avoid deep nesting; prefer references
 - Use transactions for multi-document operations`,
   },
+
+  // Stack Extras Skills - Authentication, Hosting, Payments, Monitoring, Email
+  {
+    slug: "stripe-integration",
+    name: "Stripe Integration",
+    description: "Payment processing with Stripe for subscriptions and one-time payments",
+    category: "api-design",
+    tags: ["stripe", "typescript", "nextjs"],
+    content: `## When to use
+Use Stripe for processing payments, subscriptions, and managing billing in web applications.
+
+## Setup
+\`\`\`typescript
+// lib/stripe.ts
+import Stripe from 'stripe';
+
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2023-10-16',
+  typescript: true,
+});
+\`\`\`
+
+## Checkout Session
+\`\`\`typescript
+// app/api/checkout/route.ts
+import { stripe } from '@/lib/stripe';
+import { NextResponse } from 'next/server';
+
+export async function POST(req: Request) {
+  const { priceId, customerId } = await req.json();
+
+  const session = await stripe.checkout.sessions.create({
+    customer: customerId,
+    mode: 'subscription',
+    payment_method_types: ['card'],
+    line_items: [{ price: priceId, quantity: 1 }],
+    success_url: \`\${process.env.NEXT_PUBLIC_URL}/success?session_id={CHECKOUT_SESSION_ID}\`,
+    cancel_url: \`\${process.env.NEXT_PUBLIC_URL}/pricing\`,
+  });
+
+  return NextResponse.json({ url: session.url });
+}
+\`\`\`
+
+## Webhook Handler
+\`\`\`typescript
+// app/api/webhooks/stripe/route.ts
+import { headers } from 'next/headers';
+import { stripe } from '@/lib/stripe';
+
+export async function POST(req: Request) {
+  const body = await req.text();
+  const signature = headers().get('stripe-signature')!;
+
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(
+      body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    );
+  } catch (err) {
+    return new Response('Webhook signature verification failed', { status: 400 });
+  }
+
+  switch (event.type) {
+    case 'checkout.session.completed':
+      const session = event.data.object;
+      // Provision subscription
+      break;
+    case 'customer.subscription.deleted':
+      // Handle cancellation
+      break;
+  }
+
+  return new Response('OK');
+}
+\`\`\`
+
+## Rules
+- Always verify webhook signatures
+- Use idempotency keys for API calls
+- Store Stripe customer ID with user records
+- Test with Stripe CLI locally`,
+  },
+  {
+    slug: "clerk-auth",
+    name: "Clerk Authentication",
+    description: "User authentication and management with Clerk",
+    category: "api-design",
+    tags: ["clerk", "typescript", "nextjs", "react"],
+    content: `## When to use
+Use Clerk for drop-in authentication with social logins, MFA, and user management.
+
+## Setup
+\`\`\`typescript
+// middleware.ts
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+
+const isPublicRoute = createRouteMatcher([
+  '/',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/api/webhooks(.*)',
+]);
+
+export default clerkMiddleware(async (auth, req) => {
+  if (!isPublicRoute(req)) {
+    await auth.protect();
+  }
+});
+
+export const config = {
+  matcher: ['/((?!.*\\..*|_next).*)', '/', '/(api|trpc)(.*)'],
+};
+\`\`\`
+
+## Layout
+\`\`\`typescript
+// app/layout.tsx
+import { ClerkProvider } from '@clerk/nextjs';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <ClerkProvider>
+      <html lang="en">
+        <body>{children}</body>
+      </html>
+    </ClerkProvider>
+  );
+}
+\`\`\`
+
+## Server Components
+\`\`\`typescript
+// app/dashboard/page.tsx
+import { currentUser } from '@clerk/nextjs/server';
+import { redirect } from 'next/navigation';
+
+export default async function DashboardPage() {
+  const user = await currentUser();
+  if (!user) redirect('/sign-in');
+
+  return <div>Welcome, {user.firstName}!</div>;
+}
+\`\`\`
+
+## Client Components
+\`\`\`typescript
+'use client';
+import { useUser, SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
+
+export function Header() {
+  const { user, isLoaded } = useUser();
+
+  return (
+    <header>
+      <SignedIn>
+        <UserButton afterSignOutUrl="/" />
+        <span>{user?.emailAddresses[0].emailAddress}</span>
+      </SignedIn>
+      <SignedOut>
+        <a href="/sign-in">Sign In</a>
+      </SignedOut>
+    </header>
+  );
+}
+\`\`\`
+
+## Rules
+- Protect API routes with auth() or getAuth()
+- Use webhooks for syncing user data to your database
+- Configure allowed redirect URLs in Clerk dashboard`,
+  },
+  {
+    slug: "nextauth-setup",
+    name: "NextAuth.js Setup",
+    description: "Authentication with NextAuth.js for Next.js applications",
+    category: "api-design",
+    tags: ["nextauth", "nextjs", "typescript"],
+    content: `## When to use
+Use NextAuth.js for flexible authentication with multiple providers in Next.js apps.
+
+## Setup (App Router)
+\`\`\`typescript
+// lib/auth.ts
+import NextAuth from 'next-auth';
+import GitHub from 'next-auth/providers/github';
+import Google from 'next-auth/providers/google';
+import { PrismaAdapter } from '@auth/prisma-adapter';
+import { prisma } from './prisma';
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  adapter: PrismaAdapter(prisma),
+  providers: [
+    GitHub({
+      clientId: process.env.GITHUB_ID!,
+      clientSecret: process.env.GITHUB_SECRET!,
+    }),
+    Google({
+      clientId: process.env.GOOGLE_ID!,
+      clientSecret: process.env.GOOGLE_SECRET!,
+    }),
+  ],
+  callbacks: {
+    session: ({ session, user }) => ({
+      ...session,
+      user: { ...session.user, id: user.id },
+    }),
+  },
+});
+
+// app/api/auth/[...nextauth]/route.ts
+import { handlers } from '@/lib/auth';
+export const { GET, POST } = handlers;
+\`\`\`
+
+## Server Components
+\`\`\`typescript
+// app/dashboard/page.tsx
+import { auth } from '@/lib/auth';
+import { redirect } from 'next/navigation';
+
+export default async function DashboardPage() {
+  const session = await auth();
+  if (!session?.user) redirect('/api/auth/signin');
+
+  return <div>Welcome, {session.user.name}!</div>;
+}
+\`\`\`
+
+## Client Components
+\`\`\`typescript
+'use client';
+import { useSession, signIn, signOut } from 'next-auth/react';
+
+export function AuthButton() {
+  const { data: session, status } = useSession();
+
+  if (status === 'loading') return <div>Loading...</div>;
+
+  if (session) {
+    return (
+      <button onClick={() => signOut()}>
+        Sign out ({session.user?.email})
+      </button>
+    );
+  }
+
+  return <button onClick={() => signIn()}>Sign in</button>;
+}
+\`\`\`
+
+## Rules
+- Use database adapter for production (Prisma, Drizzle)
+- Configure NEXTAUTH_SECRET in production
+- Handle session refresh for long-lived sessions`,
+  },
+  {
+    slug: "sentry-setup",
+    name: "Sentry Error Tracking",
+    description: "Error monitoring and performance tracking with Sentry",
+    category: "error-handling",
+    tags: ["sentry", "typescript", "react", "nextjs"],
+    content: `## When to use
+Use Sentry for error tracking, performance monitoring, and debugging production issues.
+
+## Setup (Next.js)
+\`\`\`bash
+npx @sentry/wizard@latest -i nextjs
+\`\`\`
+
+## Manual Configuration
+\`\`\`typescript
+// sentry.client.config.ts
+import * as Sentry from '@sentry/nextjs';
+
+Sentry.init({
+  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  tracesSampleRate: 1.0,
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1.0,
+  integrations: [
+    Sentry.replayIntegration({
+      maskAllText: true,
+      blockAllMedia: true,
+    }),
+  ],
+});
+\`\`\`
+
+## Error Boundary
+\`\`\`typescript
+'use client';
+import * as Sentry from '@sentry/nextjs';
+
+export default function GlobalError({
+  error,
+}: {
+  error: Error & { digest?: string };
+}) {
+  Sentry.captureException(error);
+
+  return (
+    <html>
+      <body>
+        <h2>Something went wrong!</h2>
+        <button onClick={() => window.location.reload()}>
+          Try again
+        </button>
+      </body>
+    </html>
+  );
+}
+\`\`\`
+
+## Custom Events
+\`\`\`typescript
+import * as Sentry from '@sentry/nextjs';
+
+// Capture exception with context
+Sentry.captureException(error, {
+  tags: { feature: 'checkout' },
+  extra: { orderId: '123', userId: 'abc' },
+});
+
+// Track custom event
+Sentry.captureMessage('Payment processed', {
+  level: 'info',
+  tags: { paymentMethod: 'stripe' },
+});
+
+// Set user context
+Sentry.setUser({ id: userId, email: userEmail });
+\`\`\`
+
+## Rules
+- Use source maps in production for readable stack traces
+- Set meaningful tags for filtering issues
+- Use breadcrumbs to track user actions
+- Configure alerting rules in Sentry dashboard`,
+  },
+  {
+    slug: "posthog-analytics",
+    name: "PostHog Analytics",
+    description: "Product analytics and feature flags with PostHog",
+    category: "api-design",
+    tags: ["posthog", "typescript", "react", "nextjs"],
+    content: `## When to use
+Use PostHog for product analytics, feature flags, A/B testing, and session replays.
+
+## Setup
+\`\`\`typescript
+// lib/posthog.ts
+import posthog from 'posthog-js';
+
+export function initPostHog() {
+  if (typeof window !== 'undefined') {
+    posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
+      api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://app.posthog.com',
+      capture_pageview: false, // Handle manually for SPA
+      capture_pageleave: true,
+    });
+  }
+}
+
+// app/providers.tsx
+'use client';
+import { useEffect } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import posthog from 'posthog-js';
+import { initPostHog } from '@/lib/posthog';
+
+export function PostHogProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    initPostHog();
+  }, []);
+
+  useEffect(() => {
+    if (pathname) {
+      let url = window.origin + pathname;
+      if (searchParams.toString()) {
+        url = url + '?' + searchParams.toString();
+      }
+      posthog.capture('$pageview', { '$current_url': url });
+    }
+  }, [pathname, searchParams]);
+
+  return children;
+}
+\`\`\`
+
+## Event Tracking
+\`\`\`typescript
+import posthog from 'posthog-js';
+
+// Track event
+posthog.capture('button_clicked', {
+  button_name: 'signup',
+  page: '/landing',
+});
+
+// Identify user
+posthog.identify(userId, {
+  email: user.email,
+  plan: user.subscription,
+});
+
+// Feature flags
+const showNewFeature = posthog.isFeatureEnabled('new-dashboard');
+\`\`\`
+
+## Rules
+- Always call identify() after user logs in
+- Use meaningful event names (verb_noun format)
+- Set up user properties for segmentation
+- Use feature flags for gradual rollouts`,
+  },
+  {
+    slug: "resend-email",
+    name: "Resend Email",
+    description: "Transactional email sending with Resend",
+    category: "api-design",
+    tags: ["resend", "typescript", "nextjs"],
+    content: `## When to use
+Use Resend for sending transactional emails with React Email templates.
+
+## Setup
+\`\`\`typescript
+// lib/resend.ts
+import { Resend } from 'resend';
+
+export const resend = new Resend(process.env.RESEND_API_KEY);
+\`\`\`
+
+## Email Template
+\`\`\`typescript
+// emails/welcome.tsx
+import {
+  Html,
+  Head,
+  Body,
+  Container,
+  Text,
+  Button,
+  Heading,
+} from '@react-email/components';
+
+interface WelcomeEmailProps {
+  name: string;
+  dashboardUrl: string;
+}
+
+export function WelcomeEmail({ name, dashboardUrl }: WelcomeEmailProps) {
+  return (
+    <Html>
+      <Head />
+      <Body style={{ fontFamily: 'sans-serif' }}>
+        <Container>
+          <Heading>Welcome, {name}!</Heading>
+          <Text>Thanks for signing up. Get started with your dashboard:</Text>
+          <Button
+            href={dashboardUrl}
+            style={{ background: '#0070f3', color: '#fff', padding: '12px 20px' }}
+          >
+            Go to Dashboard
+          </Button>
+        </Container>
+      </Body>
+    </Html>
+  );
+}
+\`\`\`
+
+## Sending Email
+\`\`\`typescript
+// app/api/send-welcome/route.ts
+import { resend } from '@/lib/resend';
+import { WelcomeEmail } from '@/emails/welcome';
+
+export async function POST(req: Request) {
+  const { email, name } = await req.json();
+
+  const { data, error } = await resend.emails.send({
+    from: 'App <noreply@yourdomain.com>',
+    to: email,
+    subject: 'Welcome to Our App!',
+    react: WelcomeEmail({ name, dashboardUrl: 'https://app.com/dashboard' }),
+  });
+
+  if (error) {
+    return Response.json({ error }, { status: 500 });
+  }
+
+  return Response.json({ success: true, id: data?.id });
+}
+\`\`\`
+
+## Rules
+- Verify domain in Resend dashboard for production
+- Use React Email for type-safe templates
+- Handle errors and retry logic
+- Set proper from address for deliverability`,
+  },
+  {
+    slug: "vercel-deployment",
+    name: "Vercel Deployment",
+    description: "Deploy and configure applications on Vercel",
+    category: "documentation",
+    tags: ["vercel", "nextjs", "typescript"],
+    content: `## When to use
+Use Vercel for deploying Next.js applications with edge functions and serverless.
+
+## Environment Variables
+\`\`\`bash
+# Set via CLI
+vercel env add STRIPE_SECRET_KEY production
+vercel env add DATABASE_URL production preview development
+
+# Or via vercel.json
+\`\`\`
+
+## Configuration
+\`\`\`json
+// vercel.json
+{
+  "buildCommand": "pnpm build",
+  "installCommand": "pnpm install",
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "crons": [{
+    "path": "/api/cron/daily-cleanup",
+    "schedule": "0 5 * * *"
+  }],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "s-maxage=60, stale-while-revalidate" }
+      ]
+    }
+  ]
+}
+\`\`\`
+
+## Edge Functions
+\`\`\`typescript
+// app/api/geo/route.ts
+import { NextResponse } from 'next/server';
+
+export const runtime = 'edge';
+
+export async function GET(request: Request) {
+  const geo = request.headers.get('x-vercel-ip-country') || 'US';
+  return NextResponse.json({ country: geo });
+}
+\`\`\`
+
+## Preview Deployments
+\`\`\`typescript
+// lib/env.ts
+export const isPreview = process.env.VERCEL_ENV === 'preview';
+export const isProd = process.env.VERCEL_ENV === 'production';
+
+// Use different API keys for preview vs production
+const apiKey = isPreview
+  ? process.env.API_KEY_PREVIEW
+  : process.env.API_KEY;
+\`\`\`
+
+## Rules
+- Use preview deployments for testing PRs
+- Set sensitive env vars via dashboard, not vercel.json
+- Use edge runtime for low-latency APIs
+- Configure proper caching headers`,
+  },
+  {
+    slug: "railway-deployment",
+    name: "Railway Deployment",
+    description: "Deploy backend services on Railway",
+    category: "documentation",
+    tags: ["railway", "typescript"],
+    content: `## When to use
+Use Railway for deploying backend services, databases, and scheduled jobs.
+
+## Configuration
+\`\`\`toml
+# railway.toml
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "pnpm start"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "on-failure"
+restartPolicyMaxRetries = 3
+
+[deploy.variables]
+NODE_ENV = "production"
+\`\`\`
+
+## Dockerfile (Alternative)
+\`\`\`dockerfile
+FROM node:20-alpine AS base
+
+FROM base AS deps
+WORKDIR /app
+COPY package.json pnpm-lock.yaml ./
+RUN npm install -g pnpm && pnpm install --frozen-lockfile
+
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN pnpm build
+
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+USER node
+CMD ["node", "dist/index.js"]
+\`\`\`
+
+## Health Check Endpoint
+\`\`\`typescript
+// src/routes/health.ts
+import { Router } from 'express';
+
+const router = Router();
+
+router.get('/health', async (req, res) => {
+  try {
+    // Check database connection
+    await db.query('SELECT 1');
+    res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+  } catch (error) {
+    res.status(503).json({ status: 'unhealthy', error: String(error) });
+  }
+});
+
+export default router;
+\`\`\`
+
+## Rules
+- Use railway.toml for configuration
+- Set up health checks for reliability
+- Use Railway CLI for local development with prod env vars
+- Connect Railway Postgres with DATABASE_URL`,
+  },
+  {
+    slug: "redis-caching",
+    name: "Redis Caching",
+    description: "Caching patterns with Redis/Upstash",
+    category: "api-design",
+    tags: ["redis", "upstash", "typescript"],
+    content: `## When to use
+Use Redis for caching, rate limiting, and session storage.
+
+## Setup (Upstash)
+\`\`\`typescript
+// lib/redis.ts
+import { Redis } from '@upstash/redis';
+
+export const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
+\`\`\`
+
+## Caching Pattern
+\`\`\`typescript
+// lib/cache.ts
+import { redis } from './redis';
+
+export async function cached<T>(
+  key: string,
+  fn: () => Promise<T>,
+  ttlSeconds: number = 3600
+): Promise<T> {
+  const cached = await redis.get<T>(key);
+  if (cached) return cached;
+
+  const data = await fn();
+  await redis.set(key, data, { ex: ttlSeconds });
+  return data;
+}
+
+// Usage
+const user = await cached(
+  \`user:\${userId}\`,
+  () => db.user.findUnique({ where: { id: userId } }),
+  300 // 5 minutes
+);
+\`\`\`
+
+## Rate Limiting
+\`\`\`typescript
+// lib/ratelimit.ts
+import { Ratelimit } from '@upstash/ratelimit';
+import { redis } from './redis';
+
+export const ratelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(10, '10 s'), // 10 requests per 10 seconds
+  analytics: true,
+});
+
+// middleware.ts
+export async function middleware(req: NextRequest) {
+  const ip = req.ip ?? '127.0.0.1';
+  const { success, limit, remaining } = await ratelimit.limit(ip);
+
+  if (!success) {
+    return new Response('Too Many Requests', {
+      status: 429,
+      headers: { 'X-RateLimit-Limit': String(limit) },
+    });
+  }
+}
+\`\`\`
+
+## Cache Invalidation
+\`\`\`typescript
+// Invalidate single key
+await redis.del(\`user:\${userId}\`);
+
+// Invalidate by pattern (use scan in production)
+const keys = await redis.keys('user:*');
+if (keys.length) await redis.del(...keys);
+\`\`\`
+
+## Rules
+- Set appropriate TTLs for different data types
+- Use cache-aside pattern for database queries
+- Implement cache invalidation on data updates
+- Monitor cache hit rates`,
+  },
+  {
+    slug: "supabase-auth-patterns",
+    name: "Supabase Auth",
+    description: "Authentication patterns with Supabase Auth",
+    category: "api-design",
+    tags: ["supabase-auth", "supabase", "typescript", "nextjs"],
+    content: `## When to use
+Use Supabase Auth for authentication with email/password, magic links, and OAuth providers.
+
+## Setup
+\`\`\`typescript
+// lib/supabase/client.ts
+import { createBrowserClient } from '@supabase/ssr';
+
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
+
+// lib/supabase/server.ts
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+
+export async function createServerSupabase() {
+  const cookieStore = await cookies();
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => cookieStore.getAll(),
+        setAll: (cookiesToSet) => {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+}
+\`\`\`
+
+## Auth Flow
+\`\`\`typescript
+'use client';
+import { createClient } from '@/lib/supabase/client';
+
+export function AuthForm() {
+  const supabase = createClient();
+
+  const signInWithEmail = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) throw error;
+    return data;
+  };
+
+  const signInWithOAuth = async (provider: 'google' | 'github') => {
+    await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: \`\${window.location.origin}/auth/callback\` },
+    });
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
+}
+\`\`\`
+
+## Server-Side Auth Check
+\`\`\`typescript
+// app/dashboard/page.tsx
+import { createServerSupabase } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
+
+export default async function DashboardPage() {
+  const supabase = await createServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) redirect('/login');
+
+  return <div>Welcome, {user.email}!</div>;
+}
+\`\`\`
+
+## Rules
+- Use RLS policies for database security
+- Handle auth state changes with onAuthStateChange
+- Store user metadata in profiles table
+- Use service role key only in server-side code`,
+  },
+  {
+    slug: "auth0-integration",
+    name: "Auth0 Integration",
+    description: "Enterprise authentication with Auth0",
+    category: "api-design",
+    tags: ["auth0", "typescript", "react", "nextjs"],
+    content: `## When to use
+Use Auth0 for enterprise authentication with SSO, MFA, and advanced security features.
+
+## Setup (Next.js)
+\`\`\`typescript
+// app/api/auth/[auth0]/route.ts
+import { handleAuth, handleLogin } from '@auth0/nextjs-auth0';
+
+export const GET = handleAuth({
+  login: handleLogin({
+    authorizationParams: {
+      audience: process.env.AUTH0_AUDIENCE,
+      scope: 'openid profile email',
+    },
+    returnTo: '/dashboard',
+  }),
+});
+\`\`\`
+
+## Client Component
+\`\`\`typescript
+'use client';
+import { useUser } from '@auth0/nextjs-auth0/client';
+
+export function Profile() {
+  const { user, error, isLoading } = useUser();
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>{error.message}</div>;
+
+  if (!user) {
+    return <a href="/api/auth/login">Login</a>;
+  }
+
+  return (
+    <div>
+      <img src={user.picture} alt={user.name} />
+      <h2>{user.name}</h2>
+      <p>{user.email}</p>
+      <a href="/api/auth/logout">Logout</a>
+    </div>
+  );
+}
+\`\`\`
+
+## Server Component
+\`\`\`typescript
+// app/dashboard/page.tsx
+import { getSession } from '@auth0/nextjs-auth0';
+import { redirect } from 'next/navigation';
+
+export default async function DashboardPage() {
+  const session = await getSession();
+  if (!session?.user) redirect('/api/auth/login');
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <p>Welcome, {session.user.name}</p>
+    </div>
+  );
+}
+\`\`\`
+
+## API Route Protection
+\`\`\`typescript
+// app/api/protected/route.ts
+import { withApiAuthRequired, getSession } from '@auth0/nextjs-auth0';
+
+export const GET = withApiAuthRequired(async (req) => {
+  const session = await getSession();
+  const user = session?.user;
+  return Response.json({ user });
+});
+\`\`\`
+
+## Rules
+- Configure allowed callback URLs in Auth0 dashboard
+- Use Rules/Actions for custom claims
+- Set up proper logout URLs
+- Handle token refresh automatically`,
+  },
+  {
+    slug: "openai-integration",
+    name: "OpenAI Integration",
+    description: "AI features with OpenAI API and streaming",
+    category: "api-design",
+    tags: ["openai", "typescript", "nextjs"],
+    content: `## When to use
+Use OpenAI for chat completions, embeddings, and other AI features.
+
+## Setup
+\`\`\`typescript
+// lib/openai.ts
+import OpenAI from 'openai';
+
+export const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+\`\`\`
+
+## Chat Completion
+\`\`\`typescript
+// app/api/chat/route.ts
+import { openai } from '@/lib/openai';
+import { OpenAIStream, StreamingTextResponse } from 'ai';
+
+export async function POST(req: Request) {
+  const { messages } = await req.json();
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4-turbo-preview',
+    messages,
+    stream: true,
+  });
+
+  const stream = OpenAIStream(response);
+  return new StreamingTextResponse(stream);
+}
+\`\`\`
+
+## Client with Vercel AI SDK
+\`\`\`typescript
+'use client';
+import { useChat } from 'ai/react';
+
+export function Chat() {
+  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat();
+
+  return (
+    <div>
+      {messages.map((m) => (
+        <div key={m.id}>
+          <strong>{m.role}:</strong> {m.content}
+        </div>
+      ))}
+
+      <form onSubmit={handleSubmit}>
+        <input
+          value={input}
+          onChange={handleInputChange}
+          placeholder="Say something..."
+          disabled={isLoading}
+        />
+        <button type="submit" disabled={isLoading}>
+          Send
+        </button>
+      </form>
+    </div>
+  );
+}
+\`\`\`
+
+## Embeddings for Search
+\`\`\`typescript
+export async function createEmbedding(text: string) {
+  const response = await openai.embeddings.create({
+    model: 'text-embedding-3-small',
+    input: text,
+  });
+  return response.data[0].embedding;
+}
+
+// Store embeddings in Supabase/pgvector
+const embedding = await createEmbedding(documentContent);
+await supabase.from('documents').insert({
+  content: documentContent,
+  embedding,
+});
+\`\`\`
+
+## Rules
+- Use streaming for chat responses (better UX)
+- Implement rate limiting on AI endpoints
+- Set max_tokens to control costs
+- Use system messages for behavior control`,
+  },
 ];
