@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { STACK_TEMPLATES, type StackTemplate } from "./stackTemplates";
+import { STACK_TEMPLATES } from "./stackTemplates";
 
 // Valid Lucide icon names used in TEMPLATE_ICONS mapping
 const VALID_ICON_NAMES = [

@@ -60,8 +60,17 @@ const mockSetStyling = vi.fn();
 const mockSetStackExtras = vi.fn();
 const mockApplyTemplate = vi.fn();
 
-// Default mock state
+// Default mock state - must include all OnboardingState properties
 const createMockState = (overrides = {}) => ({
+  // Core state
+  active: false,
+  step: 2,
+  projectPath: "/path/to/project",
+  isExistingProject: false,
+  scanning: false,
+  generating: false,
+  detectionResult: null,
+  // User-editable fields
   projectName: "",
   projectDescription: "",
   projectType: "",
@@ -71,7 +80,17 @@ const createMockState = (overrides = {}) => ({
   testing: null,
   styling: null,
   stackExtras: null,
-  detectionResult: null,
+  goals: ["features", "documentation"],
+  generateModuleDocs: true,
+  setupEnforcement: true,
+  // Actions
+  setActive: vi.fn(),
+  setStep: vi.fn(),
+  setProjectPath: vi.fn(),
+  setIsExistingProject: vi.fn(),
+  setDetectionResult: vi.fn(),
+  setScanning: vi.fn(),
+  setGenerating: vi.fn(),
   setProjectName: mockSetProjectName,
   setProjectDescription: mockSetProjectDescription,
   setProjectType: mockSetProjectType,
@@ -81,7 +100,13 @@ const createMockState = (overrides = {}) => ({
   setTesting: mockSetTesting,
   setStyling: mockSetStyling,
   setStackExtras: mockSetStackExtras,
+  setGoals: vi.fn(),
+  toggleGoal: vi.fn(),
+  setGenerateModuleDocs: vi.fn(),
+  setSetupEnforcement: vi.fn(),
+  applyDetection: vi.fn(),
   applyTemplate: mockApplyTemplate,
+  reset: vi.fn(),
   ...overrides,
 });
 

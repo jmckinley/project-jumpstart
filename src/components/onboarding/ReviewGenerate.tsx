@@ -26,7 +26,7 @@
  *
  * CLAUDE NOTES:
  * - ProjectSetup requires: path, name, description, projectType, language, framework,
- *   database, testing, styling, goals, generateModuleDocs, setupEnforcement
+ *   database, testing, styling, stackExtras, goals, generateModuleDocs, setupEnforcement
  * - path comes from projectPath in the store
  * - onComplete receives the created Project object (with id, healthScore, createdAt from backend)
  * - Always reset generating state in finally block
@@ -69,6 +69,7 @@ export function ReviewGenerate({ onComplete }: ReviewGenerateProps) {
   const database = useOnboardingStore((s) => s.database);
   const testing = useOnboardingStore((s) => s.testing);
   const styling = useOnboardingStore((s) => s.styling);
+  const stackExtras = useOnboardingStore((s) => s.stackExtras);
   const goals = useOnboardingStore((s) => s.goals);
   const generateModuleDocs = useOnboardingStore((s) => s.generateModuleDocs);
   const setupEnforcement = useOnboardingStore((s) => s.setupEnforcement);
@@ -97,6 +98,7 @@ export function ReviewGenerate({ onComplete }: ReviewGenerateProps) {
         database,
         testing,
         styling,
+        stackExtras,
         goals,
         generateModuleDocs,
         setupEnforcement,

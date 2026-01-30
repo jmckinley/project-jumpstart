@@ -23,8 +23,8 @@ import {
   rankLibrarySkills,
   MAX_RECOMMENDED_SKILLS,
 } from "./skillRelevance";
-import type { Project, StackExtras } from "@/types/project";
-import type { LibrarySkill, TechTag } from "@/types/skill";
+import type { Project } from "@/types/project";
+import type { LibrarySkill } from "@/types/skill";
 
 // Base project without stackExtras
 const baseProject: Project = {
