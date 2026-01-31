@@ -207,7 +207,7 @@ pnpm lint                 # Run ESLint
 cargo clippy              # Run Rust linter
 
 # Database
-# SQLite DB is at: ~/.project-jumpstart/copilot.db
+# SQLite DB is at: ~/.project-jumpstart/jumpstart.db
 ```
 
 ---
@@ -541,9 +541,9 @@ export async function scanProject(path: string): Promise<DetectionResult> {
 
 ### What's NOT Code (Platform/Deployment)
 
-- **macOS Notarization**: Requires Apple credentials (not a code issue)
+- **macOS Notarization**: Configured and working with Apple credentials
 - **Windows/Linux Builds**: Not yet configured (platform config, not code)
-- **E2E Tests**: Would be nice but 338+ unit tests provide good coverage
+- **E2E Tests**: Would be nice but 440 unit tests (379 frontend + 61 Rust) provide good coverage
 
 ---
 
@@ -561,7 +561,9 @@ Record key architectural decisions here so they survive context loss:
 
 5. **shadcn/ui over other libraries**: Copy-paste components, full customization, Tailwind-native
 
-6. **Auto-update enforcement mode**: Git hooks can auto-generate missing docs via API at commit time. Uses curl to call Anthropic API directly from the shell script, reading API key from `~/.project-jumpstart/settings.json`. Three modes: warn (allow), block (fail), auto-update (generate and stage).
+6. **Auto-update enforcement mode**: Git hooks can auto-generate missing docs via API at commit time. Uses curl to call Anthropic API directly from the shell script, reading API key from `~/.project-jumpstart/settings.json`. Four modes: off (no checks), warn (allow with warnings), block (fail commit), auto-update (generate and stage).
+
+7. **Enforcement settings sync**: Settings and Enforcement tabs share the same enforcement level. Changing one updates the other. When installing auto-update hook, the API key is decrypted from SQLite and exported to settings.json for the shell script to read.
 
 ---
 
@@ -668,8 +670,9 @@ interface ContextHealth {
 // Enforcement
 interface HookStatus {
   installed: boolean;
-  mode: 'warn' | 'block' | null;
-  lastRun: string | null;
+  hookPath: string;
+  mode: 'off' | 'warn' | 'block' | 'auto-update' | 'external' | 'none';
+  hasHusky: boolean;
 }
 
 // Detection Result
@@ -692,7 +695,7 @@ interface DetectionResult {
 - Use pnpm, not npm or yarn
 - Target macOS first, then Windows/Linux
 - Every file needs a documentation header (see above)
-- 338+ unit tests provide good coverage
+- 440 unit tests (379 frontend + 61 Rust) provide good coverage
 
 ### AI Integration
 - Anthropic API key stored encrypted in settings
@@ -716,10 +719,11 @@ interface DetectionResult {
 - All hooks call real Tauri backend (no mock data)
 
 ### Database
-- SQLite database location: `~/.project-jumpstart/copilot.db`
+- SQLite database location: `~/.project-jumpstart/jumpstart.db`
+- Settings JSON for hooks: `~/.project-jumpstart/settings.json` (auto-generated, 0600 permissions)
 - Use migrations for schema changes
 - All timestamps in UTC
-- Full schema includes: projects, skills, agents, activities, checkpoints, ralph_loops
+- Full schema includes: projects, skills, agents, activities, checkpoints, ralph_loops, settings
 
 ### File Paths
 - Use forward slashes even on Windows (Tauri normalizes)
@@ -765,6 +769,8 @@ The full product specification is in `project-jumpstart-spec.md`. Key sections:
 
 | Date | Change |
 |------|--------|
+| Jan 31, 2026 | Added enforcement settings sync between Settings and Enforcement tabs. Four modes: off, warn, block, auto-update. API key exported to settings.json for auto-update hook. |
+| Jan 31, 2026 | Added auto-update enforcement mode with AI-powered doc generation at commit time. |
 | Jan 2026 | Updated to reflect feature-complete status. All sections implemented. |
 
 ---
