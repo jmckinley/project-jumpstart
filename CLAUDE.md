@@ -31,7 +31,8 @@ Desktop application (Tauri 2.0 + React) that automatically applies and enforces 
 project-jumpstart/
 ├── src-tauri/                      # Rust backend
 │   ├── src/
-│   │   ├── main.rs                 # Entry point, Tauri setup
+│   │   ├── main.rs                 # Entry point (delegates to lib.rs)
+│   │   ├── lib.rs                  # App config, command registration
 │   │   ├── commands/               # IPC command handlers
 │   │   │   ├── mod.rs
 │   │   │   ├── project.rs          # Project CRUD
@@ -40,97 +41,148 @@ project-jumpstart/
 │   │   │   ├── modules.rs          # Module documentation
 │   │   │   ├── freshness.rs        # Staleness detection
 │   │   │   ├── skills.rs           # Skills management
+│   │   │   ├── agents.rs           # Agents management
 │   │   │   ├── ralph.rs            # RALPH loops
 │   │   │   ├── context.rs          # Context health
-│   │   │   └── enforcement.rs      # Git hooks, CI
+│   │   │   ├── enforcement.rs      # Git hooks, CI
+│   │   │   ├── settings.rs         # User preferences
+│   │   │   ├── activity.rs         # Activity logging
+│   │   │   ├── watcher.rs          # File watcher control
+│   │   │   └── kickstart.rs        # Project kickstart prompts
 │   │   ├── core/                   # Business logic
 │   │   │   ├── mod.rs
 │   │   │   ├── scanner.rs          # Project detection
-│   │   │   ├── watcher.rs          # File system watcher
+│   │   │   ├── watcher.rs          # File system watcher (notify-rs)
 │   │   │   ├── analyzer.rs         # Code analysis
 │   │   │   ├── generator.rs        # AI generation
 │   │   │   ├── freshness.rs        # Staleness calculation
-│   │   │   └── health.rs           # Health scoring
+│   │   │   ├── health.rs           # Health scoring
+│   │   │   ├── ai.rs               # Anthropic API client
+│   │   │   └── crypto.rs           # Encrypted settings storage
 │   │   ├── models/                 # Data structures
 │   │   │   ├── mod.rs
 │   │   │   ├── project.rs
-│   │   │   ├── module.rs
-│   │   │   └── skill.rs
+│   │   │   ├── module_doc.rs       # Module documentation model
+│   │   │   ├── skill.rs
+│   │   │   ├── agent.rs
+│   │   │   ├── ralph.rs
+│   │   │   ├── context.rs
+│   │   │   └── enforcement.rs
 │   │   └── db/                     # Database layer
-│   │       ├── mod.rs
-│   │       └── schema.rs
+│   │       ├── mod.rs              # Connection, AppState
+│   │       └── schema.rs           # SQLite migrations
 │   ├── Cargo.toml
 │   └── tauri.conf.json
 │
 ├── src/                            # React frontend
 │   ├── components/
-│   │   ├── ui/                     # shadcn primitives
+│   │   ├── ui/                     # shadcn primitives (button, card, badge)
 │   │   ├── layout/                 # App shell
-│   │   │   ├── Sidebar.tsx
-│   │   │   ├── MainPanel.tsx
+│   │   │   ├── Sidebar.tsx         # Navigation + project selector
+│   │   │   ├── MainPanel.tsx       # Content router
 │   │   │   └── StatusBar.tsx
 │   │   ├── onboarding/             # Setup wizard
-│   │   │   ├── WizardShell.tsx
-│   │   │   ├── ProjectSelect.tsx
-│   │   │   ├── AnalysisResults.tsx
-│   │   │   ├── TechStackSelect.tsx
-│   │   │   ├── GoalsSelect.tsx
-│   │   │   └── GenerationProgress.tsx
+│   │   │   ├── WizardShell.tsx     # Wizard container
+│   │   │   ├── FirstUseWelcome.tsx # Initial welcome screen
+│   │   │   ├── ProjectSelect.tsx   # Folder picker
+│   │   │   ├── AnalysisResults.tsx # Tech stack detection results
+│   │   │   ├── GoalsSelect.tsx     # Goal selection
+│   │   │   └── ReviewGenerate.tsx  # Final review + generate
 │   │   ├── dashboard/              # Main dashboard
-│   │   │   ├── HealthScore.tsx
-│   │   │   ├── QuickWins.tsx
-│   │   │   ├── ContextRotAlert.tsx
-│   │   │   └── RecentActivity.tsx
+│   │   │   ├── HealthScore.tsx     # Circular score + breakdown
+│   │   │   ├── QuickWins.tsx       # Improvement suggestions
+│   │   │   ├── ContextRotAlert.tsx # Staleness warning banner
+│   │   │   ├── RecentActivity.tsx  # Activity timeline
+│   │   │   └── RefreshDocsButton.tsx # One-click doc refresh
 │   │   ├── claude-md/              # CLAUDE.md editor
-│   │   │   ├── Editor.tsx
-│   │   │   ├── Preview.tsx
-│   │   │   └── Suggestions.tsx
+│   │   │   ├── Editor.tsx          # Monaco editor + preview
+│   │   │   ├── Preview.tsx         # Markdown preview
+│   │   │   └── Suggestions.tsx     # Section suggestions
 │   │   ├── modules/                # Module documentation
-│   │   │   ├── FileTree.tsx
-│   │   │   ├── DocStatus.tsx
-│   │   │   ├── DocPreview.tsx
-│   │   │   └── BatchGenerator.tsx
+│   │   │   ├── FileTree.tsx        # File tree with status icons
+│   │   │   ├── DocStatus.tsx       # Coverage stats bar
+│   │   │   ├── DocPreview.tsx      # Generated doc preview
+│   │   │   ├── BatchGenerator.tsx  # Batch generation controls
+│   │   │   └── ProjectKickstart.tsx # Empty project bootstrapper
 │   │   ├── skills/                 # Skills workshop
-│   │   │   ├── SkillsList.tsx
-│   │   │   ├── SkillEditor.tsx
-│   │   │   └── PatternDetector.tsx
+│   │   │   ├── SkillsList.tsx      # Skills list with tabs
+│   │   │   ├── SkillEditor.tsx     # Skill create/edit form
+│   │   │   ├── PatternDetector.tsx # Pattern detection display
+│   │   │   ├── SkillLibrary.tsx    # Curated skill library
+│   │   │   ├── SkillLibraryCard.tsx
+│   │   │   ├── SkillLibraryDetail.tsx
+│   │   │   └── SkillCategoryFilter.tsx
+│   │   ├── agents/                 # Agents management
+│   │   │   ├── AgentsList.tsx      # Agents list
+│   │   │   ├── AgentEditor.tsx     # Agent create/edit form
+│   │   │   ├── AgentLibrary.tsx    # Curated agent library
+│   │   │   ├── AgentLibraryCard.tsx
+│   │   │   ├── AgentLibraryDetail.tsx
+│   │   │   └── AgentCategoryFilter.tsx
 │   │   ├── ralph/                  # RALPH command center
-│   │   │   ├── CommandCenter.tsx
-│   │   │   ├── PromptAnalyzer.tsx
-│   │   │   └── LoopMonitor.tsx
+│   │   │   ├── CommandCenter.tsx   # Prompt input + controls
+│   │   │   ├── PromptAnalyzer.tsx  # Analysis display
+│   │   │   └── LoopMonitor.tsx     # Active loop monitor
 │   │   ├── context/                # Context health
-│   │   │   ├── HealthMonitor.tsx
-│   │   │   ├── TokenBreakdown.tsx
-│   │   │   └── McpOptimizer.tsx
-│   │   └── enforcement/            # Enforcement
-│   │       ├── GitHookSetup.tsx
-│   │       └── CISetup.tsx
-│   ├── hooks/                      # Custom hooks
+│   │   │   ├── HealthMonitor.tsx   # Health overview + checkpoints
+│   │   │   ├── TokenBreakdown.tsx  # Token usage chart
+│   │   │   └── McpOptimizer.tsx    # MCP server status
+│   │   ├── enforcement/            # Enforcement
+│   │   │   ├── GitHookSetup.tsx    # Git hook installer
+│   │   │   └── CISetup.tsx         # CI template snippets
+│   │   ├── settings/               # Settings
+│   │   │   └── SettingsView.tsx    # API key + preferences
+│   │   └── help/                   # Help
+│   │       └── HelpView.tsx        # Documentation links
+│   ├── hooks/                      # Custom hooks (all call real Tauri backend)
 │   │   ├── useProject.ts
 │   │   ├── useOnboarding.ts
 │   │   ├── useClaudeMd.ts
 │   │   ├── useModules.ts
-│   │   └── useHealth.ts
+│   │   ├── useHealth.ts
+│   │   ├── useSkills.ts
+│   │   ├── useAgents.ts
+│   │   ├── useRalph.ts
+│   │   ├── useContextHealth.ts
+│   │   ├── useEnforcement.ts
+│   │   ├── useRefreshDocs.ts
+│   │   └── useSectionCompletion.ts
 │   ├── stores/                     # Zustand stores
 │   │   ├── projectStore.ts
 │   │   ├── onboardingStore.ts
 │   │   └── settingsStore.ts
+│   ├── data/                       # Static data
+│   │   ├── skillLibrary.ts         # Curated skill definitions
+│   │   ├── skillCategories.ts
+│   │   ├── agentLibrary.ts         # Curated agent definitions
+│   │   ├── agentCategories.ts
+│   │   └── stackTemplates.ts       # Tech stack templates
 │   ├── types/                      # TypeScript types
 │   │   ├── index.ts
 │   │   ├── project.ts
 │   │   ├── module.ts
-│   │   └── health.ts
+│   │   ├── skill.ts
+│   │   ├── agent.ts
+│   │   ├── health.ts
+│   │   ├── ralph.ts
+│   │   ├── enforcement.ts
+│   │   └── kickstart.ts
 │   ├── lib/                        # Utilities
-│   │   ├── tauri.ts                # Tauri API wrapper
-│   │   └── utils.ts
-│   ├── App.tsx
-│   └── main.tsx
+│   │   ├── tauri.ts                # Tauri IPC wrapper (50+ commands)
+│   │   ├── utils.ts                # General utilities
+│   │   ├── skillRelevance.ts       # Skill recommendation logic
+│   │   └── agentRelevance.ts       # Agent recommendation logic
+│   ├── test/                       # Test setup
+│   │   └── setup.ts
+│   ├── App.tsx                     # Root component
+│   └── main.tsx                    # Entry point
 │
 ├── package.json
 ├── tsconfig.json
 ├── tailwind.config.js
 ├── vite.config.ts
-├── project-jumpstart-spec.md
+├── vitest.config.ts                # Test configuration
+├── project-jumpstart-spec.md       # Full product specification
 └── CLAUDE.md                       # This file
 ```
 
@@ -170,7 +222,7 @@ This is the **most important rule** in this project. Every source file needs a d
 
 2. **We're building a documentation tool** — If we don't document our own code, we're hypocrites.
 
-3. **Self-hosting** — Once v1.0 ships, we'll use Copilot on itself.
+3. **Self-hosting** — The app is now feature-complete; use Project Jumpstart on itself for documentation maintenance.
 
 ---
 
@@ -464,12 +516,34 @@ export async function scanProject(path: string): Promise<DetectionResult> {
 
 ---
 
-## Current Focus
+## Current Status
 
-**Phase**: 1 - Foundation
-**Working on**: Initial project setup
-**Next up**: Basic layout components
-**Blocked by**: Nothing
+**Status**: Feature-Complete (Beta Ready)
+**Last Updated**: January 2026
+
+### Implementation Status
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Onboarding Wizard | ✅ Complete | Project selection, tech stack detection, CLAUDE.md generation |
+| Dashboard | ✅ Complete | Health score, quick wins, context rot alerts, activity feed |
+| CLAUDE.md Editor | ✅ Complete | Live preview, section suggestions, AI-powered generation |
+| Module Documentation | ✅ Complete | File tree, doc preview, batch generation |
+| Project Kickstart | ✅ Complete | Empty project bootstrapping with AI prompts |
+| Skills Workshop | ✅ Complete | CRUD, pattern detection, skill library |
+| Agents Management | ✅ Complete | CRUD, library, AI-enhanced instructions |
+| RALPH Command Center | ✅ Complete | Prompt analysis (heuristic + AI), loop monitoring |
+| Context Health | ✅ Complete | Token breakdown, MCP status, checkpoints |
+| Enforcement | ✅ Complete | Git hooks, CI integration snippets |
+| Settings | ✅ Complete | API key management, preferences |
+| File Watcher | ✅ Complete | notify-rs with debounce, event emission |
+| Database | ✅ Complete | SQLite with full schema, migrations |
+
+### What's NOT Code (Platform/Deployment)
+
+- **macOS Notarization**: Requires Apple credentials (not a code issue)
+- **Windows/Linux Builds**: Not yet configured (platform config, not code)
+- **E2E Tests**: Would be nice but 338+ unit tests provide good coverage
 
 ---
 
@@ -518,7 +592,17 @@ interface HealthScore {
   contextRotRisk: 'low' | 'medium' | 'high';
 }
 
-// Module Status
+// Module Documentation
+interface ModuleDoc {
+  module: string;
+  description: string;
+  purpose: string[];
+  dependencies: string[];
+  exports: string[];
+  patterns: string[];
+  claudeNotes: string[];
+}
+
 interface ModuleStatus {
   path: string;
   status: 'current' | 'outdated' | 'missing';
@@ -526,12 +610,73 @@ interface ModuleStatus {
   changes?: string[];
 }
 
+// Skills
+interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  content: string;
+  projectId: string | null;
+  usageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Agents
+interface Agent {
+  id: string;
+  name: string;
+  description: string;
+  tier: string;           // 'essential' | 'advanced' | 'specialized'
+  category: string;
+  instructions: string;
+  workflow: AgentWorkflowStep[] | null;
+  tools: AgentTool[] | null;
+  triggerPatterns: string[] | null;
+  projectId: string | null;
+  usageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// RALPH
+interface RalphAnalysis {
+  score: number;          // 0-100
+  issues: RalphIssue[];
+  suggestions: string[];
+  optimizedPrompt: string | null;
+}
+
+interface RalphLoop {
+  id: string;
+  prompt: string;
+  status: 'active' | 'paused' | 'completed';
+  iterations: number;
+  createdAt: string;
+}
+
+// Context Health
+interface ContextHealth {
+  totalTokens: number;
+  utilization: number;    // 0-100%
+  breakdown: TokenBreakdown;
+  risk: 'low' | 'medium' | 'high';
+}
+
+// Enforcement
+interface HookStatus {
+  installed: boolean;
+  mode: 'warn' | 'block' | null;
+  lastRun: string | null;
+}
+
 // Detection Result
 interface DetectionResult {
   confidence: 'high' | 'medium' | 'low' | 'none';
   language: { value: string; confidence: number; source: string } | null;
   framework: { value: string; confidence: number; source: string } | null;
-  // ... other detected values
+  buildTool: { value: string; confidence: number; source: string } | null;
+  testFramework: { value: string; confidence: number; source: string } | null;
 }
 ```
 
@@ -540,32 +685,49 @@ interface DetectionResult {
 ## CLAUDE NOTES
 
 ### General
+- **App is feature-complete** — all sections fully implemented
 - Always read the spec file for detailed requirements
 - Use pnpm, not npm or yarn
 - Target macOS first, then Windows/Linux
 - Every file needs a documentation header (see above)
+- 338+ unit tests provide good coverage
+
+### AI Integration
+- Anthropic API key stored encrypted in settings
+- AI features have graceful fallbacks (heuristics/templates)
+- RALPH uses heuristic analysis first, AI as enhancement
+- Module docs can generate from AI or use templates
+- Agent instructions can be AI-enhanced
 
 ### Rust
 - All Tauri commands must be async
 - All commands return `Result<T, String>`
 - Use `tokio` for async runtime
 - Prefer `anyhow` for error handling internally, convert to String at boundary
+- File watcher uses notify-rs v7 with 500ms debounce
 
 ### React
 - Use functional components only
 - Use shadcn/ui for all UI primitives
 - Use Tailwind classes, never CSS files
 - Prefer composition over prop drilling
+- All hooks call real Tauri backend (no mock data)
 
 ### Database
 - SQLite database location: `~/.project-jumpstart/copilot.db`
 - Use migrations for schema changes
 - All timestamps in UTC
+- Full schema includes: projects, skills, agents, activities, checkpoints, ralph_loops
 
 ### File Paths
 - Use forward slashes even on Windows (Tauri normalizes)
 - Store relative paths in DB when possible
 - Resolve to absolute only when needed
+
+### Testing
+- Frontend tests: `pnpm test`
+- Backend tests: `cargo test`
+- Test files colocated with source (`.test.ts`, `.test.tsx`)
 
 ---
 
@@ -580,6 +742,14 @@ The full product specification is in `project-jumpstart-spec.md`. Key sections:
 - **Part 6**: Data models
 - **Part 7**: Tauri commands
 - **Part 8**: Implementation roadmap
+
+---
+
+## Changelog
+
+| Date | Change |
+|------|--------|
+| Jan 2026 | Updated to reflect feature-complete status. All sections implemented. |
 
 ---
 

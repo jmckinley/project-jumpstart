@@ -66,6 +66,7 @@
  * - This allows the sidebar to show checkmarks for completed sections
  *
  * CLAUDE NOTES:
+ * - All section views are fully implemented and functional
  * - The dashboard layout uses a 2-column grid for HealthScore and QuickWins
  * - ContextRotAlert is placed at the top of the dashboard and returns null for "low" risk
  * - RecentActivity is rendered full-width below the grid with real data from getRecentActivities
@@ -74,9 +75,11 @@
  * - The Editor component manages its own state via useClaudeMd hook
  * - SkillsView manages selectedSkill and editing state locally
  * - SkillsView uses a 2-column grid (SkillsList left, SkillEditor right) with PatternDetector below
+ * - AgentsView follows same pattern as SkillsView with library tab support
  * - RalphView uses a 2-column grid (CommandCenter left, PromptAnalyzer right) with LoopMonitor below
  * - ContextView uses a 2-column grid (HealthMonitor left, TokenBreakdown right) with McpOptimizer below
- * - Section components will be added as they are built in later phases
+ * - EnforcementView uses a 2-column grid (GitHookSetup left, CISetup right)
+ * - KickstartView renders ProjectKickstart for empty projects
  */
 
 import { useEffect, useState, useCallback } from "react";

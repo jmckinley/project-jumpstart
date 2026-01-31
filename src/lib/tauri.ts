@@ -13,6 +13,7 @@
  * - @/types - All shared type definitions
  *
  * EXPORTS:
+ * Project Management:
  * - scanProject - Scan a directory for tech stack detection
  * - saveProject - Save a configured project to the database
  * - listProjects - Fetch all projects
@@ -20,43 +21,71 @@
  * - removeProject - Delete a project record
  * - pickFolder - Open native folder picker dialog
  * - openUrl - Open a URL in the default browser
+ *
+ * CLAUDE.md:
  * - readClaudeMd - Read CLAUDE.md file with metadata
  * - writeClaudeMd - Write content to CLAUDE.md file
  * - generateClaudeMd - Generate CLAUDE.md from project template
  * - getHealthScore - Calculate health score for a project
+ *
+ * Module Documentation:
  * - scanModules - Scan project files for documentation status
  * - generateModuleDoc - Generate doc template for a single file
  * - applyModuleDoc - Apply doc header to a file on disk
  * - batchGenerateDocs - Generate and apply docs for multiple files
  * - checkFreshness - Check freshness of a single file
  * - getStaleFiles - Get files with outdated or missing docs
+ *
+ * Skills:
  * - listSkills - List skills for a project
  * - createSkill - Create a new skill
  * - updateSkill - Update an existing skill
  * - deleteSkill - Delete a skill
  * - detectPatterns - Detect project patterns for skill suggestions
  * - incrementSkillUsage - Bump usage count for a skill
+ *
+ * Agents:
+ * - listAgents - List agents for a project
+ * - createAgent - Create a new agent
+ * - updateAgent - Update an existing agent
+ * - deleteAgent - Delete an agent
+ * - incrementAgentUsage - Bump usage count for an agent
+ * - enhanceAgentInstructions - AI-enhance agent instructions
+ *
+ * RALPH:
  * - analyzeRalphPrompt - Analyze prompt quality for RALPH loops (heuristic)
  * - analyzeRalphPromptWithAi - AI-powered prompt analysis with project context
  * - startRalphLoop - Start a new RALPH loop
  * - pauseRalphLoop - Pause an active RALPH loop
  * - listRalphLoops - List loops for a project
+ *
+ * Context Health:
  * - getContextHealth - Get context health with token breakdown
  * - getMcpStatus - Get MCP server status and recommendations
  * - createCheckpoint - Create a context checkpoint
  * - listCheckpoints - List checkpoints for a project
+ *
+ * Enforcement:
  * - installGitHooks - Install pre-commit hook for doc enforcement
  * - getHookStatus - Check if hooks are installed
  * - getEnforcementEvents - List recent enforcement events
  * - getCiSnippets - Generate CI integration templates
+ *
+ * Activity:
  * - logActivity - Log an activity event for a project
  * - getRecentActivities - Fetch recent activity events for a project
+ *
+ * File Watcher:
  * - startFileWatcher - Start watching a project directory for file changes
  * - stopFileWatcher - Stop the current file watcher
+ *
+ * Settings:
  * - getSetting - Retrieve a single setting by key
  * - saveSetting - Persist a single setting key-value pair
  * - getAllSettings - Retrieve all persisted settings as a key-value map
  * - validateApiKey - Validate API key format and test with API call
+ *
+ * Kickstart:
  * - generateKickstartPrompt - Generate a kickstart prompt for new projects
  * - generateKickstartClaudeMd - Generate and save initial CLAUDE.md from kickstart input
  * - inferTechStack - Use AI to suggest optimal tech stack based on project description
