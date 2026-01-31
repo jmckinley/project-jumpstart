@@ -31,11 +31,11 @@ import { create } from "zustand";
 interface SettingsState {
   hasApiKey: boolean;
   notificationsEnabled: boolean;
-  enforcementLevel: "off" | "warn" | "block";
+  enforcementLevel: "off" | "warn" | "block" | "auto-update";
 
   setHasApiKey: (hasKey: boolean) => void;
   setNotificationsEnabled: (enabled: boolean) => void;
-  setEnforcementLevel: (level: "off" | "warn" | "block") => void;
+  setEnforcementLevel: (level: "off" | "warn" | "block" | "auto-update") => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({

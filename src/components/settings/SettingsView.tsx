@@ -14,7 +14,8 @@
  * - @/components/ui/button - Button for enforcement level selection and API key save
  * - @/components/ui/badge - Badge for API key status indicator
  * - @/stores/settingsStore - Zustand store for settings state
- * - @/lib/tauri - saveSetting, getAllSettings, getSetting for IPC persistence
+ * - @/stores/projectStore - Active project for git hook sync
+ * - @/lib/tauri - saveSetting, getAllSettings, getSetting, installGitHooks, getHookStatus for IPC
  *
  * EXPORTS:
  * - SettingsView - Main settings panel component
@@ -30,9 +31,11 @@
  * CLAUDE NOTES:
  * - The API key is stored as "anthropic_api_key" in the settings table
  * - Frontend only displays a masked version (last 4 chars) and a boolean hasApiKey flag
- * - Enforcement levels: "off" (no checks), "warn" (show warnings), "block" (prevent commits)
+ * - Enforcement levels: "off" (no checks), "warn" (warnings), "block" (prevent commits), "auto-update" (AI-generate docs)
  * - Settings are persisted as string key-value pairs; booleans are stored as "true"/"false"
  * - The about section is static and does not depend on any backend data
+ * - Enforcement level syncs with git hook: changing level here updates the installed hook
+ * - On mount, if a hook is installed, the settings are synced from the hook mode
  */
 
 import { useEffect, useState } from "react";
@@ -40,16 +43,18 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { saveSetting, getAllSettings, getSetting } from "@/lib/tauri";
+import { saveSetting, getAllSettings, getSetting, installGitHooks, getHookStatus } from "@/lib/tauri";
+import { useProjectStore } from "@/stores/projectStore";
 
 const ENFORCEMENT_OPTIONS: Array<{
-  value: "off" | "warn" | "block";
+  value: "off" | "warn" | "block" | "auto-update";
   label: string;
   description: string;
 }> = [
   { value: "off", label: "Off", description: "No documentation checks" },
-  { value: "warn", label: "Warn", description: "Show warnings for missing docs" },
-  { value: "block", label: "Block", description: "Prevent commits without docs" },
+  { value: "warn", label: "Warn", description: "Allow commits but show warnings for missing docs" },
+  { value: "block", label: "Block", description: "Prevent commits with missing doc headers" },
+  { value: "auto-update", label: "Auto-Update", description: "Generate missing docs via AI, stage them, then commit (Recommended)" },
 ];
 
 export function SettingsView() {
@@ -59,6 +64,7 @@ export function SettingsView() {
   const setEnforcementLevel = useSettingsStore((s) => s.setEnforcementLevel);
   const setNotificationsEnabled = useSettingsStore((s) => s.setNotificationsEnabled);
   const setHasApiKey = useSettingsStore((s) => s.setHasApiKey);
+  const activeProject = useProjectStore((s) => s.activeProject);
 
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [apiKeyMask, setApiKeyMask] = useState<string | null>(null);
@@ -69,8 +75,8 @@ export function SettingsView() {
       try {
         const settings = await getAllSettings();
         if (settings.enforcementLevel) {
-          const level = settings.enforcementLevel as "off" | "warn" | "block";
-          if (level === "off" || level === "warn" || level === "block") {
+          const level = settings.enforcementLevel as "off" | "warn" | "block" | "auto-update";
+          if (level === "off" || level === "warn" || level === "block" || level === "auto-update") {
             setEnforcementLevel(level);
           }
         }
@@ -90,12 +96,24 @@ export function SettingsView() {
           setHasApiKey(false);
           setApiKeyMask(null);
         }
+
+        // Check hook status if project is active and sync enforcement level from installed hook
+        if (activeProject) {
+          const status = await getHookStatus(activeProject.path);
+          if (status.installed && status.mode && status.mode !== "external") {
+            const hookMode = status.mode as "off" | "warn" | "block" | "auto-update";
+            if (hookMode !== settings.enforcementLevel) {
+              setEnforcementLevel(hookMode);
+              await saveSetting("enforcementLevel", hookMode);
+            }
+          }
+        }
       } catch {
         // Settings may not be persisted yet; defaults from the store are fine
       }
     }
     loadSettings();
-  }, [setEnforcementLevel, setNotificationsEnabled, setHasApiKey]);
+  }, [setEnforcementLevel, setNotificationsEnabled, setHasApiKey, activeProject]);
 
   async function handleSaveApiKey() {
     if (!apiKeyInput.trim()) return;
@@ -122,9 +140,18 @@ export function SettingsView() {
     }
   }
 
-  async function handleEnforcementChange(level: "off" | "warn" | "block") {
+  async function handleEnforcementChange(level: "off" | "warn" | "block" | "auto-update") {
     setEnforcementLevel(level);
     await saveSetting("enforcementLevel", level);
+
+    // Sync with git hook if project is active
+    if (activeProject && level !== "off") {
+      try {
+        await installGitHooks(activeProject.path, level);
+      } catch {
+        // Hook installation may fail if no git repo, etc.
+      }
+    }
   }
 
   async function handleNotificationsToggle() {

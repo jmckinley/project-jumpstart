@@ -20,6 +20,7 @@
 //! - get_enforcement_events - List recent enforcement events
 //! - get_ci_snippets - Generate CI integration templates
 //! - get_enforcement_score - Calculate enforcement score (0-10) for health
+//! - export_api_key_for_hook - (internal) Export decrypted API key to JSON for auto-update hook
 //!
 //! PATTERNS:
 //! - install_git_hooks writes a shell script to .git/hooks/pre-commit
@@ -30,6 +31,8 @@
 //! CLAUDE NOTES:
 //! - Hook modes: "block" (exit 1), "warn" (exit 0 with message), "auto-update" (generate docs)
 //! - Auto-update mode reads API key from ~/.project-jumpstart/settings.json
+//! - When installing auto-update hook, API key is exported from encrypted SQLite to JSON
+//! - The settings.json file has 0600 permissions (owner read/write only)
 //! - Husky detection: checks for .husky/ directory
 //! - CI detection: checks for .github/workflows/ or .gitlab-ci.yml
 //! - Enforcement events are logged to the DB for the event log UI
@@ -37,8 +40,58 @@
 use std::path::Path;
 use tauri::State;
 
+use crate::core::crypto;
 use crate::db::{self, AppState};
 use crate::models::enforcement::{CiSnippet, EnforcementEvent, HookStatus};
+
+/// Export the decrypted API key to a JSON file for the auto-update hook.
+/// The hook script reads this file since it can't decrypt the SQLite-stored key.
+fn export_api_key_for_hook(db: &rusqlite::Connection) -> Result<(), String> {
+    // Read the encrypted API key from the database
+    let encrypted_value: String = db
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'anthropic_api_key'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|_| "No API key configured. Please add your Anthropic API key in Settings.")?;
+
+    // Decrypt the API key
+    let api_key = if encrypted_value.starts_with("enc:") {
+        crypto::decrypt(&encrypted_value[4..])
+            .map_err(|e| format!("Failed to decrypt API key: {}", e))?
+    } else {
+        encrypted_value
+    };
+
+    if api_key.is_empty() {
+        return Err("API key is empty. Please configure your Anthropic API key in Settings.".to_string());
+    }
+
+    // Write to ~/.project-jumpstart/settings.json
+    let home = dirs::home_dir().ok_or("Could not determine home directory")?;
+    let settings_dir = home.join(".project-jumpstart");
+    std::fs::create_dir_all(&settings_dir)
+        .map_err(|e| format!("Failed to create settings directory: {}", e))?;
+
+    let settings_path = settings_dir.join("settings.json");
+    let json = serde_json::json!({
+        "anthropic_api_key": api_key
+    });
+    std::fs::write(&settings_path, serde_json::to_string_pretty(&json).unwrap())
+        .map_err(|e| format!("Failed to write settings.json: {}", e))?;
+
+    // Set restrictive permissions (owner read/write only)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let perms = std::fs::Permissions::from_mode(0o600);
+        std::fs::set_permissions(&settings_path, perms)
+            .map_err(|e| format!("Failed to set permissions on settings.json: {}", e))?;
+    }
+
+    Ok(())
+}
 
 /// Install a pre-commit git hook that checks documentation headers.
 /// Creates .git/hooks/pre-commit with a doc-checking script.
@@ -62,6 +115,15 @@ pub async fn install_git_hooks(
     }
 
     let hook_path = hooks_dir.join("pre-commit");
+
+    // For auto-update mode, export the API key to a JSON file
+    if mode == "auto-update" {
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| format!("Failed to lock database: {}", e))?;
+        export_api_key_for_hook(&db)?;
+    }
 
     let hook_script = if mode == "auto-update" {
         generate_auto_update_hook_script()
@@ -313,8 +375,8 @@ if [ ! -f "$SETTINGS_FILE" ]; then
     exit 1
 fi
 
-# Extract API key (basic JSON parsing)
-API_KEY=$(grep -o '"anthropic_api_key":"[^"]*"' "$SETTINGS_FILE" 2>/dev/null | cut -d'"' -f4)
+# Extract API key (handles JSON with or without spaces)
+API_KEY=$(grep -o '"anthropic_api_key"[[:space:]]*:[[:space:]]*"[^"]*"' "$SETTINGS_FILE" 2>/dev/null | sed 's/.*:.*"\([^"]*\)".*/\1/')
 if [ -z "$API_KEY" ]; then
     echo "ERROR: No API key found in Project Jumpstart settings."
     echo "Please configure your Anthropic API key in Project Jumpstart."

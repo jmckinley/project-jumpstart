@@ -12,6 +12,8 @@
  * - @/components/ui/button - Action buttons
  * - @/components/ui/badge - Status badges
  * - @/types/enforcement - HookStatus type
+ * - @/stores/settingsStore - Sync enforcement level to settings
+ * - @/lib/tauri - saveSetting for persisting enforcement level
  *
  * EXPORTS:
  * - GitHookSetup - Hook setup and status component
@@ -30,12 +32,15 @@
  * - "external" mode means a non-Jumpstart hook is already present
  * - has_husky flag indicates Husky framework is detected alongside
  * - Auto-update mode requires API key configured in Project Jumpstart settings
+ * - Installing a hook syncs the mode to the Settings enforcement level
  */
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { HookStatus } from "@/types/enforcement";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { saveSetting } from "@/lib/tauri";
 
 interface GitHookSetupProps {
   hookStatus: HookStatus | null;
@@ -59,6 +64,16 @@ function getStatusBadge(status: HookStatus | null) {
 }
 
 export function GitHookSetup({ hookStatus, loading, installing, onInstall, onRefresh }: GitHookSetupProps) {
+  const setEnforcementLevel = useSettingsStore((s) => s.setEnforcementLevel);
+
+  async function handleInstall(mode: "warn" | "block" | "auto-update") {
+    // Sync with settings store
+    setEnforcementLevel(mode);
+    await saveSetting("enforcementLevel", mode);
+    // Call the actual install
+    onInstall(mode);
+  }
+
   return (
     <Card className="border-neutral-800 bg-neutral-900">
       <CardHeader className="pb-3">
@@ -89,7 +104,7 @@ export function GitHookSetup({ hookStatus, loading, installing, onInstall, onRef
         <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
-            onClick={() => onInstall("auto-update")}
+            onClick={() => handleInstall("auto-update")}
             disabled={installing || loading}
             className="bg-blue-600 hover:bg-blue-500"
           >
@@ -98,7 +113,7 @@ export function GitHookSetup({ hookStatus, loading, installing, onInstall, onRef
           <Button
             size="sm"
             variant="destructive"
-            onClick={() => onInstall("block")}
+            onClick={() => handleInstall("block")}
             disabled={installing || loading}
           >
             {installing ? "Installing..." : "Block"}
@@ -106,7 +121,7 @@ export function GitHookSetup({ hookStatus, loading, installing, onInstall, onRef
           <Button
             size="sm"
             variant="outline"
-            onClick={() => onInstall("warn")}
+            onClick={() => handleInstall("warn")}
             disabled={installing || loading}
             className="border-neutral-700 text-neutral-300 hover:bg-neutral-800"
           >

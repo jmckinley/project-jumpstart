@@ -11,12 +11,25 @@
  * PATTERNS:
  * - Uses @testing-library/react for rendering
  * - Uses vitest for mocking
+ * - Mocks settingsStore and tauri saveSetting for installation sync
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { GitHookSetup } from "./GitHookSetup";
 import type { HookStatus } from "@/types/enforcement";
+
+// Mock settings store
+const mockSetEnforcementLevel = vi.fn();
+vi.mock("@/stores/settingsStore", () => ({
+  useSettingsStore: (selector: (state: { setEnforcementLevel: typeof mockSetEnforcementLevel }) => unknown) =>
+    selector({ setEnforcementLevel: mockSetEnforcementLevel }),
+}));
+
+// Mock tauri saveSetting
+vi.mock("@/lib/tauri", () => ({
+  saveSetting: vi.fn().mockResolvedValue(undefined),
+}));
 
 const mockOnInstall = vi.fn();
 const mockOnRefresh = vi.fn();
@@ -32,6 +45,7 @@ const defaultProps = {
 describe("GitHookSetup", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSetEnforcementLevel.mockClear();
   });
 
   describe("rendering", () => {
@@ -190,28 +204,37 @@ describe("GitHookSetup", () => {
   });
 
   describe("button interactions", () => {
-    it("should call onInstall with auto-update when Auto-Update button clicked", () => {
+    it("should call onInstall with auto-update when Auto-Update button clicked", async () => {
       render(<GitHookSetup {...defaultProps} />);
 
       fireEvent.click(screen.getByText("Auto-Update (Recommended)"));
 
-      expect(mockOnInstall).toHaveBeenCalledWith("auto-update");
+      await waitFor(() => {
+        expect(mockOnInstall).toHaveBeenCalledWith("auto-update");
+      });
+      expect(mockSetEnforcementLevel).toHaveBeenCalledWith("auto-update");
     });
 
-    it("should call onInstall with block when Block button clicked", () => {
+    it("should call onInstall with block when Block button clicked", async () => {
       render(<GitHookSetup {...defaultProps} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Block" }));
 
-      expect(mockOnInstall).toHaveBeenCalledWith("block");
+      await waitFor(() => {
+        expect(mockOnInstall).toHaveBeenCalledWith("block");
+      });
+      expect(mockSetEnforcementLevel).toHaveBeenCalledWith("block");
     });
 
-    it("should call onInstall with warn when Warn button clicked", () => {
+    it("should call onInstall with warn when Warn button clicked", async () => {
       render(<GitHookSetup {...defaultProps} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Warn" }));
 
-      expect(mockOnInstall).toHaveBeenCalledWith("warn");
+      await waitFor(() => {
+        expect(mockOnInstall).toHaveBeenCalledWith("warn");
+      });
+      expect(mockSetEnforcementLevel).toHaveBeenCalledWith("warn");
     });
 
     it("should call onRefresh when Refresh button clicked", () => {
