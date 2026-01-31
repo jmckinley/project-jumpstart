@@ -4,7 +4,7 @@
  *
  * PURPOSE:
  * - Test button rendering and states
- * - Test confirmation dialog flow
+ * - Test single-click refresh behavior
  * - Test success and error banner display
  * - Test callback invocation
  *
@@ -26,6 +26,7 @@
  * - Badge only shows when moduleCount > 0
  * - Success banner auto-dismisses (use fake timers to test)
  * - Error banner persists until dismissed
+ * - No confirmation dialog - single click triggers refresh
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -127,49 +128,14 @@ describe("RefreshDocsButton", () => {
     });
   });
 
-  describe("confirmation dialog", () => {
-    it("should show confirmation dialog when button is clicked", async () => {
-      const user = userEvent.setup();
-
-      vi.mocked(useRefreshDocs).mockReturnValue({
-        refreshing: false,
-        staleCount: 2,
-        missingCount: 1,
-        totalToRefresh: 4,
-        scanForStaleFiles: mockScanForStaleFiles,
-        refreshAll: mockRefreshAll,
-      });
-
-      render(<RefreshDocsButton onComplete={mockOnComplete} />);
-
-      await user.click(screen.getByRole("button", { name: /refresh docs/i }));
-
-      expect(screen.getByText(/refresh documentation\?/i)).toBeInTheDocument();
-      expect(screen.getByText(/3 module/i)).toBeInTheDocument(); // 2 + 1 = 3 module files
-      expect(screen.getByText(/1 missing/i)).toBeInTheDocument();
-      expect(screen.getByText(/2 outdated/i)).toBeInTheDocument();
-    });
-
-    it("should hide confirmation dialog when cancel is clicked", async () => {
-      const user = userEvent.setup();
-
-      render(<RefreshDocsButton onComplete={mockOnComplete} />);
-
-      await user.click(screen.getByRole("button", { name: /refresh docs/i }));
-      expect(screen.getByText(/refresh documentation\?/i)).toBeInTheDocument();
-
-      await user.click(screen.getByRole("button", { name: /cancel/i }));
-      expect(screen.queryByText(/refresh documentation\?/i)).not.toBeInTheDocument();
-    });
-
-    it("should call refreshAll when confirm is clicked", async () => {
+  describe("click behavior", () => {
+    it("should call refreshAll immediately when button is clicked", async () => {
       const user = userEvent.setup();
       mockRefreshAll.mockResolvedValue({ claudeMd: true, modules: 3 });
 
       render(<RefreshDocsButton onComplete={mockOnComplete} />);
 
       await user.click(screen.getByRole("button", { name: /refresh docs/i }));
-      await user.click(screen.getByRole("button", { name: /refresh all/i }));
 
       expect(mockRefreshAll).toHaveBeenCalled();
     });
@@ -183,7 +149,6 @@ describe("RefreshDocsButton", () => {
       render(<RefreshDocsButton onComplete={mockOnComplete} />);
 
       await user.click(screen.getByRole("button", { name: /refresh docs/i }));
-      await user.click(screen.getByRole("button", { name: /refresh all/i }));
 
       await waitFor(() => {
         expect(screen.getByText(/refreshed claude\.md and 5 module files/i)).toBeInTheDocument();
@@ -197,7 +162,6 @@ describe("RefreshDocsButton", () => {
       render(<RefreshDocsButton onComplete={mockOnComplete} />);
 
       await user.click(screen.getByRole("button", { name: /refresh docs/i }));
-      await user.click(screen.getByRole("button", { name: /refresh all/i }));
 
       await waitFor(() => {
         expect(mockOnComplete).toHaveBeenCalled();
@@ -214,7 +178,6 @@ describe("RefreshDocsButton", () => {
       render(<RefreshDocsButton onComplete={mockOnComplete} />);
 
       await user.click(screen.getByRole("button", { name: /refresh docs/i }));
-      await user.click(screen.getByRole("button", { name: /refresh all/i }));
 
       await waitFor(() => {
         expect(screen.getByText(/refreshed claude\.md/i)).toBeInTheDocument();
@@ -233,7 +196,6 @@ describe("RefreshDocsButton", () => {
       render(<RefreshDocsButton onComplete={mockOnComplete} />);
 
       await user.click(screen.getByRole("button", { name: /refresh docs/i }));
-      await user.click(screen.getByRole("button", { name: /refresh all/i }));
 
       await waitFor(() => {
         expect(screen.getByText("Refreshed CLAUDE.md")).toBeInTheDocument();
@@ -249,7 +211,6 @@ describe("RefreshDocsButton", () => {
       render(<RefreshDocsButton onComplete={mockOnComplete} />);
 
       await user.click(screen.getByRole("button", { name: /refresh docs/i }));
-      await user.click(screen.getByRole("button", { name: /refresh all/i }));
 
       await waitFor(() => {
         expect(screen.getByText(/api connection failed/i)).toBeInTheDocument();
@@ -263,7 +224,6 @@ describe("RefreshDocsButton", () => {
       render(<RefreshDocsButton onComplete={mockOnComplete} />);
 
       await user.click(screen.getByRole("button", { name: /refresh docs/i }));
-      await user.click(screen.getByRole("button", { name: /refresh all/i }));
 
       await waitFor(() => {
         expect(screen.getByText(/failed/i)).toBeInTheDocument();
@@ -279,7 +239,6 @@ describe("RefreshDocsButton", () => {
       render(<RefreshDocsButton onComplete={mockOnComplete} />);
 
       await user.click(screen.getByRole("button", { name: /refresh docs/i }));
-      await user.click(screen.getByRole("button", { name: /refresh all/i }));
 
       await waitFor(() => {
         expect(screen.getByText(/some error/i)).toBeInTheDocument();
@@ -297,7 +256,6 @@ describe("RefreshDocsButton", () => {
       render(<RefreshDocsButton onComplete={mockOnComplete} />);
 
       await user.click(screen.getByRole("button", { name: /refresh docs/i }));
-      await user.click(screen.getByRole("button", { name: /refresh all/i }));
 
       await waitFor(() => {
         expect(screen.getByText(/failed to refresh documentation/i)).toBeInTheDocument();

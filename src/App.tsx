@@ -26,7 +26,9 @@
  * PATTERNS:
  * - On mount, checks has_seen_welcome setting first
  * - If not seen welcome, shows FirstUseWelcome screen
- * - After welcome, fetches project list from backend
+ * - After welcome, fetches project list and last_active_project_id from backend
+ * - Restores last active project on load, falls back to first project
+ * - Saves last_active_project_id when project changes
  * - If no projects and not loading, renders WizardShell
  * - If projects exist, renders main layout with Sidebar + MainPanel + StatusBar
  * - onComplete from WizardShell adds project to store and resets onboarding state
@@ -37,6 +39,7 @@
  * - No URL routing; desktop app uses state-based navigation
  * - FirstUseWelcome blocks all other UI until dismissed
  * - App name: Project Jumpstart
+ * - last_active_project_id is saved whenever user switches projects or completes onboarding
  */
 
 import { useEffect, useState } from "react";
@@ -49,7 +52,7 @@ import { useProjectStore } from "@/stores/projectStore";
 import { useOnboardingStore } from "@/stores/onboardingStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useSectionCompletion } from "@/hooks/useSectionCompletion";
-import { listProjects, getSetting } from "@/lib/tauri";
+import { listProjects, getSetting, saveSetting } from "@/lib/tauri";
 import type { Project } from "@/types/project";
 
 function App() {
@@ -87,16 +90,20 @@ function App() {
       });
   }, [setHasApiKey]);
 
-  // Load projects after welcome is complete
+  // Load projects after welcome is complete, restoring last active project
   useEffect(() => {
     if (hasSeenWelcome !== true) return;
 
     setLoading(true);
-    listProjects()
-      .then((projects) => {
+    Promise.all([listProjects(), getSetting("last_active_project_id")])
+      .then(([projects, lastActiveId]) => {
         setProjects(projects);
         if (projects.length > 0) {
-          setActiveProject(projects[0]);
+          // Try to restore last active project, fallback to first
+          const lastProject = lastActiveId
+            ? projects.find((p) => p.id === lastActiveId)
+            : null;
+          setActiveProject(lastProject ?? projects[0]);
         }
       })
       .catch((err) => {
@@ -112,6 +119,7 @@ function App() {
   const handleOnboardingComplete = (project: Project) => {
     addProject(project);
     setActiveProject(project);
+    saveSetting("last_active_project_id", project.id).catch(console.error);
     resetOnboarding();
     setShowOnboarding(false);
   };
@@ -122,6 +130,7 @@ function App() {
 
   const handleProjectChange = (project: Project) => {
     setActiveProject(project);
+    saveSetting("last_active_project_id", project.id).catch(console.error);
     setActiveSection("dashboard"); // Reset to dashboard on project switch
   };
 

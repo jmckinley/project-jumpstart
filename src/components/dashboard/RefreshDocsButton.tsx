@@ -5,7 +5,6 @@
  * PURPOSE:
  * - Provide a prominent button to regenerate documentation in the dashboard header
  * - Show badge with count of stale files needing updates
- * - Display confirmation dialog before regenerating to prevent accidental overwrites
  * - Show loading state during refresh and success/error feedback after completion
  *
  * DEPENDENCIES:
@@ -17,16 +16,17 @@
  * - RefreshDocsButton - Dashboard header button component
  *
  * PATTERNS:
- * - Uses inline confirmation banner (not modal) matching Editor.tsx pattern
+ * - Single-click refresh with no confirmation (content is machine-generated)
  * - Shows spinner and disables button during refresh
  * - Calls onComplete callback after successful refresh to trigger dashboard updates
- * - Error state is shown as a temporary banner that auto-dismisses
+ * - Success/error feedback shown as temporary banners
  *
  * CLAUDE NOTES:
  * - Badge shows totalToRefresh count (stale + missing + 1 for CLAUDE.md)
  * - Badge is hidden when totalToRefresh <= 1 (only CLAUDE.md, no stale files)
  * - Success banner auto-dismisses after 3 seconds
  * - Error banner persists until user closes it or starts a new refresh
+ * - No confirmation needed since docs are AI-generated, not user-crafted
  */
 
 import { useCallback, useState } from "react";
@@ -47,24 +47,13 @@ export function RefreshDocsButton({ onComplete }: RefreshDocsButtonProps) {
     refreshAll,
   } = useRefreshDocs();
 
-  const [showConfirm, setShowConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const handleClick = useCallback(() => {
+  const handleClick = useCallback(async () => {
     setError(null);
     setShowSuccess(false);
-    setShowConfirm(true);
-  }, []);
-
-  const handleCancel = useCallback(() => {
-    setShowConfirm(false);
-  }, []);
-
-  const handleConfirm = useCallback(async () => {
-    setShowConfirm(false);
-    setError(null);
 
     try {
       const result = await refreshAll();
@@ -150,36 +139,9 @@ export function RefreshDocsButton({ onComplete }: RefreshDocsButtonProps) {
         )}
       </div>
 
-      {/* Confirmation Banner */}
-      {showConfirm && (
-        <div className="absolute right-0 top-full z-10 mt-2 min-w-[320px] rounded-md border border-amber-900 bg-amber-950/95 px-4 py-3 shadow-lg">
-          <p className="text-sm font-medium text-amber-300">
-            Refresh Documentation?
-          </p>
-          <p className="mt-1 text-xs text-amber-400/70">
-            This will regenerate CLAUDE.md and update {moduleCount} module
-            files ({missingCount} missing, {staleCount} outdated)
-          </p>
-          <div className="mt-3 flex items-center justify-end gap-2">
-            <button
-              onClick={handleCancel}
-              className="rounded-md px-3 py-1.5 text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-200"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleConfirm}
-              className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-500"
-            >
-              Refresh All
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Success Banner */}
       {showSuccess && (
-        <div className="absolute left-0 right-0 top-full z-10 border-b border-emerald-900 bg-emerald-950/95 px-6 py-3">
+        <div className="absolute right-0 top-full z-10 mt-2 min-w-[280px] rounded-md border border-emerald-900 bg-emerald-950/95 px-4 py-3 shadow-lg">
           <div className="flex items-center gap-2">
             <svg
               className="h-4 w-4 text-emerald-400"
@@ -201,11 +163,11 @@ export function RefreshDocsButton({ onComplete }: RefreshDocsButtonProps) {
 
       {/* Error Banner */}
       {error && (
-        <div className="absolute left-0 right-0 top-full z-10 border-b border-red-900 bg-red-950/95 px-6 py-3">
-          <div className="flex items-center justify-between">
+        <div className="absolute right-0 top-full z-10 mt-2 min-w-[280px] rounded-md border border-red-900 bg-red-950/95 px-4 py-3 shadow-lg">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <svg
-                className="h-4 w-4 text-red-400"
+                className="h-4 w-4 shrink-0 text-red-400"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -221,7 +183,7 @@ export function RefreshDocsButton({ onComplete }: RefreshDocsButtonProps) {
             </div>
             <button
               onClick={handleDismissError}
-              className="rounded-md px-2 py-1 text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-200"
+              className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-200"
             >
               Dismiss
             </button>
