@@ -152,31 +152,27 @@ export function RefreshDocsButton({ onComplete }: RefreshDocsButtonProps) {
 
       {/* Confirmation Banner */}
       {showConfirm && (
-        <div className="absolute left-0 right-0 top-full z-10 border-b border-amber-900 bg-amber-950/95 px-6 py-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-amber-300">
-                Refresh Documentation?
-              </p>
-              <p className="text-xs text-amber-400/70">
-                This will regenerate CLAUDE.md and update {moduleCount} module
-                files ({missingCount} missing, {staleCount} outdated)
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleCancel}
-                className="rounded-md px-3 py-1.5 text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirm}
-                className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-500"
-              >
-                Refresh All
-              </button>
-            </div>
+        <div className="absolute right-0 top-full z-10 mt-2 min-w-[320px] rounded-md border border-amber-900 bg-amber-950/95 px-4 py-3 shadow-lg">
+          <p className="text-sm font-medium text-amber-300">
+            Refresh Documentation?
+          </p>
+          <p className="mt-1 text-xs text-amber-400/70">
+            This will regenerate CLAUDE.md and update {moduleCount} module
+            files ({missingCount} missing, {staleCount} outdated)
+          </p>
+          <div className="mt-3 flex items-center justify-end gap-2">
+            <button
+              onClick={handleCancel}
+              className="rounded-md px-3 py-1.5 text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-200"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirm}
+              className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-500"
+            >
+              Refresh All
+            </button>
           </div>
         </div>
       )}
