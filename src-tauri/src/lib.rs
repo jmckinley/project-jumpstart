@@ -52,7 +52,7 @@ use commands::ralph::{
 use commands::enforcement::{
     get_ci_snippets, get_enforcement_events, get_hook_status, install_git_hooks,
 };
-use commands::settings::{get_all_settings, get_setting, save_setting};
+use commands::settings::{get_all_settings, get_setting, save_setting, validate_api_key};
 use commands::watcher::{start_file_watcher, stop_file_watcher};
 use commands::skills::{
     create_skill, delete_skill, detect_patterns, increment_skill_usage, list_skills, update_skill,
@@ -60,6 +60,7 @@ use commands::skills::{
 use commands::agents::{
     create_agent, delete_agent, enhance_agent_instructions, increment_agent_usage, list_agents, update_agent,
 };
+use commands::kickstart::{generate_kickstart_prompt, generate_kickstart_claude_md};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -119,10 +120,13 @@ pub fn run() {
             get_setting,
             save_setting,
             get_all_settings,
+            validate_api_key,
             log_activity,
             get_recent_activities,
             start_file_watcher,
             stop_file_watcher,
+            generate_kickstart_prompt,
+            generate_kickstart_claude_md,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,15 +1,15 @@
 /**
  * @module components/onboarding/FirstUseWelcome
- * @description Welcome screen shown on first app launch with app introduction and API key setup (strongly recommended)
+ * @description Welcome screen shown on first app launch with app introduction and mandatory API key setup
  *
  * PURPOSE:
  * - Introduce users to Project Jumpstart on first launch
  * - Explain the app's purpose and key features
- * - Allow immediate API key entry (strongly recommended)
+ * - Require API key entry before proceeding (mandatory for AI features)
  * - Transition user to main app or onboarding wizard
  *
  * DEPENDENCIES:
- * - @/lib/tauri - getSetting, saveSetting for persistence
+ * - @/lib/tauri - saveSetting, validateApiKey for persistence and validation
  * - @/stores/settingsStore - setHasApiKey for UI state
  *
  * EXPORTS:
@@ -17,17 +17,18 @@
  *
  * PATTERNS:
  * - Displayed only when has_seen_welcome setting is false/null
- * - API key entry is strongly recommended but can be skipped
+ * - API key is mandatory - validates format and tests with API before proceeding
  * - On completion, sets has_seen_welcome to "true"
  *
  * CLAUDE NOTES:
  * - This screen blocks all other UI until dismissed
- * - API key is saved via the save_setting command (will be encrypted in backend)
- * - The Skip button should work even without entering an API key
+ * - API key is saved via the save_setting command (encrypted in backend)
+ * - Format validation: must start with sk-ant- and be 20+ chars
+ * - API validation: makes minimal API call to test key validity
  */
 
-import { useState } from "react";
-import { saveSetting } from "@/lib/tauri";
+import { useState, useMemo } from "react";
+import { saveSetting, validateApiKey } from "@/lib/tauri";
 import { useSettingsStore } from "@/stores/settingsStore";
 
 const FEATURES = [
@@ -46,27 +47,60 @@ interface FirstUseWelcomeProps {
 export function FirstUseWelcome({ onComplete }: FirstUseWelcomeProps) {
   const [apiKey, setApiKey] = useState("");
   const [saving, setSaving] = useState(false);
+  const [validating, setValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [formatError, setFormatError] = useState<string | null>(null);
   const setHasApiKey = useSettingsStore((s) => s.setHasApiKey);
 
-  const handleComplete = async (skipApiKey = false) => {
+  // Format validation
+  const isValidFormat = useMemo(() => {
+    const trimmed = apiKey.trim();
+    return trimmed.startsWith("sk-ant-") && trimmed.length >= 20;
+  }, [apiKey]);
+
+  // Update format error as user types
+  const handleApiKeyChange = (value: string) => {
+    setApiKey(value);
+    setError(null);
+
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      setFormatError(null);
+    } else if (!trimmed.startsWith("sk-ant-")) {
+      setFormatError("Key must start with 'sk-ant-'");
+    } else if (trimmed.length < 20) {
+      setFormatError("Key is too short");
+    } else {
+      setFormatError(null);
+    }
+  };
+
+  const handleComplete = async () => {
+    if (!isValidFormat) {
+      setError("Please enter a valid API key");
+      return;
+    }
+
     setSaving(true);
+    setValidating(true);
     setError(null);
 
     try {
-      // Save API key if provided
-      if (!skipApiKey && apiKey.trim()) {
-        await saveSetting("anthropic_api_key", apiKey.trim());
-        setHasApiKey(true);
-      }
+      // Validate API key with backend (format check + API call)
+      await validateApiKey(apiKey.trim());
+
+      // Save API key
+      await saveSetting("anthropic_api_key", apiKey.trim());
+      setHasApiKey(true);
 
       // Mark welcome as seen
       await saveSetting("has_seen_welcome", "true");
 
       onComplete();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save settings");
+      setError(err instanceof Error ? err.message : "Failed to validate API key");
       setSaving(false);
+      setValidating(false);
     }
   };
 
@@ -131,18 +165,39 @@ export function FirstUseWelcome({ onComplete }: FirstUseWelcomeProps) {
         <div className="mb-6">
           <label className="mb-2 block text-sm font-medium text-neutral-300">
             Anthropic API Key{" "}
-            <span className="font-normal text-amber-500">(strongly recommended)</span>
+            <span className="font-normal text-red-400">(required)</span>
           </label>
           <input
             type="password"
             value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
+            onChange={(e) => handleApiKeyChange(e.target.value)}
             placeholder="sk-ant-..."
-            className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-3 text-neutral-100 placeholder-neutral-500 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className={`w-full rounded-lg border px-4 py-3 text-neutral-100 placeholder-neutral-500 transition-colors focus:outline-none focus:ring-1 ${
+              formatError
+                ? "border-red-500 bg-red-950/20 focus:border-red-500 focus:ring-red-500"
+                : isValidFormat
+                  ? "border-green-500 bg-green-950/20 focus:border-green-500 focus:ring-green-500"
+                  : "border-neutral-700 bg-neutral-800 focus:border-blue-500 focus:ring-blue-500"
+            }`}
           />
-          <p className="mt-2 text-sm text-neutral-500">
-            Required for AI-powered generation. You can add this later in Settings.
-          </p>
+          {formatError ? (
+            <p className="mt-2 text-sm text-red-400">{formatError}</p>
+          ) : isValidFormat ? (
+            <p className="mt-2 text-sm text-green-400">Format looks good</p>
+          ) : (
+            <p className="mt-2 text-sm text-neutral-500">
+              An API key is required for AI-powered documentation generation.
+              Get one at{" "}
+              <a
+                href="https://console.anthropic.com/account/keys"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 underline hover:text-blue-300"
+              >
+                console.anthropic.com
+              </a>
+            </p>
+          )}
         </div>
 
         {/* Error */}
@@ -153,20 +208,13 @@ export function FirstUseWelcome({ onComplete }: FirstUseWelcomeProps) {
         )}
 
         {/* Actions */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-end">
           <button
-            onClick={() => handleComplete(true)}
-            disabled={saving}
-            className="rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-neutral-200 disabled:opacity-50"
+            onClick={() => handleComplete()}
+            disabled={saving || !isValidFormat}
+            className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Skip
-          </button>
-          <button
-            onClick={() => handleComplete(false)}
-            disabled={saving}
-            className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Get Started"}
+            {validating ? "Validating..." : saving ? "Saving..." : "Get Started"}
           </button>
         </div>
       </div>

@@ -18,6 +18,7 @@
 //! - enforcement - Git hooks and CI commands
 //! - settings - User settings persistence
 //! - activity - Activity feed logging and retrieval
+//! - kickstart - Project kickstart prompt generation
 //!
 //! PATTERNS:
 //! - Each submodule contains #[tauri::command] functions
@@ -40,3 +41,4 @@ pub mod enforcement;
 pub mod settings;
 pub mod activity;
 pub mod watcher;
+pub mod kickstart;

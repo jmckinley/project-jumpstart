@@ -20,6 +20,7 @@
  * - @/components/modules/DocStatus - Coverage statistics bar
  * - @/components/modules/DocPreview - Documentation preview panel
  * - @/components/modules/BatchGenerator - Batch generation controls
+ * - @/components/modules/ProjectKickstart - Kickstart prompt generator for empty projects
  * - @/components/skills/SkillsList - Skills list with tab filtering
  * - @/components/skills/SkillEditor - Skill create/edit form
  * - @/components/skills/PatternDetector - Pattern detection results
@@ -48,7 +49,7 @@
  * - Switch on activeSection to render the correct view
  * - "dashboard" section renders health cards and activity feed
  * - "claude-md" section renders the Editor component
- * - "modules" section renders file tree, doc preview, and batch generator
+ * - "modules" section renders file tree, doc preview, and batch generator (or ProjectKickstart for empty projects)
  * - "skills" section renders skills list, skill editor, and pattern detector
  * - "ralph" section renders command center, prompt analyzer, and loop monitor
  * - "context" section renders health monitor, token breakdown, and MCP optimizer
@@ -91,6 +92,7 @@ import { FileTree } from "@/components/modules/FileTree";
 import { DocStatus } from "@/components/modules/DocStatus";
 import { DocPreview } from "@/components/modules/DocPreview";
 import { BatchGenerator } from "@/components/modules/BatchGenerator";
+import { ProjectKickstart } from "@/components/modules/ProjectKickstart";
 import { useHealth } from "@/hooks/useHealth";
 import { useModules } from "@/hooks/useModules";
 import { useSkills } from "@/hooks/useSkills";
@@ -129,8 +131,12 @@ interface MainPanelProps {
 
 function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void }) {
   const { score, components, quickWins, contextRotRisk, refresh } = useHealth();
+  const { modules, hasScanned, scan: scanModules } = useModules();
   const activeProject = useProjectStore((s) => s.activeProject);
   const [activities, setActivities] = useState<Activity[]>([]);
+
+  // Check if this is an empty project (no source files after scanning)
+  const isEmptyProject = hasScanned && modules.length === 0;
 
   const fetchActivities = useCallback(() => {
     if (activeProject) {
@@ -152,6 +158,7 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
 
   useEffect(() => {
     refresh();
+    scanModules();
     fetchActivities();
 
     // Poll activities every 15 seconds
@@ -160,7 +167,7 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
     }, 15_000);
 
     return () => clearInterval(interval);
-  }, [refresh, fetchActivities]);
+  }, [refresh, scanModules, fetchActivities]);
 
   const handleRefreshComplete = useCallback(() => {
     refresh();
@@ -183,6 +190,46 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
         risk={contextRotRisk}
         onReview={() => onNavigate?.("modules")}
       />
+
+      {/* Kickstart Card for Empty Projects */}
+      {isEmptyProject && (
+        <div className="rounded-xl border border-purple-500/30 bg-gradient-to-br from-purple-950/30 to-blue-950/30 p-6">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-blue-600">
+              <svg
+                className="h-6 w-6 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"
+                />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-neutral-100">
+                New Project?
+              </h3>
+              <p className="mt-1 text-sm text-neutral-400">
+                Generate a Claude Code kickstart prompt to bootstrap your project with AI-powered best practices.
+              </p>
+              <button
+                onClick={() => onNavigate?.("modules")}
+                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-500"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                </svg>
+                Generate Kickstart Prompt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <HealthScore score={score} components={components} />
@@ -214,6 +261,7 @@ function ModulesView({ onDocApplied }: { onDocApplied?: () => void }) {
     coverage,
     loading,
     generating,
+    hasScanned,
     scan,
     generateDoc,
     applyDoc,
@@ -267,6 +315,12 @@ function ModulesView({ onDocApplied }: { onDocApplied?: () => void }) {
         <p>Scanning modules...</p>
       </div>
     );
+  }
+
+  // Show Kickstart for empty projects (no source files found after scanning)
+  const isEmptyProject = hasScanned && !loading && modules.length === 0;
+  if (isEmptyProject) {
+    return <ProjectKickstart />;
   }
 
   return (

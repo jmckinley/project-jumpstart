@@ -17,6 +17,7 @@
 //! - get_setting - Read a single setting by key (decrypts if encrypted)
 //! - save_setting - Write a single setting key-value pair (encrypts API keys)
 //! - get_all_settings - Read all settings as a flat map (decrypts encrypted values)
+//! - validate_api_key - Validate an API key format and test with minimal API call
 //!
 //! PATTERNS:
 //! - Settings are stored as TEXT key-value pairs in the settings table
@@ -144,6 +145,58 @@ pub async fn get_all_settings(
     }
 
     Ok(settings)
+}
+
+/// Validate an Anthropic API key by checking format and making a minimal API call.
+/// Returns Ok(true) if valid, Err(message) if invalid.
+#[tauri::command]
+pub async fn validate_api_key(
+    api_key: String,
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    // Format validation: must start with "sk-ant-" and be at least 20 characters
+    if !api_key.starts_with("sk-ant-") {
+        return Err("Invalid API key format: must start with 'sk-ant-'".to_string());
+    }
+    if api_key.len() < 20 {
+        return Err("Invalid API key format: key is too short".to_string());
+    }
+
+    // Make a minimal API call to verify the key works
+    // We use a very short max_tokens to minimize cost
+    let body = serde_json::json!({
+        "model": "claude-sonnet-4-20250514",
+        "max_tokens": 1,
+        "messages": [
+            {
+                "role": "user",
+                "content": "Hi"
+            }
+        ]
+    });
+
+    let response = state
+        .http_client
+        .post("https://api.anthropic.com/v1/messages")
+        .header("x-api-key", &api_key)
+        .header("anthropic-version", "2023-06-01")
+        .header("content-type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to API: {}", e))?;
+
+    let status = response.status();
+    if status.is_success() {
+        Ok(true)
+    } else if status.as_u16() == 401 {
+        Err("Invalid API key: authentication failed".to_string())
+    } else if status.as_u16() == 403 {
+        Err("API key does not have permission to access this resource".to_string())
+    } else {
+        let error_text = response.text().await.unwrap_or_default();
+        Err(format!("API validation failed ({}): {}", status, error_text))
+    }
 }
 
 #[cfg(test)]

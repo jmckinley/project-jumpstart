@@ -22,12 +22,13 @@
  * - Call generateDoc(filePath) to preview a generated doc before applying
  * - Call applyDoc(filePath, doc) to write to disk
  * - Call batchGenerate(filePaths) to generate + apply for multiple files
- * - Returns { modules, coverage, totalFiles, documentedFiles, missingFiles, loading, error, scan, generateDoc, applyDoc, batchGenerate }
+ * - Returns { modules, coverage, totalFiles, documentedFiles, missingFiles, loading, generating, hasScanned, error, scan, generateDoc, applyDoc, batchGenerate }
  *
  * CLAUDE NOTES:
  * - scan() should be called when the modules section becomes active
  * - coverage is a percentage (0-100)
  * - After batchGenerate, call scan() to refresh the full list
+ * - hasScanned tracks whether initial scan completed (for empty project detection)
  */
 
 import { useCallback, useState } from "react";
@@ -44,6 +45,7 @@ interface ModulesState {
   modules: ModuleStatus[];
   loading: boolean;
   generating: boolean;
+  hasScanned: boolean;
   error: string | null;
 }
 
@@ -54,6 +56,7 @@ export function useModules() {
     modules: [],
     loading: false,
     generating: false,
+    hasScanned: false,
     error: null,
   });
 
@@ -63,11 +66,12 @@ export function useModules() {
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
       const modules = await scanModules(activeProject.path);
-      setState({ modules, loading: false, generating: false, error: null });
+      setState({ modules, loading: false, generating: false, hasScanned: true, error: null });
     } catch (err) {
       setState((s) => ({
         ...s,
         loading: false,
+        hasScanned: true,
         error: err instanceof Error ? err.message : "Failed to scan modules",
       }));
     }
@@ -125,7 +129,7 @@ export function useModules() {
         const results = await batchGenerateDocs(filePaths, activeProject.path);
         // Refresh the full module list after batch generation
         const modules = await scanModules(activeProject.path);
-        setState({ modules, loading: false, generating: false, error: null });
+        setState({ modules, loading: false, generating: false, hasScanned: true, error: null });
         return results;
       } catch (err) {
         setState((s) => ({

@@ -1,6 +1,31 @@
 /**
  * @module hooks/useModules.test
  * @description Unit tests for useModules hook
+ *
+ * PURPOSE:
+ * - Test initial state (empty modules, hasScanned=false)
+ * - Test scan functionality with project path
+ * - Test hasScanned state transitions (success, empty, error)
+ * - Test generateDoc, applyDoc, batchGenerate actions
+ * - Test computed values (coverage, totalFiles, missingFiles)
+ *
+ * DEPENDENCIES:
+ * - vitest - Test framework
+ * - @testing-library/react - renderHook for hook testing
+ * - @tauri-apps/api/core - invoke mock
+ *
+ * EXPORTS:
+ * - None (test file)
+ *
+ * PATTERNS:
+ * - Mock @tauri-apps/api/core invoke globally in test setup
+ * - Mock @/stores/projectStore for activeProject
+ * - Use renderHook with act() for async actions
+ *
+ * CLAUDE NOTES:
+ * - hasScanned tracks whether a scan has completed (true even on error/empty)
+ * - coverage is computed as (documented / total) * 100
+ * - batchGenerate triggers a follow-up scan to refresh modules
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -67,6 +92,61 @@ describe("useModules", () => {
       expect(result.current.coverage).toBe(0);
       expect(result.current.loading).toBe(false);
       expect(result.current.generating).toBe(false);
+    });
+
+    it("should have hasScanned=false initially", () => {
+      const { result } = renderHook(() => useModules());
+
+      expect(result.current.hasScanned).toBe(false);
+    });
+  });
+
+  describe("hasScanned state", () => {
+    it("should set hasScanned=true after successful scan", async () => {
+      vi.mocked(invoke).mockResolvedValue(mockModules);
+
+      const { result } = renderHook(() => useModules());
+
+      expect(result.current.hasScanned).toBe(false);
+
+      await act(async () => {
+        await result.current.scan();
+      });
+
+      expect(result.current.hasScanned).toBe(true);
+    });
+
+    it("should set hasScanned=true even when scan returns empty array", async () => {
+      vi.mocked(invoke).mockResolvedValue([]);
+
+      const { result } = renderHook(() => useModules());
+
+      await act(async () => {
+        await result.current.scan();
+      });
+
+      expect(result.current.hasScanned).toBe(true);
+      expect(result.current.modules).toEqual([]);
+    });
+
+    it("should set hasScanned=true when scan fails", async () => {
+      vi.mocked(invoke).mockRejectedValue(new Error("Scan failed"));
+
+      const { result } = renderHook(() => useModules());
+
+      await act(async () => {
+        await result.current.scan();
+      });
+
+      expect(result.current.hasScanned).toBe(true);
+      expect(result.current.error).toBe("Scan failed");
+    });
+
+    it("should include hasScanned in returned state", () => {
+      const { result } = renderHook(() => useModules());
+
+      expect(result.current).toHaveProperty("hasScanned");
+      expect(typeof result.current.hasScanned).toBe("boolean");
     });
   });
 
