@@ -52,6 +52,7 @@ import { useProjectStore } from "@/stores/projectStore";
 import { useOnboardingStore } from "@/stores/onboardingStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useSectionCompletion } from "@/hooks/useSectionCompletion";
+import { useModules } from "@/hooks/useModules";
 import { listProjects, getSetting, saveSetting } from "@/lib/tauri";
 import type { Project } from "@/types/project";
 
@@ -69,6 +70,10 @@ function App() {
   const resetOnboarding = useOnboardingStore((s) => s.reset);
   const setHasApiKey = useSettingsStore((s) => s.setHasApiKey);
   const { completion, refresh: refreshCompletion } = useSectionCompletion();
+  const { modules, hasScanned, scan: scanModules } = useModules();
+
+  // Check if project is empty (no source files) - used for Kickstart visibility
+  const isEmptyProject = hasScanned && modules.length === 0;
 
   // Check if this is first launch
   useEffect(() => {
@@ -143,6 +148,14 @@ function App() {
     setShowOnboarding(false);
   };
 
+  // Scan modules when active project changes to determine if it's empty
+  useEffect(() => {
+    const activeProject = useProjectStore.getState().activeProject;
+    if (activeProject) {
+      scanModules();
+    }
+  }, [projects, scanModules]);
+
   // Show loading while checking welcome status
   if (checkingWelcome) {
     return (
@@ -197,6 +210,7 @@ function App() {
           activeProject={activeProject}
           onProjectChange={handleProjectChange}
           onNewProject={handleNewProject}
+          isEmptyProject={isEmptyProject}
         />
         <MainPanel
           activeSection={activeSection}

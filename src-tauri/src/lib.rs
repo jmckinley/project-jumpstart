@@ -60,7 +60,7 @@ use commands::skills::{
 use commands::agents::{
     create_agent, delete_agent, enhance_agent_instructions, increment_agent_usage, list_agents, update_agent,
 };
-use commands::kickstart::{generate_kickstart_prompt, generate_kickstart_claude_md};
+use commands::kickstart::{generate_kickstart_prompt, generate_kickstart_claude_md, infer_tech_stack};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -127,6 +127,7 @@ pub fn run() {
             stop_file_watcher,
             generate_kickstart_prompt,
             generate_kickstart_claude_md,
+            infer_tech_stack,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

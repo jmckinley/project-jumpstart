@@ -4,13 +4,15 @@
  *
  * PURPOSE:
  * - Collect information about a new project (purpose, users, features, tech stack)
+ * - Use AI to infer optimal tech stack when user selections are incomplete
+ * - Show a review step with suggestions before generation
  * - Generate a comprehensive CLAUDE.md-style prompt using AI
  * - Display generated prompt with copy functionality
  * - Create and save an initial CLAUDE.md file based on project details
  *
  * DEPENDENCIES:
- * - @/lib/tauri - generateKickstartPrompt, generateKickstartClaudeMd for AI generation
- * - @/types/kickstart - KickstartInput type
+ * - @/lib/tauri - generateKickstartPrompt, generateKickstartClaudeMd, inferTechStack for AI generation
+ * - @/types/kickstart - KickstartInput, InferredStack, StackSuggestion types
  * - @/types/project - LANGUAGES, FRAMEWORKS, DATABASES, STYLING_OPTIONS for dropdowns
  * - @/stores/projectStore - Active project for context
  *
@@ -18,10 +20,10 @@
  * - ProjectKickstart - Kickstart form component
  *
  * PATTERNS:
- * - Accordion-style sections for App Basics, Features, Tech Stack
- * - Generate button triggers AI call
- * - Result displayed in scrollable container with copy button
- * - Uses same tech options as onboarding flow
+ * - Three-step flow: Form -> Review (if needed) -> Result
+ * - AI inference called when framework, database, or styling are missing
+ * - Review step shows user selections vs AI suggestions
+ * - Accept All applies all suggestions, Keep Mine skips suggestions
  *
  * CLAUDE NOTES:
  * - This component is shown in ModulesView when the project has no source files
@@ -29,12 +31,12 @@
  * - Tech stack dropdowns are filtered by selected language (for frameworks)
  * - Token estimate is shown with the generated prompt
  * - "Create CLAUDE.md" button generates and auto-saves a CLAUDE.md file to the project
- * - The kickstart prompt and CLAUDE.md are different: prompt is for bootstrapping, CLAUDE.md is documentation
+ * - onClaudeMdCreated callback notifies parent when CLAUDE.md is created
  */
 
 import { useState, useMemo, useCallback } from "react";
-import { generateKickstartPrompt, generateKickstartClaudeMd } from "@/lib/tauri";
-import type { KickstartInput } from "@/types/kickstart";
+import { generateKickstartPrompt, generateKickstartClaudeMd, inferTechStack } from "@/lib/tauri";
+import type { KickstartInput, InferredStack, StackSuggestion } from "@/types/kickstart";
 import {
   LANGUAGES,
   FRAMEWORKS,
@@ -43,8 +45,17 @@ import {
 } from "@/types/project";
 import { useProjectStore } from "@/stores/projectStore";
 
-export function ProjectKickstart() {
+interface ProjectKickstartProps {
+  onClaudeMdCreated?: () => void;
+}
+
+type Step = "form" | "review" | "result";
+
+export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
   const activeProject = useProjectStore((s) => s.activeProject);
+
+  // Current step
+  const [step, setStep] = useState<Step>("form");
 
   // Form state
   const [appPurpose, setAppPurpose] = useState("");
@@ -55,6 +66,13 @@ export function ProjectKickstart() {
   const [database, setDatabase] = useState("");
   const [styling, setStyling] = useState("");
   const [constraints, setConstraints] = useState("");
+
+  // Review state
+  const [inferring, setInferring] = useState(false);
+  const [inferredStack, setInferredStack] = useState<InferredStack | null>(null);
+  const [reviewedFramework, setReviewedFramework] = useState<string>("");
+  const [reviewedDatabase, setReviewedDatabase] = useState<string>("");
+  const [reviewedStyling, setReviewedStyling] = useState<string>("");
 
   // Generation state
   const [generating, setGenerating] = useState(false);
@@ -106,6 +124,74 @@ export function ProjectKickstart() {
     );
   }, [appPurpose, targetUsers, keyFeatures, language]);
 
+  // Check if stack is incomplete (missing optional but recommended fields)
+  const isStackIncomplete = useMemo(() => {
+    return !framework || !database || !styling;
+  }, [framework, database, styling]);
+
+  // Handle next step from form
+  const handleNextFromForm = useCallback(async () => {
+    if (!isValid) return;
+
+    // If stack is complete, skip review and go straight to generation
+    if (!isStackIncomplete) {
+      await handleGenerate();
+      return;
+    }
+
+    // Infer tech stack suggestions
+    setInferring(true);
+    setError(null);
+
+    try {
+      const result = await inferTechStack({
+        appPurpose: appPurpose.trim(),
+        targetUsers: targetUsers.trim(),
+        keyFeatures: keyFeatures.filter((f) => f.trim().length > 0),
+        constraints: constraints.trim() || undefined,
+        currentLanguage: language || undefined,
+        currentFramework: framework || undefined,
+        currentDatabase: database || undefined,
+        currentStyling: styling || undefined,
+      });
+
+      setInferredStack(result);
+
+      // Pre-fill reviewed values with current selections or suggestions
+      setReviewedFramework(framework || result.framework?.value || "");
+      setReviewedDatabase(database || result.database?.value || "");
+      setReviewedStyling(styling || result.styling?.value || "");
+
+      setStep("review");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to analyze project");
+    } finally {
+      setInferring(false);
+    }
+  }, [isValid, isStackIncomplete, appPurpose, targetUsers, keyFeatures, constraints, language, framework, database, styling]);
+
+  // Accept all suggestions
+  const handleAcceptAll = () => {
+    if (inferredStack) {
+      if (inferredStack.framework && !framework) {
+        setReviewedFramework(inferredStack.framework.value);
+      }
+      if (inferredStack.database && !database) {
+        setReviewedDatabase(inferredStack.database.value);
+      }
+      if (inferredStack.styling && !styling) {
+        setReviewedStyling(inferredStack.styling.value);
+      }
+    }
+  };
+
+  // Keep original selections
+  const handleKeepMine = () => {
+    setReviewedFramework(framework);
+    setReviewedDatabase(database);
+    setReviewedStyling(styling);
+  };
+
   // Generate kickstart prompt
   const handleGenerate = useCallback(async () => {
     if (!isValid) return;
@@ -114,15 +200,20 @@ export function ProjectKickstart() {
     setError(null);
     setGeneratedPrompt(null);
 
+    // Use reviewed values if in review step, otherwise use form values
+    const finalFramework = step === "review" ? reviewedFramework : framework;
+    const finalDatabase = step === "review" ? reviewedDatabase : database;
+    const finalStyling = step === "review" ? reviewedStyling : styling;
+
     const input: KickstartInput = {
       appPurpose: appPurpose.trim(),
       targetUsers: targetUsers.trim(),
       keyFeatures: keyFeatures.filter((f) => f.trim().length > 0),
       techPreferences: {
         language,
-        framework: framework || null,
-        database: database || null,
-        styling: styling || null,
+        framework: finalFramework || null,
+        database: finalDatabase || null,
+        styling: finalStyling || null,
       },
       constraints: constraints.trim() || undefined,
     };
@@ -131,12 +222,13 @@ export function ProjectKickstart() {
       const result = await generateKickstartPrompt(input);
       setGeneratedPrompt(result.fullPrompt);
       setTokenEstimate(result.tokenEstimate);
+      setStep("result");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate prompt");
     } finally {
       setGenerating(false);
     }
-  }, [isValid, appPurpose, targetUsers, keyFeatures, language, framework, database, styling, constraints]);
+  }, [isValid, step, appPurpose, targetUsers, keyFeatures, language, framework, database, styling, reviewedFramework, reviewedDatabase, reviewedStyling, constraints]);
 
   // Copy to clipboard
   const handleCopy = async () => {
@@ -157,15 +249,19 @@ export function ProjectKickstart() {
     setCreatingClaudeMd(true);
     setError(null);
 
+    const finalFramework = step === "review" ? reviewedFramework : framework;
+    const finalDatabase = step === "review" ? reviewedDatabase : database;
+    const finalStyling = step === "review" ? reviewedStyling : styling;
+
     const input: KickstartInput = {
       appPurpose: appPurpose.trim(),
       targetUsers: targetUsers.trim(),
       keyFeatures: keyFeatures.filter((f) => f.trim().length > 0),
       techPreferences: {
         language,
-        framework: framework || null,
-        database: database || null,
-        styling: styling || null,
+        framework: finalFramework || null,
+        database: finalDatabase || null,
+        styling: finalStyling || null,
       },
       constraints: constraints.trim() || undefined,
     };
@@ -173,12 +269,89 @@ export function ProjectKickstart() {
     try {
       await generateKickstartClaudeMd(input, activeProject.path);
       setClaudeMdCreated(true);
+      onClaudeMdCreated?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create CLAUDE.md");
     } finally {
       setCreatingClaudeMd(false);
     }
-  }, [activeProject, isValid, appPurpose, targetUsers, keyFeatures, language, framework, database, styling, constraints]);
+  }, [activeProject, isValid, step, appPurpose, targetUsers, keyFeatures, language, framework, database, styling, reviewedFramework, reviewedDatabase, reviewedStyling, constraints, onClaudeMdCreated]);
+
+  // Render suggestion row for review step
+  const renderSuggestionRow = (
+    label: string,
+    userValue: string,
+    suggestion: StackSuggestion | null,
+    reviewedValue: string,
+    setReviewedValue: (v: string) => void,
+    options: readonly string[]
+  ) => {
+    const hasSuggestion = suggestion && !userValue;
+
+    return (
+      <div className="flex items-start gap-4 py-3 border-b border-neutral-800 last:border-0">
+        <div className="w-24 flex-shrink-0">
+          <span className="text-sm font-medium text-neutral-300">{label}</span>
+        </div>
+        <div className="flex-1 space-y-2">
+          {userValue ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-neutral-100">{userValue}</span>
+              <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
+                Your choice
+              </span>
+            </div>
+          ) : hasSuggestion ? (
+            <>
+              <div className="flex items-center gap-2">
+                <select
+                  value={reviewedValue}
+                  onChange={(e) => setReviewedValue(e.target.value)}
+                  className="rounded-lg border border-purple-500/50 bg-purple-950/30 px-3 py-1.5 text-sm text-neutral-100 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                >
+                  <option value="">None</option>
+                  {options.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+                <span className="rounded-full bg-purple-500/20 px-2 py-0.5 text-xs text-purple-400">
+                  AI suggested
+                </span>
+                <span className={`rounded-full px-2 py-0.5 text-xs ${
+                  suggestion.confidence === "high"
+                    ? "bg-green-500/20 text-green-400"
+                    : suggestion.confidence === "medium"
+                    ? "bg-yellow-500/20 text-yellow-400"
+                    : "bg-neutral-500/20 text-neutral-400"
+                }`}>
+                  {suggestion.confidence} confidence
+                </span>
+              </div>
+              <p className="text-xs text-neutral-500">{suggestion.reason}</p>
+            </>
+          ) : (
+            <div className="flex items-center gap-2">
+              <select
+                value={reviewedValue}
+                onChange={(e) => setReviewedValue(e.target.value)}
+                className="rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="">None</option>
+                {options.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-neutral-500">No suggestion available</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -223,8 +396,8 @@ export function ProjectKickstart() {
         </div>
       )}
 
-      {/* Form or Result */}
-      {generatedPrompt ? (
+      {/* Step: Result */}
+      {step === "result" && generatedPrompt ? (
         <div className="space-y-4">
           {/* Result Header */}
           <div className="flex items-center justify-between">
@@ -258,7 +431,10 @@ export function ProjectKickstart() {
                 )}
               </button>
               <button
-                onClick={() => setGeneratedPrompt(null)}
+                onClick={() => {
+                  setStep("form");
+                  setGeneratedPrompt(null);
+                }}
                 className="rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:bg-neutral-700"
               >
                 Edit
@@ -333,7 +509,136 @@ export function ProjectKickstart() {
             </div>
           )}
         </div>
+      ) : step === "review" && inferredStack ? (
+        /* Step: Review */
+        <div className="space-y-6">
+          <div className="rounded-xl border border-purple-500/30 bg-gradient-to-br from-purple-950/20 to-blue-950/20 p-6">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/20">
+                <svg className="h-5 w-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              </div>
+              <div>
+                <h4 className="font-medium text-neutral-200">Review Tech Stack</h4>
+                <p className="text-sm text-neutral-400">
+                  Based on your project, we have some suggestions. Review and customize below.
+                </p>
+              </div>
+            </div>
+
+            {/* Warnings */}
+            {inferredStack.warnings.length > 0 && (
+              <div className="mb-4 rounded-lg bg-yellow-950/30 border border-yellow-500/30 px-4 py-3">
+                <div className="flex items-start gap-2">
+                  <svg className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-yellow-300">Recommendations</p>
+                    <ul className="mt-1 text-xs text-yellow-400/80 list-disc list-inside">
+                      {inferredStack.warnings.map((warning, i) => (
+                        <li key={i}>{warning}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Stack Review */}
+            <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 divide-y divide-neutral-800">
+              {/* Language - always user's choice */}
+              <div className="flex items-center gap-4 py-3 px-4">
+                <div className="w-24 flex-shrink-0">
+                  <span className="text-sm font-medium text-neutral-300">Language</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-neutral-100">{language}</span>
+                  <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
+                    Your choice
+                  </span>
+                </div>
+              </div>
+
+              <div className="px-4">
+                {renderSuggestionRow(
+                  "Framework",
+                  framework,
+                  inferredStack.framework,
+                  reviewedFramework,
+                  setReviewedFramework,
+                  availableFrameworks
+                )}
+              </div>
+
+              <div className="px-4">
+                {renderSuggestionRow(
+                  "Database",
+                  database,
+                  inferredStack.database,
+                  reviewedDatabase,
+                  setReviewedDatabase,
+                  DATABASES
+                )}
+              </div>
+
+              <div className="px-4">
+                {renderSuggestionRow(
+                  "Styling",
+                  styling,
+                  inferredStack.styling,
+                  reviewedStyling,
+                  setReviewedStyling,
+                  STYLING_OPTIONS
+                )}
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="mt-4 flex items-center justify-between">
+              <button
+                onClick={() => setStep("form")}
+                className="text-sm text-neutral-400 hover:text-neutral-300"
+              >
+                ← Back to form
+              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleKeepMine}
+                  className="rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:bg-neutral-700"
+                >
+                  Keep Mine
+                </button>
+                <button
+                  onClick={handleAcceptAll}
+                  className="rounded-lg border border-purple-500/50 bg-purple-600/20 px-4 py-2 text-sm font-medium text-purple-300 transition-colors hover:bg-purple-600/30"
+                >
+                  Accept Suggestions
+                </button>
+                <button
+                  onClick={handleGenerate}
+                  disabled={generating}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {generating ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Generating...
+                    </>
+                  ) : (
+                    "Generate"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       ) : (
+        /* Step: Form */
         <div className="space-y-6">
           {/* App Basics Section */}
           <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-6">
@@ -409,9 +714,16 @@ export function ProjectKickstart() {
 
           {/* Tech Stack Section */}
           <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-6">
-            <h4 className="mb-4 text-sm font-medium uppercase tracking-wider text-neutral-400">
-              Tech Stack
-            </h4>
+            <div className="mb-4 flex items-center justify-between">
+              <h4 className="text-sm font-medium uppercase tracking-wider text-neutral-400">
+                Tech Stack
+              </h4>
+              {isStackIncomplete && (
+                <span className="text-xs text-purple-400">
+                  Missing selections will be suggested by AI
+                </span>
+              )}
+            </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-neutral-300">
@@ -508,11 +820,19 @@ export function ProjectKickstart() {
           {/* Generate Button */}
           <div className="flex justify-end">
             <button
-              onClick={handleGenerate}
-              disabled={!isValid || generating}
+              onClick={handleNextFromForm}
+              disabled={!isValid || inferring || generating}
               className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {generating ? (
+              {inferring ? (
+                <>
+                  <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Analyzing...
+                </>
+              ) : generating ? (
                 <>
                   <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -525,7 +845,7 @@ export function ProjectKickstart() {
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                   </svg>
-                  Generate Kickstart Prompt
+                  {isStackIncomplete ? "Review & Generate" : "Generate Kickstart Prompt"}
                 </>
               )}
             </button>

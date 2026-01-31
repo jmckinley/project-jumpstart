@@ -48,6 +48,7 @@
  * PATTERNS:
  * - Switch on activeSection to render the correct view
  * - "dashboard" section renders health cards and activity feed
+ * - "kickstart" section renders ProjectKickstart for new project setup
  * - "claude-md" section renders the Editor component
  * - "modules" section renders file tree, doc preview, and batch generator (or ProjectKickstart for empty projects)
  * - "skills" section renders skills list, skill editor, and pattern detector
@@ -320,7 +321,7 @@ function ModulesView({ onDocApplied }: { onDocApplied?: () => void }) {
   // Show Kickstart for empty projects (no source files found after scanning)
   const isEmptyProject = hasScanned && !loading && modules.length === 0;
   if (isEmptyProject) {
-    return <ProjectKickstart />;
+    return <ProjectKickstart onClaudeMdCreated={onDocApplied} />;
   }
 
   return (
@@ -881,6 +882,10 @@ function EnforcementView({ onHooksInstalled }: { onHooksInstalled?: () => void }
   );
 }
 
+function KickstartView({ onClaudeMdCreated }: { onClaudeMdCreated?: () => void }) {
+  return <ProjectKickstart onClaudeMdCreated={onClaudeMdCreated} />;
+}
+
 function renderSection(
   section: string,
   onNavigate?: (section: string) => void,
@@ -889,6 +894,8 @@ function renderSection(
   switch (section) {
     case "dashboard":
       return <DashboardView onNavigate={onNavigate} />;
+    case "kickstart":
+      return <KickstartView onClaudeMdCreated={onCompletionChange} />;
     case "claude-md":
       return <Editor onSave={onCompletionChange} />;
     case "modules":

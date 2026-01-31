@@ -1,9 +1,10 @@
 //! @module commands/kickstart
-//! @description Tauri IPC command for generating project kickstart prompts
+//! @description Tauri IPC commands for generating project kickstart prompts and inferring tech stacks
 //!
 //! PURPOSE:
 //! - Generate a comprehensive Claude Code kickstart prompt for new/empty projects
 //! - Use AI to create CLAUDE.md-style documentation based on user input
+//! - Infer optimal tech stack based on project description and features
 //! - Help users bootstrap new projects with best practices
 //!
 //! DEPENDENCIES:
@@ -15,15 +16,18 @@
 //! EXPORTS:
 //! - generate_kickstart_prompt - Generate a kickstart prompt from user input
 //! - generate_kickstart_claude_md - Generate and save initial CLAUDE.md from kickstart input
+//! - infer_tech_stack - Use AI to suggest optimal tech stack based on project description
 //!
 //! PATTERNS:
 //! - Uses core::ai::call_claude for AI generation
 //! - Returns full prompt text with token estimate
 //! - Token estimate uses rough approximation (4 chars = 1 token)
+//! - Stack inference returns suggestions with reasoning
 //!
 //! CLAUDE NOTES:
 //! - System prompt instructs Claude to generate CLAUDE.md-style content
 //! - Output includes: Overview, Tech Stack, Architecture, Structure, Conventions, Roadmap
+//! - Stack inference distinguishes between user selections and AI suggestions
 //! - App name: Project Jumpstart
 
 use serde::{Deserialize, Serialize};
@@ -60,6 +64,41 @@ pub struct KickstartInput {
 pub struct KickstartPrompt {
     pub full_prompt: String,
     pub token_estimate: u32,
+}
+
+/// A single tech stack suggestion with reasoning
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct StackSuggestion {
+    pub value: String,
+    pub reason: String,
+    pub confidence: String, // "high", "medium", "low"
+}
+
+/// Input for tech stack inference
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InferStackInput {
+    pub app_purpose: String,
+    pub target_users: String,
+    pub key_features: Vec<String>,
+    pub constraints: Option<String>,
+    /// User's current selections (may be partial)
+    pub current_language: Option<String>,
+    pub current_framework: Option<String>,
+    pub current_database: Option<String>,
+    pub current_styling: Option<String>,
+}
+
+/// Result of tech stack inference
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InferredStack {
+    pub language: Option<StackSuggestion>,
+    pub framework: Option<StackSuggestion>,
+    pub database: Option<StackSuggestion>,
+    pub styling: Option<StackSuggestion>,
+    pub warnings: Vec<String>,
 }
 
 const KICKSTART_SYSTEM_PROMPT: &str = r#"You are an expert software architect helping users bootstrap new projects with Claude Code best practices.
@@ -279,6 +318,118 @@ Generate a well-structured CLAUDE.md that will help Claude Code understand and w
         .map_err(|e| format!("Failed to write CLAUDE.md: {}", e))?;
 
     Ok(content)
+}
+
+const INFER_STACK_SYSTEM_PROMPT: &str = r#"You are an expert software architect helping users choose the best tech stack for their project.
+
+Based on the project description, target users, and key features, recommend the optimal tech stack.
+
+IMPORTANT RULES:
+1. Only suggest technologies that are well-suited for the described features
+2. Consider the user's existing selections - don't change them unless there's a compatibility issue
+3. For each suggestion, provide a brief reason (1 sentence max)
+4. Rate your confidence as "high", "medium", or "low"
+5. Flag any compatibility warnings between technologies
+
+You must respond with valid JSON in this exact format (no markdown, no explanation):
+{
+  "language": {"value": "TypeScript", "reason": "Best for React web apps with type safety", "confidence": "high"},
+  "framework": {"value": "Next.js", "reason": "Ideal for real-time features with built-in API routes", "confidence": "high"},
+  "database": {"value": "Supabase", "reason": "Real-time sync out of the box for collaboration", "confidence": "medium"},
+  "styling": {"value": "Tailwind CSS", "reason": "Rapid UI development with utility classes", "confidence": "high"},
+  "warnings": ["Consider adding Redis for session management at scale"]
+}
+
+If the user already selected a value and it's appropriate, return null for that field.
+Only suggest alternatives if there's a clear mismatch with the project requirements."#;
+
+/// Infer optimal tech stack based on project description and features.
+#[tauri::command]
+pub async fn infer_tech_stack(
+    input: InferStackInput,
+    state: State<'_, AppState>,
+) -> Result<InferredStack, String> {
+    // Get API key from database
+    let api_key = {
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| format!("Failed to lock database: {}", e))?;
+
+        let encrypted = db
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'anthropic_api_key'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .map_err(|_| "Anthropic API key not configured. Set it in Settings.".to_string())?;
+
+        if encrypted.starts_with("enc:") {
+            crypto::decrypt(&encrypted[4..])
+                .map_err(|e| format!("Failed to decrypt API key: {}", e))?
+        } else {
+            encrypted
+        }
+    };
+
+    // Build the user prompt
+    let features_list = input
+        .key_features
+        .iter()
+        .map(|f| format!("- {}", f))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let current_selections = format!(
+        "Current user selections:\n- Language: {}\n- Framework: {}\n- Database: {}\n- Styling: {}",
+        input.current_language.as_deref().unwrap_or("Not selected"),
+        input.current_framework.as_deref().unwrap_or("Not selected"),
+        input.current_database.as_deref().unwrap_or("Not selected"),
+        input.current_styling.as_deref().unwrap_or("Not selected"),
+    );
+
+    let constraints_section = input
+        .constraints
+        .as_ref()
+        .map(|c| format!("\n\nConstraints/Requirements:\n{}", c))
+        .unwrap_or_default();
+
+    let user_prompt = format!(
+        r#"Analyze this project and recommend the optimal tech stack:
+
+**App Purpose:**
+{}
+
+**Target Users:**
+{}
+
+**Key Features:**
+{}
+
+{}{}
+
+Respond with JSON only. For any field where the user's selection is appropriate, return null for that field."#,
+        input.app_purpose,
+        input.target_users,
+        features_list,
+        current_selections,
+        constraints_section
+    );
+
+    // Call Claude API
+    let response = ai::call_claude(
+        &state.http_client,
+        &api_key,
+        INFER_STACK_SYSTEM_PROMPT,
+        &user_prompt,
+    )
+    .await?;
+
+    // Parse the JSON response
+    let inferred: InferredStack = serde_json::from_str(&response)
+        .map_err(|e| format!("Failed to parse AI response: {}. Response was: {}", e, response))?;
+
+    Ok(inferred)
 }
 
 #[cfg(test)]

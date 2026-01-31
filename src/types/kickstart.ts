@@ -5,10 +5,15 @@
  * PURPOSE:
  * - Define input data structure for kickstart prompt generation
  * - Define output structure for generated prompt
+ * - Define types for AI-powered tech stack inference
  *
  * EXPORTS:
+ * - TechPreferences - Tech stack preferences for a project
  * - KickstartInput - User-provided information about the new project
  * - KickstartPrompt - Generated kickstart prompt with token estimate
+ * - StackSuggestion - A single tech stack suggestion with reasoning
+ * - InferStackInput - Input for tech stack inference
+ * - InferredStack - Result of AI-powered stack inference
  *
  * PATTERNS:
  * - Types mirror Rust structs in commands/kickstart.rs
@@ -19,6 +24,7 @@
  * - Tauri IPC automatically converts snake_case to camelCase
  * - keyFeatures is an array of strings, user can add multiple features
  * - techPreferences uses same values as LANGUAGES, FRAMEWORKS from project.ts
+ * - Stack inference distinguishes between user selections and AI suggestions
  */
 
 /**
@@ -48,4 +54,38 @@ export interface KickstartInput {
 export interface KickstartPrompt {
   fullPrompt: string;
   tokenEstimate: number;
+}
+
+/**
+ * A single tech stack suggestion with reasoning
+ */
+export interface StackSuggestion {
+  value: string;
+  reason: string;
+  confidence: "high" | "medium" | "low";
+}
+
+/**
+ * Input for tech stack inference
+ */
+export interface InferStackInput {
+  appPurpose: string;
+  targetUsers: string;
+  keyFeatures: string[];
+  constraints?: string;
+  currentLanguage?: string;
+  currentFramework?: string;
+  currentDatabase?: string;
+  currentStyling?: string;
+}
+
+/**
+ * Result of AI-powered stack inference
+ */
+export interface InferredStack {
+  language: StackSuggestion | null;
+  framework: StackSuggestion | null;
+  database: StackSuggestion | null;
+  styling: StackSuggestion | null;
+  warnings: string[];
 }

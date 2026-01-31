@@ -51,10 +51,12 @@ function getSelectByLabelText(labelText: RegExp | string): HTMLSelectElement {
 // Mock the tauri lib
 const mockGenerateKickstartPrompt = vi.fn();
 const mockGenerateKickstartClaudeMd = vi.fn();
+const mockInferTechStack = vi.fn();
 
 vi.mock("@/lib/tauri", () => ({
   generateKickstartPrompt: (...args: unknown[]) => mockGenerateKickstartPrompt(...args),
   generateKickstartClaudeMd: (...args: unknown[]) => mockGenerateKickstartClaudeMd(...args),
+  inferTechStack: (...args: unknown[]) => mockInferTechStack(...args),
 }));
 
 // Mock the project store
@@ -98,6 +100,13 @@ describe("ProjectKickstart", () => {
       tokenEstimate: 1500,
     });
     mockGenerateKickstartClaudeMd.mockResolvedValue("CLAUDE.md created successfully");
+    mockInferTechStack.mockResolvedValue({
+      language: null,
+      framework: { value: "React", reason: "Best for web apps", confidence: "high" },
+      database: { value: "PostgreSQL", reason: "Reliable and scalable", confidence: "medium" },
+      styling: { value: "Tailwind CSS", reason: "Utility-first CSS", confidence: "high" },
+      warnings: [],
+    });
     // Setup clipboard mock
     mockWriteText.mockResolvedValue(undefined);
     vi.stubGlobal("navigator", {
@@ -164,7 +173,8 @@ describe("ProjectKickstart", () => {
     it("should render disabled Generate button initially", () => {
       render(<ProjectKickstart />);
 
-      const button = screen.getByRole("button", { name: /generate kickstart prompt/i });
+      // Button text depends on stack completeness, match either
+      const button = screen.getByRole("button", { name: /(generate kickstart prompt|review & generate)/i });
       expect(button).toBeDisabled();
     });
   });
@@ -188,7 +198,8 @@ describe("ProjectKickstart", () => {
       const languageSelect = getSelectByLabelText(/Language/);
       await user.selectOptions(languageSelect, "TypeScript");
 
-      const button = screen.getByRole("button", { name: /generate kickstart prompt/i });
+      // Button text depends on stack completeness, match either
+      const button = screen.getByRole("button", { name: /(generate kickstart prompt|review & generate)/i });
       expect(button).toBeEnabled();
     });
 
@@ -196,7 +207,8 @@ describe("ProjectKickstart", () => {
       const user = userEvent.setup();
       render(<ProjectKickstart />);
 
-      const button = screen.getByRole("button", { name: /generate kickstart prompt/i });
+      // Button text depends on stack completeness, match either
+      const button = screen.getByRole("button", { name: /(generate kickstart prompt|review & generate)/i });
 
       // Fill only appPurpose - still disabled
       await user.type(screen.getByPlaceholderText(/A task management app/), "An app");
@@ -216,7 +228,7 @@ describe("ProjectKickstart", () => {
       expect(button).toBeEnabled();
     });
 
-    it("should allow generating without optional fields (framework, database, styling, constraints)", async () => {
+    it("should allow proceeding without optional fields (framework, database, styling, constraints)", async () => {
       const user = userEvent.setup();
       render(<ProjectKickstart />);
 
@@ -228,26 +240,20 @@ describe("ProjectKickstart", () => {
       const languageSelect = getSelectByLabelText(/Language/);
       await user.selectOptions(languageSelect, "Python");
 
-      const button = screen.getByRole("button", { name: /generate kickstart prompt/i });
+      // When stack is incomplete, button says "Review & Generate" (AI will suggest missing fields)
+      const button = screen.getByRole("button", { name: /review & generate/i });
       expect(button).toBeEnabled();
 
+      // Clicking it should trigger the review step with AI suggestions
       await user.click(button);
 
+      // Verify we enter the review step where AI provides suggestions
       await waitFor(() => {
-        expect(mockGenerateKickstartPrompt).toHaveBeenCalledWith(
-          expect.objectContaining({
-            appPurpose: "An app",
-            targetUsers: "Users",
-            keyFeatures: ["Feature"],
-            techPreferences: {
-              language: "Python",
-              framework: null,
-              database: null,
-              styling: null,
-            },
-          })
-        );
+        expect(screen.getByText("Review Tech Stack")).toBeInTheDocument();
       });
+
+      // Verify user can see their original language selection
+      expect(screen.getByText("Python")).toBeInTheDocument();
     });
   });
 
@@ -362,6 +368,13 @@ describe("ProjectKickstart", () => {
       await user.type(screen.getByPlaceholderText("Feature 1..."), "Create notes");
       const languageSelect = getSelectByLabelText(/Language/);
       await user.selectOptions(languageSelect, "TypeScript");
+      // Fill all tech stack fields to skip review step
+      const frameworkSelect = getSelectByLabelText(/Framework/);
+      await user.selectOptions(frameworkSelect, "React");
+      const databaseSelect = getSelectByLabelText(/Database/);
+      await user.selectOptions(databaseSelect, "PostgreSQL");
+      const stylingSelect = getSelectByLabelText(/Styling/);
+      await user.selectOptions(stylingSelect, "Tailwind CSS");
     }
 
     it("should call generateKickstartPrompt with correct input on Generate click", async () => {
@@ -378,9 +391,9 @@ describe("ProjectKickstart", () => {
           keyFeatures: ["Create notes"],
           techPreferences: {
             language: "TypeScript",
-            framework: null,
-            database: null,
-            styling: null,
+            framework: "React",
+            database: "PostgreSQL",
+            styling: "Tailwind CSS",
           },
           constraints: undefined,
         });
@@ -509,6 +522,13 @@ describe("ProjectKickstart", () => {
       await user.type(screen.getByPlaceholderText("Feature 1..."), "Create notes");
       const languageSelect = getSelectByLabelText(/Language/);
       await user.selectOptions(languageSelect, "TypeScript");
+      // Fill all tech stack fields to skip review step
+      const frameworkSelect = getSelectByLabelText(/Framework/);
+      await user.selectOptions(frameworkSelect, "React");
+      const databaseSelect = getSelectByLabelText(/Database/);
+      await user.selectOptions(databaseSelect, "PostgreSQL");
+      const stylingSelect = getSelectByLabelText(/Styling/);
+      await user.selectOptions(stylingSelect, "Tailwind CSS");
       await user.click(screen.getByRole("button", { name: /generate kickstart prompt/i }));
     }
 
@@ -544,9 +564,9 @@ describe("ProjectKickstart", () => {
             keyFeatures: ["Create notes"],
             techPreferences: {
               language: "TypeScript",
-              framework: null,
-              database: null,
-              styling: null,
+              framework: "React",
+              database: "PostgreSQL",
+              styling: "Tailwind CSS",
             },
           }),
           "/test/project/path"

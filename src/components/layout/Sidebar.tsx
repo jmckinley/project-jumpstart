@@ -8,6 +8,7 @@
  * - Show active section highlighting
  * - Show checkmarks for completed sections (per-project)
  * - Provide "New Project" button to start onboarding
+ * - Show temporary "Kickstart" section for empty projects
  *
  * DEPENDENCIES:
  * - @/hooks/useSectionCompletion - SectionCompletion type for completion status
@@ -23,9 +24,11 @@
  * - Active section is highlighted with accent color
  * - Checkmark icon shown for sections with completion status true
  * - Checkmarks are per-project - refresh automatically on project switch
+ * - Kickstart shown when isEmptyProject=true AND CLAUDE.md not yet created
  *
  * CLAUDE NOTES:
  * - Sections: Dashboard, CLAUDE.md, Modules, Skills, Agents, RALPH, Context, Enforcement, Settings
+ * - Kickstart section is temporary - disappears after CLAUDE.md is created
  * - Sections with completion tracking: claude-md, modules, skills, agents, ralph, enforcement
  * - Project selector is at the top of the sidebar
  * - Completion state is fetched per-project by useSectionCompletion hook
@@ -43,6 +46,7 @@ interface SidebarProps {
   activeProject?: Project | null;
   onProjectChange?: (project: Project) => void;
   onNewProject?: () => void;
+  isEmptyProject?: boolean;
 }
 
 const sections = [
@@ -118,6 +122,24 @@ function FolderIcon() {
   );
 }
 
+function SparkleIcon() {
+  return (
+    <svg
+      className="h-4 w-4 text-purple-400"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"
+      />
+    </svg>
+  );
+}
+
 export function Sidebar({
   activeSection,
   onNavigate,
@@ -126,8 +148,12 @@ export function Sidebar({
   activeProject,
   onProjectChange,
   onNewProject,
+  isEmptyProject = false,
 }: SidebarProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  // Show Kickstart when project is empty and CLAUDE.md hasn't been created yet
+  const showKickstart = isEmptyProject && !completion["claude-md"];
 
   const handleProjectSelect = (project: Project) => {
     onProjectChange?.(project);
@@ -198,6 +224,23 @@ export function Sidebar({
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto p-3">
+        {/* Kickstart - shown only for empty projects without CLAUDE.md */}
+        {showKickstart && (
+          <div className="mb-4">
+            <button
+              onClick={() => onNavigate("kickstart")}
+              className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                activeSection === "kickstart"
+                  ? "border-purple-500/50 bg-purple-600/20 text-purple-300"
+                  : "border-purple-500/30 bg-gradient-to-r from-purple-950/30 to-blue-950/30 text-purple-300 hover:border-purple-500/50 hover:bg-purple-600/20"
+              }`}
+            >
+              <SparkleIcon />
+              <span>Kickstart</span>
+            </button>
+          </div>
+        )}
+
         <div className="mb-3 px-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
           Navigation
         </div>

@@ -59,6 +59,7 @@
  * - validateApiKey - Validate API key format and test with API call
  * - generateKickstartPrompt - Generate a kickstart prompt for new projects
  * - generateKickstartClaudeMd - Generate and save initial CLAUDE.md from kickstart input
+ * - inferTechStack - Use AI to suggest optimal tech stack based on project description
  *
  * PATTERNS:
  * - Each function wraps a single Tauri command
@@ -81,7 +82,7 @@ import type { Skill, Pattern } from "@/types/skill";
 import type { RalphLoop, PromptAnalysis } from "@/types/ralph";
 import type { EnforcementEvent, HookStatus, CiSnippet } from "@/types/enforcement";
 import type { Agent, AgentWorkflowStep, AgentTool } from "@/types/agent";
-import type { KickstartInput, KickstartPrompt } from "@/types/kickstart";
+import type { KickstartInput, KickstartPrompt, InferStackInput, InferredStack } from "@/types/kickstart";
 
 export async function scanProject(path: string): Promise<DetectionResult> {
   return invoke<DetectionResult>("scan_project", { path });
@@ -319,6 +320,10 @@ export async function generateKickstartPrompt(input: KickstartInput): Promise<Ki
 
 export async function generateKickstartClaudeMd(input: KickstartInput, projectPath: string): Promise<string> {
   return invoke<string>("generate_kickstart_claude_md", { input, projectPath });
+}
+
+export async function inferTechStack(input: InferStackInput): Promise<InferredStack> {
+  return invoke<InferredStack>("infer_tech_stack", { input });
 }
 
 export async function listAgents(projectId?: string): Promise<Agent[]> {
