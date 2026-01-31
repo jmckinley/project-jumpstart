@@ -15,13 +15,16 @@
  * PATTERNS:
  * - EnforcementEvent.eventType: "block" | "warning" | "info"
  * - EnforcementEvent.source: "hook" | "ci" | "watcher"
- * - HookStatus.mode: "block" | "warn" | "none" | "external"
+ * - HookStatus.mode: "block" | "warn" | "auto-update" | "none" | "external"
  * - CiSnippet.provider: "github_actions" | "gitlab_ci"
  *
  * CLAUDE NOTES:
  * - Keep in sync with Rust models in src-tauri/src/models/enforcement.rs
  * - Enforcement contributes 10% to the overall health score (5 hooks + 5 CI)
- * - Hook modes: "block" (fail commit) or "warn" (allow but log)
+ * - Hook modes:
+ *   - "warn": Allow commit but show warning about missing docs
+ *   - "block": Fail commit until docs are manually added
+ *   - "auto-update": Automatically generate docs using AI and stage them
  */
 
 export interface EnforcementEvent {

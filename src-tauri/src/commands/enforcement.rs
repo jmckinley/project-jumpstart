@@ -28,7 +28,8 @@
 //! - Enforcement score: 5 for hooks installed, 5 for CI config present
 //!
 //! CLAUDE NOTES:
-//! - Hook mode: "block" (exit 1) or "warn" (exit 0 with message)
+//! - Hook modes: "block" (exit 1), "warn" (exit 0 with message), "auto-update" (generate docs)
+//! - Auto-update mode reads API key from ~/.project-jumpstart/settings.json
 //! - Husky detection: checks for .husky/ directory
 //! - CI detection: checks for .github/workflows/ or .gitlab-ci.yml
 //! - Enforcement events are logged to the DB for the event log UI
@@ -61,10 +62,13 @@ pub async fn install_git_hooks(
     }
 
     let hook_path = hooks_dir.join("pre-commit");
-    let exit_code = if mode == "block" { "1" } else { "0" };
 
-    let hook_script = format!(
-        r#"#!/bin/sh
+    let hook_script = if mode == "auto-update" {
+        generate_auto_update_hook_script()
+    } else {
+        let exit_code = if mode == "block" { "1" } else { "0" };
+        format!(
+            r#"#!/bin/sh
 # Project Jumpstart — Documentation Enforcement Hook
 # Mode: {mode}
 # Auto-generated. Edit via Project Jumpstart settings.
@@ -95,9 +99,10 @@ fi
 
 exit 0
 "#,
-        mode = mode,
-        exit_code = exit_code,
-    );
+            mode = mode,
+            exit_code = exit_code,
+        )
+    };
 
     std::fs::write(&hook_path, &hook_script)
         .map_err(|e| format!("Failed to write hook: {}", e))?;
@@ -163,6 +168,8 @@ pub async fn get_hook_status(project_path: String) -> Result<HookStatus, String>
         "external".to_string()
     } else if content.contains("Mode: block") {
         "block".to_string()
+    } else if content.contains("Mode: auto-update") {
+        "auto-update".to_string()
     } else {
         "warn".to_string()
     };
@@ -282,6 +289,111 @@ pub fn calculate_enforcement_score(project_path: &str) -> u32 {
     score.min(10)
 }
 
+// --- Hook Script Generators ---
+
+fn generate_auto_update_hook_script() -> String {
+    r#"#!/bin/sh
+# Project Jumpstart — Documentation Enforcement Hook
+# Mode: auto-update
+# Auto-generated. Edit via Project Jumpstart settings.
+#
+# This hook automatically generates documentation for files missing headers.
+# It reads the Anthropic API key from ~/.project-jumpstart/settings.json
+
+set -e
+
+EXTENSIONS="ts tsx js jsx rs py go"
+MISSING_FILES=""
+SETTINGS_FILE="$HOME/.project-jumpstart/settings.json"
+
+# Check if settings file exists
+if [ ! -f "$SETTINGS_FILE" ]; then
+    echo "ERROR: Project Jumpstart settings not found at $SETTINGS_FILE"
+    echo "Please run Project Jumpstart to configure your API key."
+    exit 1
+fi
+
+# Extract API key (basic JSON parsing)
+API_KEY=$(grep -o '"anthropic_api_key":"[^"]*"' "$SETTINGS_FILE" 2>/dev/null | cut -d'"' -f4)
+if [ -z "$API_KEY" ]; then
+    echo "ERROR: No API key found in Project Jumpstart settings."
+    echo "Please configure your Anthropic API key in Project Jumpstart."
+    exit 1
+fi
+
+# Find files missing documentation
+for file in $(git diff --cached --name-only --diff-filter=ACM); do
+    ext="${file##*.}"
+    case " $EXTENSIONS " in
+        *" $ext "*)
+            if ! head -30 "$file" 2>/dev/null | grep -q "@module\|@description\|//! @module"; then
+                MISSING_FILES="$MISSING_FILES $file"
+            fi
+            ;;
+    esac
+done
+
+# If no missing files, exit successfully
+if [ -z "$MISSING_FILES" ]; then
+    exit 0
+fi
+
+echo "Auto-generating documentation for files with missing headers..."
+
+for file in $MISSING_FILES; do
+    echo "  Generating docs for: $file"
+
+    # Read file content
+    CONTENT=$(cat "$file")
+    FILENAME=$(basename "$file")
+    EXT="${file##*.}"
+
+    # Determine comment style
+    if [ "$EXT" = "rs" ]; then
+        COMMENT_STYLE="rust"
+    else
+        COMMENT_STYLE="typescript"
+    fi
+
+    # Call Anthropic API to generate documentation header
+    DOC_HEADER=$(curl -s https://api.anthropic.com/v1/messages \
+        -H "Content-Type: application/json" \
+        -H "x-api-key: $API_KEY" \
+        -H "anthropic-version: 2023-06-01" \
+        -d "{
+            \"model\": \"claude-sonnet-4-20250514\",
+            \"max_tokens\": 1024,
+            \"messages\": [{
+                \"role\": \"user\",
+                \"content\": \"Generate ONLY a documentation header for this $EXT file named $FILENAME. Use $COMMENT_STYLE style comments. Include @module, @description, PURPOSE, EXPORTS, and CLAUDE NOTES sections. Output ONLY the comment block, nothing else:\\n\\n$CONTENT\"
+            }]
+        }" 2>/dev/null | grep -o '"text":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\\n/\n/g')
+
+    if [ -n "$DOC_HEADER" ]; then
+        # Prepend documentation to file
+        TEMP_FILE=$(mktemp)
+        echo "$DOC_HEADER" > "$TEMP_FILE"
+        echo "" >> "$TEMP_FILE"
+        cat "$file" >> "$TEMP_FILE"
+        mv "$TEMP_FILE" "$file"
+
+        # Re-stage the file
+        git add "$file"
+        echo "    ✓ Documentation added and staged"
+    else
+        echo "    ✗ Failed to generate documentation (API error)"
+        exit 1
+    fi
+done
+
+echo ""
+echo "Documentation auto-generated for $(echo $MISSING_FILES | wc -w | tr -d ' ') file(s)."
+echo "Changes have been staged. Proceeding with commit..."
+
+exit 0
+"#.to_string()
+}
+
 // --- CI Template Generators ---
 
 fn generate_github_actions_snippet() -> String {
@@ -374,5 +486,19 @@ mod tests {
         assert!(snippet.contains("doc-check"));
         assert!(snippet.contains("@module"));
         assert!(snippet.contains("merge_requests"));
+    }
+
+    #[test]
+    fn test_auto_update_hook_script() {
+        let script = generate_auto_update_hook_script();
+        // Check it contains auto-update mode marker
+        assert!(script.contains("Mode: auto-update"));
+        // Check it reads API key from settings
+        assert!(script.contains("project-jumpstart/settings.json"));
+        assert!(script.contains("anthropic_api_key"));
+        // Check it calls Anthropic API
+        assert!(script.contains("api.anthropic.com"));
+        // Check it stages files after generating docs
+        assert!(script.contains("git add"));
     }
 }

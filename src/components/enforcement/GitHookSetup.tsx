@@ -4,7 +4,7 @@
  *
  * PURPOSE:
  * - Display current git hook installation status
- * - Allow installing/updating pre-commit hooks with block or warn mode
+ * - Allow installing/updating pre-commit hooks with block, warn, or auto-update mode
  * - Show Husky detection if present
  *
  * DEPENDENCIES:
@@ -23,9 +23,13 @@
  * - Shows status badge: green for installed, yellow for external, gray for not installed
  *
  * CLAUDE NOTES:
- * - Hook modes: "block" (exit 1, prevents commit) or "warn" (exit 0, allows commit)
- * - "external" mode means a non-Copilot hook is already present
+ * - Hook modes:
+ *   - "block" (exit 1, prevents commit)
+ *   - "warn" (exit 0, allows commit with warning)
+ *   - "auto-update" (generates missing docs via AI, stages them, allows commit)
+ * - "external" mode means a non-Jumpstart hook is already present
  * - has_husky flag indicates Husky framework is detected alongside
+ * - Auto-update mode requires API key configured in Project Jumpstart settings
  */
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,7 +41,7 @@ interface GitHookSetupProps {
   hookStatus: HookStatus | null;
   loading: boolean;
   installing: boolean;
-  onInstall: (mode: "warn" | "block") => void;
+  onInstall: (mode: "warn" | "block" | "auto-update") => void;
   onRefresh: () => void;
 }
 
@@ -82,14 +86,22 @@ export function GitHookSetup({ hookStatus, loading, installing, onInstall, onRef
           </div>
         )}
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            onClick={() => onInstall("auto-update")}
+            disabled={installing || loading}
+            className="bg-blue-600 hover:bg-blue-500"
+          >
+            {installing ? "Installing..." : "Auto-Update (Recommended)"}
+          </Button>
           <Button
             size="sm"
             variant="destructive"
             onClick={() => onInstall("block")}
             disabled={installing || loading}
           >
-            {installing ? "Installing..." : "Install (Block Mode)"}
+            {installing ? "Installing..." : "Block"}
           </Button>
           <Button
             size="sm"
@@ -98,7 +110,7 @@ export function GitHookSetup({ hookStatus, loading, installing, onInstall, onRef
             disabled={installing || loading}
             className="border-neutral-700 text-neutral-300 hover:bg-neutral-800"
           >
-            {installing ? "Installing..." : "Install (Warn Mode)"}
+            {installing ? "Installing..." : "Warn"}
           </Button>
           <Button
             size="sm"
@@ -112,8 +124,9 @@ export function GitHookSetup({ hookStatus, loading, installing, onInstall, onRef
         </div>
 
         <div className="text-xs text-neutral-500 space-y-1">
-          <p><span className="font-medium text-red-400">Block mode</span> — Prevents commits with missing doc headers (exit 1)</p>
-          <p><span className="font-medium text-yellow-400">Warn mode</span> — Allows commits but prints warnings (exit 0)</p>
+          <p><span className="font-medium text-blue-400">Auto-update</span> — Generates missing docs via AI, stages them, then commits</p>
+          <p><span className="font-medium text-red-400">Block</span> — Prevents commits with missing doc headers (must fix manually)</p>
+          <p><span className="font-medium text-yellow-400">Warn</span> — Allows commits but prints warnings about missing docs</p>
         </div>
 
         {hookStatus?.installed && (

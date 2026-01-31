@@ -24,7 +24,11 @@
  * - All actions auto-resolve project path/ID from the active project store
  *
  * CLAUDE NOTES:
- * - Hook modes: "block" (exit 1) or "warn" (exit 0 with message)
+ * - Hook modes:
+ *   - "block" (exit 1, prevents commit)
+ *   - "warn" (exit 0, allows commit with warning)
+ *   - "auto-update" (generates missing docs via AI, stages them, allows commit)
+ * - Auto-update mode requires API key configured in Project Jumpstart settings
  * - Snippets are generated server-side, no local state mutation needed
  * - Events are sorted by created_at descending (most recent first)
  */

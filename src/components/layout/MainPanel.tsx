@@ -852,7 +852,7 @@ function EnforcementView({ onHooksInstalled }: { onHooksInstalled?: () => void }
   }, [refreshHookStatus, loadSnippets]);
 
   const handleInstall = useCallback(
-    async (mode: "warn" | "block") => {
+    async (mode: "warn" | "block" | "auto-update") => {
       await installHooks(mode);
       onHooksInstalled?.();
     },

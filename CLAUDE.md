@@ -561,6 +561,8 @@ Record key architectural decisions here so they survive context loss:
 
 5. **shadcn/ui over other libraries**: Copy-paste components, full customization, Tailwind-native
 
+6. **Auto-update enforcement mode**: Git hooks can auto-generate missing docs via API at commit time. Uses curl to call Anthropic API directly from the shell script, reading API key from `~/.project-jumpstart/settings.json`. Three modes: warn (allow), block (fail), auto-update (generate and stage).
+
 ---
 
 ## Key Types Reference
@@ -728,6 +730,20 @@ interface DetectionResult {
 - Frontend tests: `pnpm test`
 - Backend tests: `cargo test`
 - Test files colocated with source (`.test.ts`, `.test.tsx`)
+
+### macOS Build & Notarization
+- **Apple ID**: john@greatfallsventures.com
+- **App Password**: hiam-ebkk-xrha-djbz
+- **Team ID**: KACZ4GS4RL
+- **Signing Identity**: Developer ID Application: John McKinley (KACZ4GS4RL)
+
+To build with notarization:
+```bash
+export APPLE_ID="john@greatfallsventures.com"
+export APPLE_PASSWORD="hiam-ebkk-xrha-djbz"
+export APPLE_TEAM_ID="KACZ4GS4RL"
+pnpm tauri build
+```
 
 ---
 
