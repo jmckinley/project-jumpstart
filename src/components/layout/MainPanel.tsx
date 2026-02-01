@@ -115,7 +115,6 @@ import type { Agent, LibraryAgent, AgentWorkflowStep, AgentTool } from "@/types/
 import { CommandCenter } from "@/components/ralph/CommandCenter";
 import { PromptAnalyzer } from "@/components/ralph/PromptAnalyzer";
 import { LoopMonitor } from "@/components/ralph/LoopMonitor";
-import { MistakesPanel } from "@/components/ralph/MistakesPanel";
 import { useRalph } from "@/hooks/useRalph";
 import { HealthMonitor } from "@/components/context/HealthMonitor";
 import { TokenBreakdownChart } from "@/components/context/TokenBreakdown";
@@ -845,17 +844,12 @@ function RalphView({ onLoopStarted }: { onLoopStarted?: () => void }) {
 
       <LoopMonitor
         loops={loops}
+        mistakes={mistakes}
         loading={loading}
         onPause={pauseLoop}
         onResume={resumeLoop}
         onKill={killLoop}
         onRefresh={loadLoops}
-      />
-
-      <MistakesPanel
-        mistakes={mistakes}
-        loading={loading}
-        onRefresh={loadMistakes}
       />
     </div>
   );
