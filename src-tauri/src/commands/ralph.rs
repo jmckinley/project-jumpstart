@@ -37,6 +37,7 @@
 //! - start_ralph_loop stores loop in DB then spawns background task to execute claude CLI
 //! - pause_ralph_loop transitions "running" to "paused"
 //! - Loop statuses: idle -> running -> paused/completed/failed
+//! - Failed/killed loops automatically record mistakes for learning (categorized by error type)
 //!
 //! CLAUDE NOTES:
 //! - RALPH = Review, Analyze, List, Plan, Handoff
@@ -443,6 +444,64 @@ async fn execute_ralph_loop(
         "RALPH loop failed"
     };
     let _ = db::log_activity_db(&db, &project_id, "generate", activity_msg);
+
+    // Automatically record mistakes for failed loops (learning from errors)
+    if status == "failed" {
+        let mistake_id = uuid::Uuid::new_v4().to_string();
+        let mistake_type = categorize_mistake(&outcome);
+        let description = if outcome.len() > 500 {
+            format!("{}...", &outcome[..500])
+        } else {
+            outcome.clone()
+        };
+
+        let _ = db.execute(
+            "INSERT INTO ralph_mistakes (id, project_id, loop_id, mistake_type, description, context, resolution, learned_pattern, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, NULL, ?7)",
+            rusqlite::params![
+                mistake_id,
+                project_id,
+                loop_id,
+                mistake_type,
+                description,
+                prompt, // Store the original prompt as context
+                now
+            ],
+        );
+
+        // Prune old mistakes (keep only most recent 50 per project)
+        let _ = db.execute(
+            "DELETE FROM ralph_mistakes WHERE project_id = ?1 AND id NOT IN (
+                SELECT id FROM ralph_mistakes WHERE project_id = ?1 ORDER BY created_at DESC LIMIT 50
+            )",
+            rusqlite::params![project_id],
+        );
+    }
+}
+
+/// Categorize a mistake based on error message content.
+fn categorize_mistake(error: &str) -> &'static str {
+    let lower = error.to_lowercase();
+
+    if lower.contains("not found") || lower.contains("no such file") || lower.contains("doesn't exist") {
+        "file_not_found"
+    } else if lower.contains("permission") || lower.contains("access denied") {
+        "permission_error"
+    } else if lower.contains("syntax") || lower.contains("parse") || lower.contains("unexpected token") {
+        "syntax_error"
+    } else if lower.contains("type") || lower.contains("cannot assign") || lower.contains("incompatible") {
+        "type_error"
+    } else if lower.contains("timeout") || lower.contains("timed out") {
+        "timeout"
+    } else if lower.contains("network") || lower.contains("connection") || lower.contains("api") {
+        "network_error"
+    } else if lower.contains("memory") || lower.contains("heap") || lower.contains("stack overflow") {
+        "resource_error"
+    } else if lower.contains("killed") || lower.contains("terminated") || lower.contains("cancelled") {
+        "user_cancelled"
+    } else {
+        "implementation"
+    }
 }
 
 /// Pause an active RALPH loop by ID.
@@ -526,7 +585,7 @@ pub async fn resume_ralph_loop(
 }
 
 /// Kill a running or paused RALPH loop by ID.
-/// Marks the loop as failed and attempts to kill any associated Claude process.
+/// Marks the loop as failed, records a mistake, and attempts to kill any associated Claude process.
 #[tauri::command]
 pub async fn kill_ralph_loop(
     loop_id: String,
@@ -536,6 +595,15 @@ pub async fn kill_ralph_loop(
         .db
         .lock()
         .map_err(|e| format!("Failed to lock database: {}", e))?;
+
+    // Get loop info before updating (for mistake recording)
+    let loop_info: Option<(String, String)> = db
+        .query_row(
+            "SELECT project_id, prompt FROM ralph_loops WHERE id = ?1 AND status IN ('running', 'paused')",
+            rusqlite::params![&loop_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .ok();
 
     let now = Utc::now().to_rfc3339();
 
@@ -548,6 +616,16 @@ pub async fn kill_ralph_loop(
 
     if rows_updated == 0 {
         return Err("Loop not found or already completed/failed.".to_string());
+    }
+
+    // Record as a user-cancelled mistake for tracking
+    if let Some((project_id, prompt)) = loop_info {
+        let mistake_id = uuid::Uuid::new_v4().to_string();
+        let _ = db.execute(
+            "INSERT INTO ralph_mistakes (id, project_id, loop_id, mistake_type, description, context, resolution, learned_pattern, created_at)
+             VALUES (?1, ?2, ?3, 'user_cancelled', 'Loop was manually killed by user', ?4, NULL, NULL, ?5)",
+            rusqlite::params![mistake_id, project_id, loop_id, prompt, now],
+        );
     }
 
     // Try to kill any Claude processes that might be running for this loop
