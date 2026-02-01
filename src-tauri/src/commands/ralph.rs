@@ -4,6 +4,7 @@
 //! PURPOSE:
 //! - Analyze prompt quality for RALPH loops (clarity, specificity, context, scope)
 //! - Start and pause RALPH loops with DB persistence
+//! - Execute RALPH loops via Claude Code CLI in background
 //! - List loop history for the active project
 //! - Provide auto-enhanced prompts based on quality analysis
 //! - AI-powered prompt enhancement when API key is available
@@ -15,12 +16,15 @@
 //! - uuid - Loop ID generation
 //! - chrono - Timestamp handling
 //! - core::ai - Claude API for AI-powered enhancement
+//! - std::process::Command - Execute Claude CLI
+//! - tokio - Async runtime for background execution
 //!
 //! EXPORTS:
 //! - analyze_ralph_prompt - Score prompt quality and generate suggestions (heuristic)
 //! - analyze_ralph_prompt_with_ai - AI-powered prompt analysis and enhancement
-//! - start_ralph_loop - Create a new RALPH loop record
+//! - start_ralph_loop - Create loop and execute via Claude CLI in background
 //! - pause_ralph_loop - Pause an active loop
+//! - kill_ralph_loop - Kill a running loop and mark as failed
 //! - list_ralph_loops - Get loops for a project
 //! - get_ralph_context - Get CLAUDE.md summary, recent mistakes, and project patterns
 //! - record_ralph_mistake - Record a mistake from a RALPH loop for learning
@@ -29,7 +33,7 @@
 //! PATTERNS:
 //! - analyze_ralph_prompt uses fast heuristics for immediate feedback
 //! - analyze_ralph_prompt_with_ai uses Claude for deeper analysis (when API key available)
-//! - start_ralph_loop stores the loop in the DB with "running" status
+//! - start_ralph_loop stores loop in DB then spawns background task to execute claude CLI
 //! - pause_ralph_loop transitions "running" to "paused"
 //! - Loop statuses: idle -> running -> paused/completed/failed
 //!
@@ -38,15 +42,29 @@
 //! - Quality score is sum of 4 criteria (clarity, specificity, context, scope), each 0-25
 //! - Heuristic analysis is instant; AI analysis takes 2-5 seconds
 //! - AI enhancement provides project-aware suggestions when context is provided
-//! - Safety settings control loop boundaries
+//! - Claude CLI is executed with: claude -p "prompt" --allowedTools ... in project directory
 //! - get_ralph_context reads CLAUDE.md from project path and fetches recent mistakes from DB
 //! - update_claude_md_with_pattern appends to CLAUDE NOTES section in CLAUDE.md file
 
 use chrono::Utc;
+use rusqlite::Connection;
 use tauri::State;
 
 use std::fs;
 use std::path::Path;
+use std::process::Command;
+
+/// Get the database path for opening new connections in background tasks.
+fn get_db_path() -> Result<std::path::PathBuf, String> {
+    let home = dirs::home_dir().ok_or("Could not determine home directory")?;
+    Ok(home.join(".project-jumpstart").join("jumpstart.db"))
+}
+
+/// Open a new database connection for background tasks.
+fn open_db_connection() -> Result<Connection, String> {
+    let db_path = get_db_path()?;
+    Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))
+}
 
 use crate::core::ai;
 use crate::db::{self, AppState};
@@ -257,7 +275,7 @@ ENHANCED PROMPT REQUIREMENTS:
 }
 
 /// Start a new RALPH loop for a project.
-/// Creates a loop record in the DB with "running" status.
+/// Creates a loop record in the DB with "running" status and executes via Claude CLI.
 #[tauri::command]
 pub async fn start_ralph_loop(
     project_id: String,
@@ -266,28 +284,47 @@ pub async fn start_ralph_loop(
     quality_score: u32,
     state: State<'_, AppState>,
 ) -> Result<RalphLoop, String> {
-    let db = state
-        .db
-        .lock()
-        .map_err(|e| format!("Failed to lock database: {}", e))?;
+    // Get project path first
+    let project_path = {
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| format!("Failed to lock database: {}", e))?;
+
+        let mut stmt = db
+            .prepare("SELECT path FROM projects WHERE id = ?1")
+            .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
+        stmt.query_row(rusqlite::params![&project_id], |row| row.get::<_, String>(0))
+            .map_err(|e| format!("Project not found: {}", e))?
+    };
 
     let id = uuid::Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
 
-    db.execute(
-        "INSERT INTO ralph_loops (id, project_id, prompt, enhanced_prompt, status, quality_score, iterations, outcome, started_at, created_at) VALUES (?1, ?2, ?3, ?4, 'running', ?5, 0, NULL, ?6, ?6)",
-        rusqlite::params![id, project_id, prompt, enhanced_prompt, quality_score, now],
-    )
-    .map_err(|e| format!("Failed to create RALPH loop: {}", e))?;
+    // Insert loop record
+    {
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| format!("Failed to lock database: {}", e))?;
 
-    // Log activity
-    let _ = db::log_activity_db(&db, &project_id, "generate", "Started RALPH loop");
+        db.execute(
+            "INSERT INTO ralph_loops (id, project_id, prompt, enhanced_prompt, status, quality_score, iterations, outcome, started_at, created_at) VALUES (?1, ?2, ?3, ?4, 'running', ?5, 0, NULL, ?6, ?6)",
+            rusqlite::params![&id, &project_id, &prompt, &enhanced_prompt, quality_score, &now],
+        )
+        .map_err(|e| format!("Failed to create RALPH loop: {}", e))?;
 
-    Ok(RalphLoop {
-        id,
-        project_id,
-        prompt,
-        enhanced_prompt,
+        // Log activity
+        let _ = db::log_activity_db(&db, &project_id, "generate", "Started RALPH loop");
+    }
+
+    // Create the loop result to return immediately
+    let loop_result = RalphLoop {
+        id: id.clone(),
+        project_id: project_id.clone(),
+        prompt: prompt.clone(),
+        enhanced_prompt: enhanced_prompt.clone(),
         status: "running".to_string(),
         quality_score,
         iterations: 0,
@@ -296,7 +333,115 @@ pub async fn start_ralph_loop(
         paused_at: None,
         completed_at: None,
         created_at: now,
-    })
+    };
+
+    // Prepare data for background task
+    let loop_id = id.clone();
+    let final_prompt = enhanced_prompt.unwrap_or(prompt);
+
+    // Spawn background task to execute Claude CLI
+    tokio::spawn(async move {
+        execute_ralph_loop(loop_id, project_id, project_path, final_prompt).await;
+    });
+
+    Ok(loop_result)
+}
+
+/// Execute a RALPH loop via the Claude CLI in a background task.
+/// Updates the loop record with outcome and status when complete.
+async fn execute_ralph_loop(
+    loop_id: String,
+    project_id: String,
+    project_path: String,
+    prompt: String,
+) {
+    // Open a fresh database connection for this background task
+    let db = match open_db_connection() {
+        Ok(conn) => conn,
+        Err(e) => {
+            eprintln!("RALPH: Failed to open database connection: {}", e);
+            return;
+        }
+    };
+
+    // Check if claude CLI is available
+    let claude_check = Command::new("which")
+        .arg("claude")
+        .output();
+
+    let claude_path = match claude_check {
+        Ok(output) if output.status.success() => {
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        }
+        _ => {
+            // Try common paths
+            if Path::new("/usr/local/bin/claude").exists() {
+                "/usr/local/bin/claude".to_string()
+            } else if Path::new("/opt/homebrew/bin/claude").exists() {
+                "/opt/homebrew/bin/claude".to_string()
+            } else {
+                // Claude CLI not found - mark as failed
+                let now = Utc::now().to_rfc3339();
+                let _ = db.execute(
+                    "UPDATE ralph_loops SET status = 'failed', outcome = ?1, completed_at = ?2 WHERE id = ?3",
+                    rusqlite::params!["Claude CLI not found. Install with: npm install -g @anthropic-ai/claude-code", &now, &loop_id],
+                );
+                return;
+            }
+        }
+    };
+
+    // Execute claude with the prompt
+    // Using -p for print mode (non-interactive) and allowing common tools
+    let result = Command::new(&claude_path)
+        .arg("-p")
+        .arg(&prompt)
+        .arg("--allowedTools")
+        .arg("Read,Write,Edit,Bash,Glob,Grep")
+        .current_dir(&project_path)
+        .output();
+
+    let (status, outcome) = match result {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+
+            if output.status.success() {
+                // Truncate output if too long (max 10000 chars)
+                let outcome_text = if stdout.len() > 10000 {
+                    format!("{}...\n[Output truncated]", &stdout[..10000])
+                } else {
+                    stdout.to_string()
+                };
+                ("completed".to_string(), outcome_text)
+            } else {
+                let error_msg = if stderr.is_empty() {
+                    format!("Claude exited with code: {:?}", output.status.code())
+                } else {
+                    stderr.to_string()
+                };
+                ("failed".to_string(), error_msg)
+            }
+        }
+        Err(e) => {
+            ("failed".to_string(), format!("Failed to execute Claude: {}", e))
+        }
+    };
+
+    // Update loop record with result
+    let now = Utc::now().to_rfc3339();
+    let _ = db.execute(
+        "UPDATE ralph_loops SET status = ?1, outcome = ?2, completed_at = ?3, iterations = iterations + 1 WHERE id = ?4",
+        rusqlite::params![&status, &outcome, &now, &loop_id],
+    );
+
+    // Log completion activity
+    let activity_msg = if status == "completed" {
+        "RALPH loop completed successfully"
+    } else {
+        "RALPH loop failed"
+    };
+    let _ = db::log_activity_db(&db, &project_id, "generate", activity_msg);
 }
 
 /// Pause an active RALPH loop by ID.
@@ -322,6 +467,44 @@ pub async fn pause_ralph_loop(
 
     if rows_updated == 0 {
         return Err("Loop not found or not currently running.".to_string());
+    }
+
+    Ok(())
+}
+
+/// Kill a running RALPH loop by ID.
+/// Marks the loop as failed and attempts to kill any associated Claude process.
+#[tauri::command]
+pub async fn kill_ralph_loop(
+    loop_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let db = state
+        .db
+        .lock()
+        .map_err(|e| format!("Failed to lock database: {}", e))?;
+
+    let now = Utc::now().to_rfc3339();
+
+    let rows_updated = db
+        .execute(
+            "UPDATE ralph_loops SET status = 'failed', outcome = 'Killed by user', completed_at = ?1 WHERE id = ?2 AND status = 'running'",
+            rusqlite::params![now, loop_id],
+        )
+        .map_err(|e| format!("Failed to kill RALPH loop: {}", e))?;
+
+    if rows_updated == 0 {
+        return Err("Loop not found or not currently running.".to_string());
+    }
+
+    // Try to kill any Claude processes that might be running for this loop
+    // Note: This is a best-effort attempt - we can't guarantee we kill the right process
+    // since we don't track PIDs. In the future, we could store PIDs in the DB.
+    #[cfg(unix)]
+    {
+        let _ = std::process::Command::new("pkill")
+            .args(["-f", "claude -p"])
+            .output();
     }
 
     Ok(())

@@ -24,6 +24,7 @@
  * - When useAi=true and API key is configured, uses AI for deeper analysis
  * - Call startLoop() to begin a RALPH loop (requires analysis first)
  * - Call pauseLoop() to pause an active loop
+ * - Call killLoop() to kill a running loop and mark as failed
  * - Call loadLoops() to refresh loop history
  * - Call loadContext() to fetch CLAUDE.md + mistakes before analysis
  * - Call recordMistake() to record a new mistake for learning
@@ -48,6 +49,7 @@ import {
   analyzeRalphPromptWithAi,
   startRalphLoop,
   pauseRalphLoop,
+  killRalphLoop,
   listRalphLoops,
   scanModules,
   getRalphContext,
@@ -204,6 +206,27 @@ export function useRalph() {
     [],
   );
 
+  const killLoop = useCallback(
+    async (loopId: string) => {
+      setState((s) => ({ ...s, error: null }));
+      try {
+        await killRalphLoop(loopId);
+        setState((s) => ({
+          ...s,
+          loops: s.loops.map((l) =>
+            l.id === loopId ? { ...l, status: "failed" as const, outcome: "Killed by user" } : l,
+          ),
+        }));
+      } catch (err) {
+        setState((s) => ({
+          ...s,
+          error: err instanceof Error ? err.message : "Failed to kill loop",
+        }));
+      }
+    },
+    [],
+  );
+
   const clearAnalysis = useCallback(() => {
     setState((s) => ({ ...s, analysis: null }));
   }, []);
@@ -275,6 +298,7 @@ export function useRalph() {
     analyzePrompt,
     startLoop,
     pauseLoop,
+    killLoop,
     clearAnalysis,
     recordMistake,
     learnPattern,

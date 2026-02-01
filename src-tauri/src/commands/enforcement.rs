@@ -16,6 +16,7 @@
 //!
 //! EXPORTS:
 //! - install_git_hooks - Install pre-commit hook for doc enforcement
+//! - install_git_hooks_internal - Internal function for hook installation (used by onboarding)
 //! - get_hook_status - Check if hooks are installed
 //! - get_enforcement_events - List recent enforcement events
 //! - get_ci_snippets - Generate CI integration templates
@@ -202,6 +203,94 @@ exit 0
         mode,
         has_husky,
     })
+}
+
+/// Internal function to install git hooks without State (used by onboarding).
+/// This is a synchronous version that takes the db connection directly.
+pub fn install_git_hooks_internal(
+    project_path: &str,
+    mode: &str,
+    db: Option<&rusqlite::Connection>,
+) -> Result<(), String> {
+    let path = Path::new(project_path);
+    let git_dir = path.join(".git");
+
+    if !git_dir.exists() {
+        // Not a git repository - skip silently (don't fail onboarding)
+        return Ok(());
+    }
+
+    let hooks_dir = git_dir.join("hooks");
+    if !hooks_dir.exists() {
+        std::fs::create_dir_all(&hooks_dir)
+            .map_err(|e| format!("Failed to create hooks directory: {}", e))?;
+    }
+
+    let hook_path = hooks_dir.join("pre-commit");
+
+    // For auto-update mode, export the API key (requires db)
+    if mode == "auto-update" {
+        if let Some(conn) = db {
+            export_api_key_for_hook(conn)?;
+        } else {
+            return Err("Auto-update mode requires database access".to_string());
+        }
+    }
+
+    let hook_script = if mode == "auto-update" {
+        generate_auto_update_hook_script()
+    } else {
+        let exit_code = if mode == "block" { "1" } else { "0" };
+        format!(
+            r#"#!/bin/sh
+# Project Jumpstart — Documentation Enforcement Hook
+# Mode: {mode}
+# Auto-generated. Edit via Project Jumpstart settings.
+
+MISSING_DOCS=0
+EXTENSIONS="ts tsx js jsx rs py go"
+
+for file in $(git diff --cached --name-only --diff-filter=ACM); do
+    # Check if file has a documentable extension
+    ext="${{file##*.}}"
+    case " $EXTENSIONS " in
+        *" $ext "*)
+            # Check for doc header in first 30 lines
+            head -30 "$file" 2>/dev/null | grep -q "@module\|@description\|//! @module" || {{
+                echo "WARNING: Missing documentation header in $file"
+                MISSING_DOCS=$((MISSING_DOCS + 1))
+            }}
+            ;;
+    esac
+done
+
+if [ $MISSING_DOCS -gt 0 ]; then
+    echo ""
+    echo "Found $MISSING_DOCS file(s) without documentation headers."
+    echo "Run Project Jumpstart to generate missing docs."
+    exit {exit_code}
+fi
+
+exit 0
+"#,
+            mode = mode,
+            exit_code = exit_code,
+        )
+    };
+
+    std::fs::write(&hook_path, &hook_script)
+        .map_err(|e| format!("Failed to write hook: {}", e))?;
+
+    // Make executable (Unix)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let perms = std::fs::Permissions::from_mode(0o755);
+        std::fs::set_permissions(&hook_path, perms)
+            .map_err(|e| format!("Failed to set hook permissions: {}", e))?;
+    }
+
+    Ok(())
 }
 
 /// Check the current status of git hooks for a project.
@@ -562,5 +651,69 @@ mod tests {
         assert!(script.contains("api.anthropic.com"));
         // Check it stages files after generating docs
         assert!(script.contains("git add"));
+    }
+
+    #[test]
+    fn test_install_hooks_no_git_dir() {
+        // No .git directory - should return Ok without installing (graceful skip)
+        let temp = tempfile::TempDir::new().unwrap();
+        let result = install_git_hooks_internal(temp.path().to_str().unwrap(), "warn", None);
+        assert!(result.is_ok());
+        // Hook file should not exist
+        assert!(!temp.path().join(".git/hooks/pre-commit").exists());
+    }
+
+    #[test]
+    fn test_install_hooks_warn_mode() {
+        let temp = tempfile::TempDir::new().unwrap();
+        std::fs::create_dir_all(temp.path().join(".git/hooks")).unwrap();
+
+        let result = install_git_hooks_internal(temp.path().to_str().unwrap(), "warn", None);
+        assert!(result.is_ok());
+
+        let hook_path = temp.path().join(".git/hooks/pre-commit");
+        assert!(hook_path.exists());
+
+        let hook = std::fs::read_to_string(&hook_path).unwrap();
+        assert!(hook.contains("Mode: warn"));
+        assert!(hook.contains("exit 0")); // warn mode exits 0, not 1
+    }
+
+    #[test]
+    fn test_install_hooks_block_mode() {
+        let temp = tempfile::TempDir::new().unwrap();
+        std::fs::create_dir_all(temp.path().join(".git/hooks")).unwrap();
+
+        let result = install_git_hooks_internal(temp.path().to_str().unwrap(), "block", None);
+        assert!(result.is_ok());
+
+        let hook = std::fs::read_to_string(temp.path().join(".git/hooks/pre-commit")).unwrap();
+        assert!(hook.contains("Mode: block"));
+        assert!(hook.contains("exit 1")); // block mode exits 1
+    }
+
+    #[test]
+    fn test_install_hooks_creates_hooks_dir() {
+        let temp = tempfile::TempDir::new().unwrap();
+        // Only create .git, not .git/hooks
+        std::fs::create_dir(temp.path().join(".git")).unwrap();
+
+        let result = install_git_hooks_internal(temp.path().to_str().unwrap(), "warn", None);
+        assert!(result.is_ok());
+
+        // hooks dir should be created automatically
+        assert!(temp.path().join(".git/hooks").exists());
+        assert!(temp.path().join(".git/hooks/pre-commit").exists());
+    }
+
+    #[test]
+    fn test_install_hooks_auto_update_requires_db() {
+        let temp = tempfile::TempDir::new().unwrap();
+        std::fs::create_dir_all(temp.path().join(".git/hooks")).unwrap();
+
+        // auto-update without db should fail
+        let result = install_git_hooks_internal(temp.path().to_str().unwrap(), "auto-update", None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("requires database"));
     }
 }

@@ -16,6 +16,8 @@
  * Project Management:
  * - scanProject - Scan a directory for tech stack detection
  * - saveProject - Save a configured project to the database
+ * - checkGitInstalled - Check if git is available on the system
+ * - installGit - Trigger OS-appropriate git installation
  * - listProjects - Fetch all projects
  * - getProject - Fetch a single project by ID
  * - removeProject - Delete a project record
@@ -57,6 +59,7 @@
  * - analyzeRalphPromptWithAi - AI-powered prompt analysis with project context
  * - startRalphLoop - Start a new RALPH loop
  * - pauseRalphLoop - Pause an active RALPH loop
+ * - killRalphLoop - Kill a running RALPH loop
  * - listRalphLoops - List loops for a project
  * - getRalphContext - Get CLAUDE.md summary, recent mistakes, and project patterns
  * - recordRalphMistake - Record a mistake from a RALPH loop for learning
@@ -122,6 +125,14 @@ export async function scanProject(path: string): Promise<DetectionResult> {
 
 export async function saveProject(setup: ProjectSetup): Promise<Project> {
   return invoke<Project>("save_project", { setup });
+}
+
+export async function checkGitInstalled(): Promise<boolean> {
+  return invoke<boolean>("check_git_installed");
+}
+
+export async function installGit(): Promise<string> {
+  return invoke<string>("install_git");
 }
 
 export async function listProjects(): Promise<Project[]> {
@@ -261,6 +272,10 @@ export async function startRalphLoop(
 
 export async function pauseRalphLoop(loopId: string): Promise<void> {
   return invoke<void>("pause_ralph_loop", { loopId });
+}
+
+export async function killRalphLoop(loopId: string): Promise<void> {
+  return invoke<void>("kill_ralph_loop", { loopId });
 }
 
 export async function listRalphLoops(projectId: string): Promise<RalphLoop[]> {

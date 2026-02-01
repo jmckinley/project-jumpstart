@@ -14,7 +14,9 @@
 //!
 //! EXPORTS:
 //! - scan_project - Scan a directory and return detection results
-//! - save_project - Save a fully configured project to the database (also auto-adds Skeptical Reviewer agent)
+//! - save_project - Save a fully configured project to the database (also auto-adds Skeptical Reviewer agent and git hooks)
+//! - check_git_installed - Check if git is available on the system
+//! - install_git - Trigger OS-appropriate git installation (xcode-select on macOS)
 //!
 //! PATTERNS:
 //! - scan_project is called when a user selects a folder
@@ -23,7 +25,10 @@
 //!
 //! CLAUDE NOTES:
 //! - scan_project does NOT modify any files or database
-//! - save_project creates the database record and auto-adds the Skeptical Reviewer agent
+//! - save_project creates the database record, auto-adds Skeptical Reviewer, and installs git hooks if setup_enforcement is true
+//! - If setup_enforcement is true but no .git exists, git is auto-initialized first (great for new projects)
+//! - Git hooks use "auto-update" mode (generates docs automatically at commit time)
+//! - API key is mandatory, so auto-update hooks always work
 //! - See spec Part 2 for the full onboarding flow
 //! - Skeptical Reviewer is auto-added to help catch issues in every new project
 
@@ -31,6 +36,7 @@ use chrono::Utc;
 use tauri::State;
 use uuid::Uuid;
 
+use crate::commands::enforcement::install_git_hooks_internal;
 use crate::core::scanner;
 use crate::db::{self, AppState};
 use crate::models::project::{DetectionResult, Project, ProjectSetup};
@@ -97,6 +103,55 @@ pub async fn save_project(
 
     // Auto-add the Skeptical Reviewer agent to new projects
     let _ = add_default_agents(&db, &id);
+
+    // Auto-install git hooks if setup_enforcement is enabled (one-click setup!)
+    // Uses "auto-update" mode - automatically generates docs for undocumented files at commit
+    // API key is required, so auto-update will always work
+    if setup.setup_enforcement {
+        // First, check if git is installed
+        let git_available = std::process::Command::new("git")
+            .args(["--version"])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+
+        if !git_available {
+            return Err(
+                "GIT_NOT_INSTALLED: Git is not installed on your system."
+                    .to_string(),
+            );
+        }
+
+        // Initialize git if not already a repo (common for new projects)
+        let git_dir = std::path::Path::new(&project.path).join(".git");
+        if !git_dir.exists() {
+            match std::process::Command::new("git")
+                .args(["init"])
+                .current_dir(&project.path)
+                .output()
+            {
+                Ok(output) if output.status.success() => {
+                    let _ = db::log_activity_db(&db, &id, "enforcement", "Auto-initialized git repository");
+                }
+                Ok(output) => {
+                    eprintln!("git init failed: {}", String::from_utf8_lossy(&output.stderr));
+                }
+                Err(e) => {
+                    eprintln!("Failed to run git init: {}", e);
+                }
+            }
+        }
+
+        // Install auto-update hooks (API key is mandatory, so this will work)
+        match install_git_hooks_internal(&project.path, "auto-update", Some(&db)) {
+            Ok(()) => {
+                let _ = db::log_activity_db(&db, &id, "enforcement", "Auto-installed git hooks (auto-update)");
+            }
+            Err(e) => {
+                eprintln!("Failed to install git hooks: {}", e);
+            }
+        }
+    }
 
     Ok(project)
 }
@@ -173,4 +228,74 @@ For each issue found:
     let _ = db::log_activity_db(db, project_id, "generate", "Auto-added Skeptical Reviewer agent");
 
     Ok(())
+}
+
+/// Check if git is installed and available on the system.
+#[tauri::command]
+pub async fn check_git_installed() -> Result<bool, String> {
+    let result = std::process::Command::new("git")
+        .args(["--version"])
+        .output();
+
+    Ok(result.map(|o| o.status.success()).unwrap_or(false))
+}
+
+/// Trigger OS-appropriate git installation.
+/// On macOS: opens xcode-select dialog
+/// On other platforms: opens git download page in browser
+#[tauri::command]
+pub async fn install_git() -> Result<String, String> {
+    #[cfg(target_os = "macos")]
+    {
+        // On macOS, xcode-select --install opens a native dialog
+        let result = std::process::Command::new("xcode-select")
+            .args(["--install"])
+            .spawn();
+
+        match result {
+            Ok(_) => Ok("Git installation started. Please complete the Xcode Command Line Tools installation dialog, then try again.".to_string()),
+            Err(e) => Err(format!("Failed to start git installation: {}", e)),
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // On Windows, open the git download page
+        let _ = std::process::Command::new("cmd")
+            .args(["/C", "start", "https://git-scm.com/download/win"])
+            .spawn();
+        Ok("Opening Git download page. Please install Git, then try again.".to_string())
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // On Linux, try common package managers
+        let apt = std::process::Command::new("which").arg("apt").output();
+        let dnf = std::process::Command::new("which").arg("dnf").output();
+
+        if apt.map(|o| o.status.success()).unwrap_or(false) {
+            // Debian/Ubuntu - open terminal with install command
+            let _ = std::process::Command::new("x-terminal-emulator")
+                .args(["-e", "sudo apt install git"])
+                .spawn();
+            Ok("Opening terminal to install Git. Please enter your password to continue.".to_string())
+        } else if dnf.map(|o| o.status.success()).unwrap_or(false) {
+            // Fedora
+            let _ = std::process::Command::new("gnome-terminal")
+                .args(["--", "sudo", "dnf", "install", "git"])
+                .spawn();
+            Ok("Opening terminal to install Git. Please enter your password to continue.".to_string())
+        } else {
+            // Fallback: open download page
+            let _ = std::process::Command::new("xdg-open")
+                .arg("https://git-scm.com/download/linux")
+                .spawn();
+            Ok("Opening Git download page. Please install Git, then try again.".to_string())
+        }
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    {
+        Err("Automatic Git installation is not supported on this platform. Please install Git manually from https://git-scm.com/downloads".to_string())
+    }
 }

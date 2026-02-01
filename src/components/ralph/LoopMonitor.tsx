@@ -33,6 +33,7 @@ interface LoopMonitorProps {
   loops: RalphLoop[];
   loading: boolean;
   onPause: (loopId: string) => void;
+  onKill: (loopId: string) => void;
   onRefresh: () => void;
 }
 
@@ -68,9 +69,11 @@ function formatRelativeTime(isoString: string): string {
 function LoopCard({
   loop,
   onPause,
+  onKill,
 }: {
   loop: RalphLoop;
   onPause: (id: string) => void;
+  onKill: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const status = getStatusBadge(loop.status);
@@ -113,12 +116,20 @@ function LoopCard({
             {formatRelativeTime(loop.createdAt)}
           </span>
           {loop.status === "running" && (
-            <button
-              onClick={() => onPause(loop.id)}
-              className="rounded px-2 py-1 text-xs font-medium text-yellow-400 transition-colors hover:bg-yellow-950"
-            >
-              Pause
-            </button>
+            <div className="flex gap-1">
+              <button
+                onClick={() => onPause(loop.id)}
+                className="rounded px-2 py-1 text-xs font-medium text-yellow-400 transition-colors hover:bg-yellow-950"
+              >
+                Pause
+              </button>
+              <button
+                onClick={() => onKill(loop.id)}
+                className="rounded px-2 py-1 text-xs font-medium text-red-400 transition-colors hover:bg-red-950"
+              >
+                Kill
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -126,7 +137,7 @@ function LoopCard({
   );
 }
 
-export function LoopMonitor({ loops, loading, onPause, onRefresh }: LoopMonitorProps) {
+export function LoopMonitor({ loops, loading, onPause, onKill, onRefresh }: LoopMonitorProps) {
   const activeLoops = loops.filter((l) => l.status === "running");
   const recentLoops = loops.filter((l) => l.status !== "running");
 
@@ -156,7 +167,7 @@ export function LoopMonitor({ loops, loading, onPause, onRefresh }: LoopMonitorP
             Active ({activeLoops.length})
           </h4>
           {activeLoops.map((loop) => (
-            <LoopCard key={loop.id} loop={loop} onPause={onPause} />
+            <LoopCard key={loop.id} loop={loop} onPause={onPause} onKill={onKill} />
           ))}
         </div>
       )}
@@ -168,7 +179,7 @@ export function LoopMonitor({ loops, loading, onPause, onRefresh }: LoopMonitorP
             Recent ({recentLoops.length})
           </h4>
           {recentLoops.map((loop) => (
-            <LoopCard key={loop.id} loop={loop} onPause={onPause} />
+            <LoopCard key={loop.id} loop={loop} onPause={onPause} onKill={onKill} />
           ))}
         </div>
       )}

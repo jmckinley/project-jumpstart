@@ -11,7 +11,7 @@
  *
  * DEPENDENCIES:
  * - @/stores/onboardingStore - useOnboardingStore for all wizard state
- * - @/lib/tauri - saveProject() to persist the project configuration
+ * - @/lib/tauri - saveProject() to persist, installGit() for one-click git install
  * - @/types/project - Project, ProjectSetup types; GOALS constant for label lookup
  *
  * EXPORTS:
@@ -30,11 +30,13 @@
  * - path comes from projectPath in the store
  * - onComplete receives the created Project object (with id, healthScore, createdAt from backend)
  * - Always reset generating state in finally block
+ * - If Git is not installed, shows one-click install button (xcode-select on macOS)
+ * - GIT_NOT_INSTALLED: error prefix triggers the Git install UI
  */
 
 import { useState } from "react";
 import { useOnboardingStore } from "@/stores/onboardingStore";
-import { saveProject } from "@/lib/tauri";
+import { saveProject, installGit } from "@/lib/tauri";
 import type { Project, ProjectSetup } from "@/types/project";
 import { GOALS } from "@/types/project";
 
@@ -76,15 +78,33 @@ export function ReviewGenerate({ onComplete }: ReviewGenerateProps) {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [gitMissing, setGitMissing] = useState(false);
+  const [installingGit, setInstallingGit] = useState(false);
+  const [gitInstallMessage, setGitInstallMessage] = useState<string | null>(null);
 
   const selectedGoalLabels = GOALS.filter((g) => goals.includes(g.id)).map(
     (g) => g.label
   );
 
+  const handleInstallGit = async () => {
+    setInstallingGit(true);
+    setError(null);
+    try {
+      const message = await installGit();
+      setGitInstallMessage(message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to install Git");
+    } finally {
+      setInstallingGit(false);
+    }
+  };
+
   const handleCreate = async () => {
     if (!projectPath || !projectName || !language) return;
 
     setError(null);
+    setGitMissing(false);
+    setGitInstallMessage(null);
     setSaving(true);
 
     try {
@@ -107,9 +127,12 @@ export function ReviewGenerate({ onComplete }: ReviewGenerateProps) {
       const project = await saveProject(setup);
       onComplete(project);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to create project"
-      );
+      const message = err instanceof Error ? err.message : "Failed to create project";
+      if (message.startsWith("GIT_NOT_INSTALLED:")) {
+        setGitMissing(true);
+      } else {
+        setError(message);
+      }
     } finally {
       setSaving(false);
     }
@@ -233,6 +256,54 @@ export function ReviewGenerate({ onComplete }: ReviewGenerateProps) {
           )}
         </ul>
       </div>
+
+      {/* Git Not Installed State */}
+      {gitMissing && (
+        <div className="mb-4 rounded-lg border border-yellow-800/50 bg-yellow-900/20 p-4">
+          <div className="flex items-start gap-3">
+            <svg
+              className="h-5 w-5 shrink-0 text-yellow-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+            <div className="flex-1">
+              <h4 className="text-sm font-medium text-yellow-400">Git is not installed</h4>
+              <p className="mt-1 text-sm text-yellow-200/70">
+                Git is required for documentation enforcement. Click below to install it.
+              </p>
+              {gitInstallMessage && (
+                <p className="mt-2 rounded bg-yellow-900/30 p-2 text-xs text-yellow-300">
+                  {gitInstallMessage}
+                </p>
+              )}
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={handleInstallGit}
+                  disabled={installingGit}
+                  className="rounded-md bg-yellow-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-yellow-500 disabled:opacity-50"
+                >
+                  {installingGit ? "Installing..." : "Install Git"}
+                </button>
+                <button
+                  onClick={handleCreate}
+                  disabled={saving}
+                  className="rounded-md border border-yellow-600 px-3 py-1.5 text-sm font-medium text-yellow-400 transition-colors hover:bg-yellow-900/30"
+                >
+                  Try Again
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error State */}
       {error && (

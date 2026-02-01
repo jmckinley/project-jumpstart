@@ -44,11 +44,11 @@ use commands::claude_md::{generate_claude_md, get_health_score, read_claude_md, 
 use commands::context::{create_checkpoint, get_context_health, get_mcp_status, list_checkpoints};
 use commands::freshness::{check_freshness, get_stale_files};
 use commands::modules::{apply_module_doc, batch_generate_docs, generate_module_doc, scan_modules};
-use commands::onboarding::{save_project, scan_project};
+use commands::onboarding::{check_git_installed, install_git, save_project, scan_project};
 use commands::project::{get_project, list_projects, remove_project};
 use commands::ralph::{
-    analyze_ralph_prompt, analyze_ralph_prompt_with_ai, list_ralph_loops, pause_ralph_loop, start_ralph_loop,
-    get_ralph_context, record_ralph_mistake, update_claude_md_with_pattern,
+    analyze_ralph_prompt, analyze_ralph_prompt_with_ai, kill_ralph_loop, list_ralph_loops,
+    pause_ralph_loop, start_ralph_loop, get_ralph_context, record_ralph_mistake, update_claude_md_with_pattern,
 };
 use commands::enforcement::{
     get_ci_snippets, get_enforcement_events, get_hook_status, install_git_hooks,
@@ -80,6 +80,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             scan_project,
             save_project,
+            check_git_installed,
+            install_git,
             list_projects,
             get_project,
             remove_project,
@@ -109,6 +111,7 @@ pub fn run() {
             analyze_ralph_prompt_with_ai,
             start_ralph_loop,
             pause_ralph_loop,
+            kill_ralph_loop,
             list_ralph_loops,
             get_ralph_context,
             record_ralph_mistake,

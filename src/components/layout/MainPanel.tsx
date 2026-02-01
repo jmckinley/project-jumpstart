@@ -741,6 +741,7 @@ function RalphView({ onLoopStarted }: { onLoopStarted?: () => void }) {
     analyzePrompt,
     startLoop,
     pauseLoop,
+    killLoop,
     loadLoops,
     loadContext,
     clearAnalysis,
@@ -749,6 +750,13 @@ function RalphView({ onLoopStarted }: { onLoopStarted?: () => void }) {
   useEffect(() => {
     loadLoops();
     loadContext();
+
+    // Poll for loop updates every 5 seconds while on RALPH tab
+    const interval = setInterval(() => {
+      loadLoops();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [loadLoops, loadContext]);
 
   const handleStartLoop = useCallback(
@@ -788,6 +796,7 @@ function RalphView({ onLoopStarted }: { onLoopStarted?: () => void }) {
         loops={loops}
         loading={loading}
         onPause={pauseLoop}
+        onKill={killLoop}
         onRefresh={loadLoops}
       />
     </div>
