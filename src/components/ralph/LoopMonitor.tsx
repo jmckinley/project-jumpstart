@@ -112,7 +112,7 @@ function LoopCard({
   onResume: (id: string) => void;
   onKill: (id: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const status = getStatusBadge(loop.status);
   const promptPreview =
     loop.prompt.length > 80 ? loop.prompt.slice(0, 80) + "..." : loop.prompt;
