@@ -7,12 +7,14 @@
  * - Analyze prompt quality before starting loops (with optional AI enhancement)
  * - Start and pause RALPH loops
  * - Track loop history for the active project
+ * - Load project context (CLAUDE.md, recent mistakes, patterns) for enhanced analysis
+ * - Record mistakes for learning and pattern extraction
  *
  * DEPENDENCIES:
- * - @/lib/tauri - analyzeRalphPrompt, analyzeRalphPromptWithAi, startRalphLoop, pauseRalphLoop, listRalphLoops IPC calls
+ * - @/lib/tauri - analyzeRalphPrompt, analyzeRalphPromptWithAi, startRalphLoop, pauseRalphLoop, listRalphLoops, getRalphContext, recordRalphMistake, updateClaudeMdWithPattern IPC calls
  * - @/stores/projectStore - Active project for scoping loops
  * - @/stores/settingsStore - hasApiKey to determine if AI analysis is available
- * - @/types/ralph - RalphLoop, PromptAnalysis types
+ * - @/types/ralph - RalphLoop, PromptAnalysis, RalphLoopContext, RalphMistake types
  *
  * EXPORTS:
  * - useRalph - Hook returning RALPH state and actions
@@ -23,7 +25,10 @@
  * - Call startLoop() to begin a RALPH loop (requires analysis first)
  * - Call pauseLoop() to pause an active loop
  * - Call loadLoops() to refresh loop history
- * - Returns { loops, analysis, analyzing, loading, error, analyzePrompt, startLoop, pauseLoop, loadLoops, clearAnalysis }
+ * - Call loadContext() to fetch CLAUDE.md + mistakes before analysis
+ * - Call recordMistake() to record a new mistake for learning
+ * - Call learnPattern() to add a pattern to CLAUDE.md
+ * - Returns { loops, analysis, context, analyzing, loading, error, analyzePrompt, startLoop, pauseLoop, loadLoops, loadContext, recordMistake, learnPattern, clearAnalysis }
  *
  * CLAUDE NOTES:
  * - analyzePrompt sets the analysis state for display in PromptAnalyzer
@@ -31,6 +36,8 @@
  * - startLoop uses the last analysis result's enhanced prompt if available
  * - Loops are scoped to the active project
  * - clearAnalysis resets the analysis state for fresh prompt entry
+ * - Context includes CLAUDE.md summary and recent mistakes for learning
+ * - recordMistake stores mistakes in DB with auto-pruning (max 50 per project)
  */
 
 import { useCallback, useState } from "react";
@@ -43,12 +50,16 @@ import {
   pauseRalphLoop,
   listRalphLoops,
   scanModules,
+  getRalphContext,
+  recordRalphMistake,
+  updateClaudeMdWithPattern,
 } from "@/lib/tauri";
-import type { RalphLoop, PromptAnalysis } from "@/types/ralph";
+import type { RalphLoop, PromptAnalysis, RalphLoopContext, RalphMistake } from "@/types/ralph";
 
 interface RalphState {
   loops: RalphLoop[];
   analysis: PromptAnalysis | null;
+  context: RalphLoopContext | null;
   analyzing: boolean;
   loading: boolean;
   error: string | null;
@@ -61,6 +72,7 @@ export function useRalph() {
   const [state, setState] = useState<RalphState>({
     loops: [],
     analysis: null,
+    context: null,
     analyzing: false,
     loading: false,
     error: null,
@@ -78,6 +90,23 @@ export function useRalph() {
         loading: false,
         error: err instanceof Error ? err.message : "Failed to load loops",
       }));
+    }
+  }, [activeProject]);
+
+  /**
+   * Load RALPH context including CLAUDE.md summary, recent mistakes, and project patterns.
+   * Call this before analyzePrompt for context-aware analysis.
+   */
+  const loadContext = useCallback(async () => {
+    if (!activeProject) return null;
+    try {
+      const context = await getRalphContext(activeProject.id, activeProject.path);
+      setState((s) => ({ ...s, context }));
+      return context;
+    } catch (err) {
+      // Context loading failures are non-critical, continue without context
+      console.warn("Failed to load RALPH context:", err);
+      return null;
     }
   }, [activeProject]);
 
@@ -179,12 +208,75 @@ export function useRalph() {
     setState((s) => ({ ...s, analysis: null }));
   }, []);
 
+  /**
+   * Record a mistake from a RALPH loop for learning.
+   * Mistakes are stored in the database and can be used to enhance future analyses.
+   */
+  const recordMistake = useCallback(
+    async (
+      loopId: string | null,
+      mistakeType: RalphMistake["mistakeType"],
+      description: string,
+      context?: string,
+      resolution?: string,
+    ): Promise<RalphMistake | null> => {
+      if (!activeProject) return null;
+      try {
+        const mistake = await recordRalphMistake(
+          activeProject.id,
+          loopId,
+          mistakeType,
+          description,
+          context ?? null,
+          resolution ?? null,
+          null, // learnedPattern can be added later
+        );
+        // Refresh context to include the new mistake
+        await loadContext();
+        return mistake;
+      } catch (err) {
+        setState((s) => ({
+          ...s,
+          error: err instanceof Error ? err.message : "Failed to record mistake",
+        }));
+        return null;
+      }
+    },
+    [activeProject, loadContext],
+  );
+
+  /**
+   * Learn a pattern by adding it to CLAUDE.md's CLAUDE NOTES section.
+   * This makes the pattern persist across sessions.
+   */
+  const learnPattern = useCallback(
+    async (pattern: string): Promise<boolean> => {
+      if (!activeProject) return false;
+      try {
+        await updateClaudeMdWithPattern(activeProject.path, pattern);
+        // Refresh context to include the new pattern
+        await loadContext();
+        return true;
+      } catch (err) {
+        setState((s) => ({
+          ...s,
+          error: err instanceof Error ? err.message : "Failed to learn pattern",
+        }));
+        return false;
+      }
+    },
+    [activeProject, loadContext],
+  );
+
   return {
     ...state,
     loadLoops,
+    loadContext,
     analyzePrompt,
     startLoop,
     pauseLoop,
     clearAnalysis,
+    recordMistake,
+    learnPattern,
   };
 }

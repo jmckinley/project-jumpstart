@@ -22,6 +22,9 @@
 //! - start_ralph_loop - Create a new RALPH loop record
 //! - pause_ralph_loop - Pause an active loop
 //! - list_ralph_loops - Get loops for a project
+//! - get_ralph_context - Get CLAUDE.md summary, recent mistakes, and project patterns
+//! - record_ralph_mistake - Record a mistake from a RALPH loop for learning
+//! - update_claude_md_with_pattern - Append learned pattern to CLAUDE.md CLAUDE NOTES section
 //!
 //! PATTERNS:
 //! - analyze_ralph_prompt uses fast heuristics for immediate feedback
@@ -36,13 +39,18 @@
 //! - Heuristic analysis is instant; AI analysis takes 2-5 seconds
 //! - AI enhancement provides project-aware suggestions when context is provided
 //! - Safety settings control loop boundaries
+//! - get_ralph_context reads CLAUDE.md from project path and fetches recent mistakes from DB
+//! - update_claude_md_with_pattern appends to CLAUDE NOTES section in CLAUDE.md file
 
 use chrono::Utc;
 use tauri::State;
 
+use std::fs;
+use std::path::Path;
+
 use crate::core::ai;
 use crate::db::{self, AppState};
-use crate::models::ralph::{PromptAnalysis, PromptCriterion, RalphLoop};
+use crate::models::ralph::{PromptAnalysis, PromptCriterion, RalphLoop, RalphMistake, RalphLoopContext};
 
 /// Analyze a prompt's quality for use in a RALPH loop.
 /// Scores clarity, specificity, context, and scope (0-25 each, 0-100 total).
@@ -585,6 +593,227 @@ fn generate_enhanced_prompt(original: &str) -> String {
         After completing changes, verify everything works and document what was done.",
         original
     )
+}
+
+/// Get RALPH loop context including CLAUDE.md summary, recent mistakes, and project patterns.
+/// Used to enhance AI prompt analysis with project-specific learning.
+#[tauri::command]
+pub async fn get_ralph_context(
+    project_id: String,
+    project_path: String,
+    state: State<'_, AppState>,
+) -> Result<RalphLoopContext, String> {
+    // Read CLAUDE.md summary
+    let claude_md_path = Path::new(&project_path).join("CLAUDE.md");
+    let claude_md_summary = if claude_md_path.exists() {
+        let content = fs::read_to_string(&claude_md_path)
+            .map_err(|e| format!("Failed to read CLAUDE.md: {}", e))?;
+        // Extract first 500 chars or up to first ## section as summary
+        let summary = content
+            .lines()
+            .take(20)
+            .collect::<Vec<_>>()
+            .join("\n");
+        if summary.len() > 500 {
+            format!("{}...", &summary[..500])
+        } else {
+            summary
+        }
+    } else {
+        "No CLAUDE.md found".to_string()
+    };
+
+    // Get recent mistakes from DB
+    let db = state.db.lock().map_err(|e| format!("DB lock error: {}", e))?;
+    let mut stmt = db
+        .prepare(
+            "SELECT id, project_id, loop_id, mistake_type, description, context, resolution, learned_pattern, created_at
+             FROM ralph_mistakes
+             WHERE project_id = ?1
+             ORDER BY created_at DESC
+             LIMIT 10",
+        )
+        .map_err(|e| format!("Failed to query mistakes: {}", e))?;
+
+    let recent_mistakes: Vec<RalphMistake> = stmt
+        .query_map(rusqlite::params![project_id], |row| {
+            Ok(RalphMistake {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                loop_id: row.get(2)?,
+                mistake_type: row.get(3)?,
+                description: row.get(4)?,
+                context: row.get(5)?,
+                resolution: row.get(6)?,
+                learned_pattern: row.get(7)?,
+                created_at: row.get(8)?,
+            })
+        })
+        .map_err(|e| format!("Failed to read mistakes: {}", e))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    // Extract project patterns from CLAUDE NOTES section
+    let project_patterns = if claude_md_path.exists() {
+        let content = fs::read_to_string(&claude_md_path).unwrap_or_default();
+        extract_claude_notes_patterns(&content)
+    } else {
+        Vec::new()
+    };
+
+    Ok(RalphLoopContext {
+        claude_md_summary,
+        recent_mistakes,
+        project_patterns,
+    })
+}
+
+/// Extract patterns from the CLAUDE NOTES section of CLAUDE.md
+fn extract_claude_notes_patterns(content: &str) -> Vec<String> {
+    let mut patterns = Vec::new();
+    let mut in_claude_notes = false;
+
+    for line in content.lines() {
+        if line.starts_with("## CLAUDE NOTES") || line.starts_with("### CLAUDE NOTES") {
+            in_claude_notes = true;
+            continue;
+        }
+        if in_claude_notes {
+            // Stop at next section
+            if line.starts_with("## ") || line.starts_with("### ") {
+                break;
+            }
+            // Extract bullet points
+            let trimmed = line.trim();
+            if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
+                patterns.push(trimmed[2..].to_string());
+            }
+        }
+    }
+
+    patterns
+}
+
+/// Maximum number of mistakes to keep per project (prevents DB bloat)
+const MAX_MISTAKES_PER_PROJECT: i64 = 50;
+
+/// Record a mistake from a RALPH loop for future learning.
+/// Automatically prunes old mistakes to keep only the most recent 50 per project.
+#[tauri::command]
+pub async fn record_ralph_mistake(
+    project_id: String,
+    loop_id: Option<String>,
+    mistake_type: String,
+    description: String,
+    context: Option<String>,
+    resolution: Option<String>,
+    learned_pattern: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<RalphMistake, String> {
+    let db = state.db.lock().map_err(|e| format!("DB lock error: {}", e))?;
+    let id = uuid::Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+
+    db.execute(
+        "INSERT INTO ralph_mistakes (id, project_id, loop_id, mistake_type, description, context, resolution, learned_pattern, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        rusqlite::params![id, project_id, loop_id, mistake_type, description, context, resolution, learned_pattern, now],
+    )
+    .map_err(|e| format!("Failed to record mistake: {}", e))?;
+
+    // Prune old mistakes to prevent DB bloat (keep only the most recent N per project)
+    let _ = db.execute(
+        "DELETE FROM ralph_mistakes WHERE project_id = ?1 AND id NOT IN (
+            SELECT id FROM ralph_mistakes WHERE project_id = ?1 ORDER BY created_at DESC LIMIT ?2
+        )",
+        rusqlite::params![project_id, MAX_MISTAKES_PER_PROJECT],
+    );
+
+    // Log activity
+    let _ = db::log_activity_db(&db, &project_id, "learn", &format!("Recorded RALPH mistake: {}", &description));
+
+    Ok(RalphMistake {
+        id,
+        project_id,
+        loop_id,
+        mistake_type,
+        description,
+        context,
+        resolution,
+        learned_pattern,
+        created_at: now,
+    })
+}
+
+/// Append a learned pattern to the CLAUDE NOTES section of CLAUDE.md.
+#[tauri::command]
+pub async fn update_claude_md_with_pattern(
+    project_path: String,
+    pattern: String,
+) -> Result<(), String> {
+    let claude_md_path = Path::new(&project_path).join("CLAUDE.md");
+
+    if !claude_md_path.exists() {
+        return Err("CLAUDE.md does not exist in project".to_string());
+    }
+
+    let content = fs::read_to_string(&claude_md_path)
+        .map_err(|e| format!("Failed to read CLAUDE.md: {}", e))?;
+
+    // Find CLAUDE NOTES section and append pattern
+    let updated_content = append_pattern_to_claude_notes(&content, &pattern);
+
+    fs::write(&claude_md_path, updated_content)
+        .map_err(|e| format!("Failed to write CLAUDE.md: {}", e))?;
+
+    Ok(())
+}
+
+/// Append a pattern to the CLAUDE NOTES section, creating it if necessary.
+fn append_pattern_to_claude_notes(content: &str, pattern: &str) -> String {
+    let lines: Vec<&str> = content.lines().collect();
+    let mut result = Vec::new();
+    let mut found_claude_notes = false;
+    let mut inserted = false;
+
+    for (i, line) in lines.iter().enumerate() {
+        result.push(line.to_string());
+
+        // Check if this is the CLAUDE NOTES section header
+        if line.starts_with("## CLAUDE NOTES") || line.starts_with("### CLAUDE NOTES") {
+            found_claude_notes = true;
+            continue;
+        }
+
+        // If we're in CLAUDE NOTES and hit the next section or end, insert before
+        if found_claude_notes && !inserted {
+            let is_next_section = line.starts_with("## ") || line.starts_with("### ");
+            let is_last_line = i == lines.len() - 1;
+
+            if is_next_section {
+                // Insert before this section header
+                result.pop(); // Remove the section header we just added
+                result.push(format!("- {} (learned from RALPH loop)", pattern));
+                result.push(String::new());
+                result.push(line.to_string()); // Re-add the section header
+                inserted = true;
+            } else if is_last_line {
+                // Append at end
+                result.push(format!("- {} (learned from RALPH loop)", pattern));
+                inserted = true;
+            }
+        }
+    }
+
+    // If CLAUDE NOTES wasn't found, append a new section
+    if !found_claude_notes {
+        result.push(String::new());
+        result.push("## CLAUDE NOTES".to_string());
+        result.push(String::new());
+        result.push(format!("- {} (learned from RALPH loop)", pattern));
+    }
+
+    result.join("\n")
 }
 
 #[cfg(test)]

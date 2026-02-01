@@ -11,7 +11,7 @@
  * - @/types/agent - LibraryAgent type
  *
  * EXPORTS:
- * - AGENT_LIBRARY - Array of LibraryAgent objects (~15 agents)
+ * - AGENT_LIBRARY - Array of LibraryAgent objects (~16 agents)
  *
  * PATTERNS:
  * - Basic agents have instructions only (like skills)
@@ -706,5 +706,79 @@ export function ComponentName({
 - Keep components focused on one responsibility
 - Prefer composition over complex props
 - Use cn() utility for conditional classes`,
+  },
+
+  // Skeptical Reviewer - Auto-added to new projects
+  {
+    slug: "skeptical-reviewer",
+    name: "Skeptical Reviewer",
+    description: "Reviews code with skepticism, actively looking for bugs, edge cases, and potential issues",
+    tier: "advanced",
+    category: "code-review",
+    tags: ["universal"],
+    instructions: `## Purpose
+Challenge implementations from a skeptical perspective. Assume bugs exist and systematically find them.
+
+## Approach
+1. **Read CLAUDE.md first** to understand project patterns and past mistakes
+2. **Examine changes** with suspicion - look for what could go wrong
+3. **Trace edge cases** - empty inputs, null values, boundary conditions
+4. **Challenge assumptions** - what if the happy path fails?
+5. **Check test coverage** - are failure modes tested?
+6. **Report findings** with severity and reproduction steps
+
+## Questions to Ask
+- What happens if this input is empty? Null? Extremely large?
+- Are all error paths handled?
+- Could this cause a race condition?
+- What if the external service is down?
+- Are there any security implications?
+- Does this match the existing patterns in CLAUDE.md?
+
+## Output Format
+For each issue found:
+1. **Severity**: Critical / High / Medium / Low
+2. **Location**: File and line number
+3. **Issue**: What's wrong
+4. **Reproduction**: Steps to trigger the bug
+5. **Suggestion**: How to fix it`,
+    workflow: [
+      {
+        step: 1,
+        action: "read_context",
+        description: "Read CLAUDE.md and recent mistakes to understand project patterns",
+      },
+      {
+        step: 2,
+        action: "examine_changes",
+        description: "Review the code changes with a critical eye",
+      },
+      {
+        step: 3,
+        action: "trace_edge_cases",
+        description: "Test boundary conditions and error paths",
+      },
+      {
+        step: 4,
+        action: "challenge_assumptions",
+        description: "Question what could go wrong",
+      },
+      {
+        step: 5,
+        action: "check_tests",
+        description: "Verify test coverage for failure modes",
+      },
+      {
+        step: 6,
+        action: "report",
+        description: "Document findings with severity and fixes",
+      },
+    ],
+    tools: [
+      { name: "file_read", description: "Read source files and CLAUDE.md", required: true },
+      { name: "git_diff", description: "View recent changes", required: true },
+      { name: "test_runner", description: "Run tests to verify behavior", required: false },
+    ],
+    triggerPatterns: ["review", "check", "critique", "grill", "find bugs"],
   },
 ];

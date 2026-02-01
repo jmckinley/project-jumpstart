@@ -11,6 +11,8 @@
  * - RalphLoop - A RALPH loop execution record with status tracking
  * - PromptAnalysis - Quality analysis result with criteria breakdown and suggestions
  * - PromptCriterion - Individual quality criterion (clarity, specificity, context, scope)
+ * - RalphMistake - A recorded mistake from a RALPH loop for learning
+ * - RalphLoopContext - Context data (CLAUDE.md summary, mistakes, patterns) for enhanced analysis
  *
  * PATTERNS:
  * - Types mirror Rust structs in models/ralph.rs
@@ -21,6 +23,8 @@
  * - Keep in sync with Rust models in src-tauri/src/models/ralph.rs
  * - RALPH = Review, Analyze, List, Plan, Handoff
  * - Timestamps are ISO strings serialized by Tauri
+ * - RalphMistake.mistakeType: "implementation" | "logic" | "scope" | "testing" | "other"
+ * - RalphLoopContext is returned by getRalphContext for enhanced AI analysis
  */
 
 export interface RalphLoop {
@@ -50,4 +54,22 @@ export interface PromptCriterion {
   score: number;
   maxScore: number;
   feedback: string;
+}
+
+export interface RalphMistake {
+  id: string;
+  projectId: string;
+  loopId: string | null;
+  mistakeType: "implementation" | "logic" | "scope" | "testing" | "other";
+  description: string;
+  context: string | null;
+  resolution: string | null;
+  learnedPattern: string | null;
+  createdAt: string;
+}
+
+export interface RalphLoopContext {
+  claudeMdSummary: string;
+  recentMistakes: RalphMistake[];
+  projectPatterns: string[];
 }

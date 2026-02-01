@@ -58,6 +58,9 @@
  * - startRalphLoop - Start a new RALPH loop
  * - pauseRalphLoop - Pause an active RALPH loop
  * - listRalphLoops - List loops for a project
+ * - getRalphContext - Get CLAUDE.md summary, recent mistakes, and project patterns
+ * - recordRalphMistake - Record a mistake from a RALPH loop for learning
+ * - updateClaudeMdWithPattern - Append learned pattern to CLAUDE.md
  *
  * Context Health:
  * - getContextHealth - Get context health with token breakdown
@@ -108,7 +111,7 @@ import type { ClaudeMdInfo, DetectionResult, Project, ProjectSetup } from "@/typ
 import type { HealthScore, ContextHealth, McpServerStatus, Checkpoint } from "@/types/health";
 import type { ModuleStatus, ModuleDoc } from "@/types/module";
 import type { Skill, Pattern } from "@/types/skill";
-import type { RalphLoop, PromptAnalysis } from "@/types/ralph";
+import type { RalphLoop, PromptAnalysis, RalphMistake, RalphLoopContext } from "@/types/ralph";
 import type { EnforcementEvent, HookStatus, CiSnippet } from "@/types/enforcement";
 import type { Agent, AgentWorkflowStep, AgentTool } from "@/types/agent";
 import type { KickstartInput, KickstartPrompt, InferStackInput, InferredStack } from "@/types/kickstart";
@@ -262,6 +265,34 @@ export async function pauseRalphLoop(loopId: string): Promise<void> {
 
 export async function listRalphLoops(projectId: string): Promise<RalphLoop[]> {
   return invoke<RalphLoop[]>("list_ralph_loops", { projectId });
+}
+
+export async function getRalphContext(projectId: string, projectPath: string): Promise<RalphLoopContext> {
+  return invoke<RalphLoopContext>("get_ralph_context", { projectId, projectPath });
+}
+
+export async function recordRalphMistake(
+  projectId: string,
+  loopId: string | null,
+  mistakeType: string,
+  description: string,
+  context: string | null,
+  resolution: string | null,
+  learnedPattern: string | null,
+): Promise<RalphMistake> {
+  return invoke<RalphMistake>("record_ralph_mistake", {
+    projectId,
+    loopId,
+    mistakeType,
+    description,
+    context,
+    resolution,
+    learnedPattern,
+  });
+}
+
+export async function updateClaudeMdWithPattern(projectPath: string, pattern: string): Promise<void> {
+  return invoke<void>("update_claude_md_with_pattern", { projectPath, pattern });
 }
 
 export async function getContextHealth(projectPath: string): Promise<ContextHealth> {

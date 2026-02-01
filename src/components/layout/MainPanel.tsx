@@ -734,6 +734,7 @@ function RalphView({ onLoopStarted }: { onLoopStarted?: () => void }) {
   const {
     loops,
     analysis,
+    context,
     analyzing,
     loading,
     error,
@@ -741,12 +742,14 @@ function RalphView({ onLoopStarted }: { onLoopStarted?: () => void }) {
     startLoop,
     pauseLoop,
     loadLoops,
+    loadContext,
     clearAnalysis,
   } = useRalph();
 
   useEffect(() => {
     loadLoops();
-  }, [loadLoops]);
+    loadContext();
+  }, [loadLoops, loadContext]);
 
   const handleStartLoop = useCallback(
     async (prompt: string) => {
@@ -768,6 +771,7 @@ function RalphView({ onLoopStarted }: { onLoopStarted?: () => void }) {
         <div className="lg:col-span-2">
           <CommandCenter
             analysis={analysis}
+            context={context}
             analyzing={analyzing}
             loading={loading}
             onAnalyze={analyzePrompt}

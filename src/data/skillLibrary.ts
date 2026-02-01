@@ -11,7 +11,7 @@
  * - @/types/skill - LibrarySkill type
  *
  * EXPORTS:
- * - SKILL_LIBRARY - Array of LibrarySkill objects (~46 skills)
+ * - SKILL_LIBRARY - Array of LibrarySkill objects (~50 skills)
  *
  * PATTERNS:
  * - Each skill has markdown content with sections: When to use, Instructions, Template, Rules
@@ -4702,5 +4702,196 @@ await supabase.from('documents').insert({
 - Implement rate limiting on AI endpoints
 - Set max_tokens to control costs
 - Use system messages for behavior control`,
+  },
+
+  // Claude Code Best Practices - Prompting Patterns
+  {
+    slug: "grill-me-on-changes",
+    name: "Grill Me On Changes",
+    description: "Request aggressive review to catch issues before shipping",
+    category: "code-review",
+    tags: ["universal"],
+    content: `## When to use
+Use when you want Claude to aggressively review your changes to catch bugs, edge cases, and potential issues before they reach production. This is especially valuable before merging PRs or deploying.
+
+## Instructions
+After making changes, invoke this pattern to get a thorough, skeptical review:
+
+1. Present all your changes to Claude
+2. Ask Claude to assume bugs exist and find them
+3. Request Claude to challenge your assumptions
+4. Have Claude trace through edge cases systematically
+
+## Template
+\`\`\`
+I've made the following changes. Please grill me on them:
+
+[Paste your changes or describe what you modified]
+
+Assume there ARE bugs in this code and find them. Be skeptical. Check:
+- Edge cases (empty inputs, null values, boundary conditions)
+- Error handling (what if external services fail?)
+- Race conditions (concurrent access issues)
+- Security implications (injection, auth bypass)
+- Performance issues (N+1 queries, memory leaks)
+- Missing test coverage
+
+Don't be nice - I want to catch issues before users do.
+\`\`\`
+
+## Rules
+- Don't get defensive when Claude finds issues - that's the point
+- Fix issues Claude finds before moving on
+- Use this before every PR or major commit
+- Consider adding found issues to CLAUDE.md for future reference`,
+  },
+  {
+    slug: "prove-it-works",
+    name: "Prove It Works",
+    description: "Demand concrete evidence that changes function correctly",
+    category: "testing",
+    tags: ["universal"],
+    content: `## When to use
+Use when you need verification that changes actually work, not just that the code looks right. This pattern forces demonstration of correct behavior.
+
+## Instructions
+After Claude makes changes, demand proof:
+
+1. Ask for specific test cases that prove the change works
+2. Request edge case demonstrations
+3. Have Claude show the before/after behavior
+4. Verify error handling paths
+
+## Template
+\`\`\`
+You made changes to [describe what changed]. Now prove it works:
+
+1. Show me a test case that exercises the happy path
+2. Show me what happens with edge cases:
+   - Empty input
+   - Invalid input
+   - Boundary values
+3. Show me what happens when things fail:
+   - Network errors
+   - Invalid state
+   - Missing dependencies
+4. If this is a UI change, describe what the user sees
+
+Don't just tell me it works - demonstrate it.
+\`\`\`
+
+## Rules
+- Never accept "this should work" - demand evidence
+- Require actual test output, not theoretical explanations
+- If Claude can't prove it works, the change isn't done
+- Add regression tests for any bugs found`,
+  },
+  {
+    slug: "fresh-start-pattern",
+    name: "Fresh Start Pattern",
+    description: "Scrap accumulated context and restart when hitting walls",
+    category: "debugging",
+    tags: ["universal"],
+    content: `## When to use
+Use when you've been going in circles, Claude seems confused about the state of the code, or you've accumulated so much context that responses are degraded. This is the "context rot" escape hatch.
+
+## Instructions
+When you're stuck:
+
+1. Save any important discoveries to CLAUDE.md
+2. Start a completely fresh conversation
+3. Begin with minimal, precise context
+4. Don't pollute the new session with old assumptions
+
+## Template
+For ending the stuck session:
+\`\`\`
+Before we end this session, let me save what we learned:
+
+What's the root cause we identified? [Document in CLAUDE.md]
+What approaches did NOT work? [Document to avoid repeating]
+What's the current state of the code? [Note any partial changes]
+
+Now I'm going to start fresh with a new conversation.
+\`\`\`
+
+For starting the fresh session:
+\`\`\`
+Fresh start on [problem description].
+
+Context (minimal):
+- File: [specific file]
+- Issue: [one sentence description]
+- Constraint: [any hard requirements]
+
+Previous session learned:
+- [Key insight 1]
+- [Key insight 2]
+- [Approaches that didn't work]
+
+Let's solve this with fresh eyes.
+\`\`\`
+
+## Rules
+- Don't bring old conversation baggage into new sessions
+- Save learnings to CLAUDE.md so they persist across sessions
+- Keep new session context minimal and focused
+- It's OK to throw away progress that wasn't working`,
+  },
+  {
+    slug: "two-claude-review",
+    name: "Two-Claude Review",
+    description: "Use separate sessions for implementation and review",
+    category: "code-review",
+    tags: ["universal"],
+    content: `## When to use
+Use for important changes where you want independent review. A second Claude session without implementation context will catch different issues than the one that wrote the code.
+
+## Instructions
+Split implementation and review into separate sessions:
+
+1. Session A: Implement the feature/fix
+2. Session B (fresh): Review Session A's output
+3. Session A: Address Session B's feedback
+4. Repeat until Session B approves
+
+## Template
+For Session A (Implementation):
+\`\`\`
+[Normal implementation work]
+\`\`\`
+
+For Session B (Fresh Review Session):
+\`\`\`
+Please review this code change. You didn't write it - I'm asking for independent review.
+
+The change is meant to: [describe intent]
+
+Here's the diff/code:
+[paste changes]
+
+Review for:
+1. Does it actually achieve the stated goal?
+2. Are there bugs or edge cases missed?
+3. Is the approach appropriate for this codebase?
+4. Are there simpler ways to accomplish this?
+5. What's missing from the tests?
+
+Be critical - the author isn't in the room.
+\`\`\`
+
+Back to Session A:
+\`\`\`
+Independent review found these issues:
+[paste Session B feedback]
+
+Please address each one.
+\`\`\`
+
+## Rules
+- Don't share Session A's reasoning with Session B
+- Session B should review code at face value
+- Take Session B's feedback seriously - it has fresh perspective
+- Use for any change you'd want a human colleague to review`,
   },
 ];

@@ -9,9 +9,10 @@
  * - Allow starting RALPH loops from analyzed prompts
  * - Show auto-enhance option for low-quality prompts
  * - Provide example prompts for quick start
+ * - Display learned context from previous loops (mistakes and patterns)
  *
  * DEPENDENCIES:
- * - @/types/ralph - PromptAnalysis type
+ * - @/types/ralph - PromptAnalysis, RalphLoopContext types
  *
  * EXPORTS:
  * - CommandCenter - Prompt input with analysis and loop controls
@@ -22,6 +23,7 @@
  * - Auto-enhance replaces prompt text with RALPH-structured version
  * - Analysis results are shown below the input
  * - Example prompts help users understand good prompt structure
+ * - "Learned from Previous Loops" banner shows when context has mistakes
  *
  * CLAUDE NOTES:
  * - Check Prompt button is disabled while analyzing or when prompt is empty
@@ -29,10 +31,11 @@
  * - The prompt textarea is resizable and supports multiline input
  * - RALPH = Review, Analyze, List, Plan, Handoff
  * - Example prompts demonstrate specificity (files, functions, behavior)
+ * - Context banner only shows when there are recent mistakes to learn from
  */
 
 import { useState, useCallback } from "react";
-import type { PromptAnalysis } from "@/types/ralph";
+import type { PromptAnalysis, RalphLoopContext } from "@/types/ralph";
 
 const EXAMPLE_PROMPTS = [
   {
@@ -81,6 +84,7 @@ SUCCESS CRITERIA: Hook works identically but with automatic caching and backgrou
 
 interface CommandCenterProps {
   analysis: PromptAnalysis | null;
+  context: RalphLoopContext | null;
   analyzing: boolean;
   loading: boolean;
   onAnalyze: (prompt: string) => void;
@@ -90,6 +94,7 @@ interface CommandCenterProps {
 
 export function CommandCenter({
   analysis,
+  context,
   analyzing,
   loading,
   onAnalyze,
@@ -151,6 +156,45 @@ export function CommandCenter({
           </button>
         )}
       </div>
+
+      {/* Learned from Previous Loops Banner */}
+      {context && context.recentMistakes.length > 0 && (
+        <div className="rounded-md border border-yellow-800 bg-yellow-950/30 p-3">
+          <div className="flex items-center gap-2">
+            <svg
+              className="h-4 w-4 shrink-0 text-yellow-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <span className="text-sm font-medium text-yellow-400">
+              Learned from Previous Loops
+            </span>
+          </div>
+          <ul className="mt-2 space-y-1">
+            {context.recentMistakes.slice(0, 3).map((mistake) => (
+              <li key={mistake.id} className="text-xs text-yellow-500/80">
+                • {mistake.description}
+                {mistake.resolution && (
+                  <span className="text-yellow-600/60"> → {mistake.resolution}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+          {context.recentMistakes.length > 3 && (
+            <p className="mt-1 text-xs text-yellow-600/60">
+              +{context.recentMistakes.length - 3} more learned patterns
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Example Prompts */}
       <div className="flex flex-wrap items-center gap-2">

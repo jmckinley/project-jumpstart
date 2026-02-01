@@ -20,9 +20,10 @@
 //! CLAUDE NOTES:
 //! - Tables: projects, module_docs, freshness_history (Phase 5), skills, patterns, agents,
 //!   ralph_loops (Phase 7), checkpoints (Phase 8), enforcement_events (Phase 9), settings,
-//!   activities (Phase 10)
+//!   activities (Phase 10), ralph_mistakes (for learning from loop errors)
 //! - freshness_history stores per-file freshness snapshots for trend analysis
 //! - ralph_loops tracks RALPH loop execution with status (idle/running/paused/completed/failed)
+//! - ralph_mistakes stores mistakes and learned patterns for RALPH context enhancement
 //! - See spec Part 6.2 for full table definitions
 //! - Add new tables here and call in create_tables()
 //! - stack_extras column stores JSON for additional services (auth, hosting, payments, etc.)
@@ -173,6 +174,22 @@ pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
             created_at      TEXT NOT NULL,
             FOREIGN KEY (project_id) REFERENCES projects(id)
         );
+
+        CREATE TABLE IF NOT EXISTS ralph_mistakes (
+            id              TEXT PRIMARY KEY,
+            project_id      TEXT NOT NULL,
+            loop_id         TEXT,
+            mistake_type    TEXT NOT NULL DEFAULT 'implementation',
+            description     TEXT NOT NULL,
+            context         TEXT,
+            resolution      TEXT,
+            learned_pattern TEXT,
+            created_at      TEXT NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(id),
+            FOREIGN KEY (loop_id) REFERENCES ralph_loops(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_ralph_mistakes_project ON ralph_mistakes(project_id);
         ",
     )?;
 

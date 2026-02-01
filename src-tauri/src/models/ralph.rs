@@ -13,6 +13,8 @@
 //! - RalphLoop - A RALPH loop execution record
 //! - PromptAnalysis - Quality analysis result for a prompt
 //! - PromptCriterion - Individual scored criterion (clarity, specificity, context, scope)
+//! - RalphMistake - A recorded mistake from a RALPH loop for learning
+//! - RalphLoopContext - Context data (CLAUDE.md summary, mistakes, patterns) for enhanced analysis
 //!
 //! PATTERNS:
 //! - RalphLoop status: "idle" | "running" | "paused" | "completed" | "failed"
@@ -23,6 +25,8 @@
 //! - RALPH = Review, Analyze, List, Plan, Handoff
 //! - Keep in sync with TypeScript types in src/types/ralph.ts
 //! - Loop status transitions: idle -> running -> paused/completed/failed
+//! - RalphMistake.mistake_type: "implementation" | "logic" | "scope" | "testing" | "other"
+//! - RalphLoopContext is returned by get_ralph_context for enhanced AI analysis
 
 use serde::{Deserialize, Serialize};
 
@@ -59,4 +63,26 @@ pub struct PromptCriterion {
     pub score: u32,
     pub max_score: u32,
     pub feedback: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RalphMistake {
+    pub id: String,
+    pub project_id: String,
+    pub loop_id: Option<String>,
+    pub mistake_type: String,
+    pub description: String,
+    pub context: Option<String>,
+    pub resolution: Option<String>,
+    pub learned_pattern: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RalphLoopContext {
+    pub claude_md_summary: String,
+    pub recent_mistakes: Vec<RalphMistake>,
+    pub project_patterns: Vec<String>,
 }
