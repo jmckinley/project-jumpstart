@@ -27,7 +27,7 @@
  * - Framework dropdown options are filtered by the selected language
  * - All values read from and write to useOnboardingStore
  * - Confidence badge shows "Auto-detected (XX%)" when a detection result exists
- * - Stack templates are shown in a collapsible panel
+ * - Stack templates shown prominently above tech stack (expanded by default for new projects)
  * - Additional services are shown in a separate section below tech stack
  *
  * CLAUDE NOTES:
@@ -116,7 +116,10 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
 }
 
 export function AnalysisResults() {
-  const [templatesExpanded, setTemplatesExpanded] = useState(false);
+  // Show templates expanded by default if no detection results (new/empty project)
+  const detectionResult = useOnboardingStore((s) => s.detectionResult);
+  const isNewProject = !detectionResult?.language && !detectionResult?.framework;
+  const [templatesExpanded, setTemplatesExpanded] = useState(isNewProject);
 
   const projectName = useOnboardingStore((s) => s.projectName);
   const projectDescription = useOnboardingStore((s) => s.projectDescription);
@@ -127,7 +130,6 @@ export function AnalysisResults() {
   const testing = useOnboardingStore((s) => s.testing);
   const styling = useOnboardingStore((s) => s.styling);
   const stackExtras = useOnboardingStore((s) => s.stackExtras);
-  const detectionResult = useOnboardingStore((s) => s.detectionResult);
 
   const setProjectName = useOnboardingStore((s) => s.setProjectName);
   const setProjectDescription = useOnboardingStore(
@@ -234,6 +236,56 @@ export function AnalysisResults() {
             </select>
           </div>
         </div>
+      </div>
+
+      {/* Stack Templates Section - Prominent for new projects */}
+      <div className={`mb-6 rounded-lg border p-5 ${isNewProject ? 'border-blue-500/50 bg-blue-950/20' : 'border-neutral-800 bg-neutral-900'}`}>
+        <button
+          onClick={() => setTemplatesExpanded(!templatesExpanded)}
+          className="flex w-full items-center gap-3 text-left"
+        >
+          <div className={`rounded-lg p-2 ${isNewProject ? 'bg-blue-500/20' : 'bg-neutral-800'}`}>
+            <Sparkles className={`h-5 w-5 ${isNewProject ? 'text-blue-400' : 'text-neutral-400'}`} />
+          </div>
+          <div className="flex-1">
+            <h3 className={`text-sm font-semibold ${isNewProject ? 'text-blue-300' : 'text-neutral-300'}`}>
+              {isNewProject ? 'Quick Start Templates' : 'Use a Template'}
+            </h3>
+            <p className="text-xs text-neutral-500">
+              {isNewProject
+                ? '12 pre-configured stacks for common project types — saves setup time'
+                : 'Override current settings with a pre-configured stack'}
+            </p>
+          </div>
+          {templatesExpanded ? (
+            <ChevronUp className="h-5 w-5 text-neutral-400" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-neutral-400" />
+          )}
+        </button>
+
+        {templatesExpanded && (
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            {STACK_TEMPLATES.map((template) => {
+              const Icon = getTemplateIcon(template.icon);
+              return (
+                <button
+                  key={template.id}
+                  onClick={() => handleApplyTemplate(template)}
+                  className="flex items-start gap-3 rounded-lg border border-neutral-700 bg-neutral-800/50 p-3 text-left transition-colors hover:border-blue-500/50 hover:bg-neutral-800"
+                >
+                  <div className="rounded-md bg-neutral-700 p-2">
+                    <Icon className="h-4 w-4 text-blue-400" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-neutral-200">{template.name}</div>
+                    <div className="truncate text-xs text-neutral-500">{template.description}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Tech Stack Section */}
@@ -372,44 +424,6 @@ export function AnalysisResults() {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Stack Templates Section */}
-      <div className="mt-6">
-        <button
-          onClick={() => setTemplatesExpanded(!templatesExpanded)}
-          className="flex w-full items-center gap-2 rounded-lg border border-dashed border-neutral-700 bg-neutral-900/50 px-4 py-3 text-sm text-neutral-400 hover:border-blue-500/50 hover:text-neutral-300"
-        >
-          <Sparkles className="h-4 w-4 text-blue-400" />
-          <span>Starting a new project? Try one of our recommended stacks</span>
-          {templatesExpanded ? (
-            <ChevronUp className="ml-auto h-4 w-4" />
-          ) : (
-            <ChevronDown className="ml-auto h-4 w-4" />
-          )}
-        </button>
-        {templatesExpanded && (
-          <div className="grid grid-cols-2 gap-3 pt-4">
-            {STACK_TEMPLATES.map((template) => {
-              const Icon = getTemplateIcon(template.icon);
-              return (
-                <button
-                  key={template.id}
-                  onClick={() => handleApplyTemplate(template)}
-                  className="flex items-start gap-3 rounded-lg border border-neutral-800 bg-neutral-900 p-3 text-left hover:border-blue-500/50"
-                >
-                  <div className="rounded-md bg-neutral-800 p-2">
-                    <Icon className="h-4 w-4 text-blue-400" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-neutral-200">{template.name}</div>
-                    <div className="text-xs text-neutral-500">{template.description}</div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       {/* Additional Services Section */}

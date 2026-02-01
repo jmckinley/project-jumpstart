@@ -129,16 +129,16 @@ describe("AnalysisResults", () => {
       render(<AnalysisResults />);
 
       expect(
-        screen.getByText(/Starting a new project\? Try one of our recommended stacks/i)
+        screen.getByText(/Quick Start Templates|Use a Template/i)
       ).toBeInTheDocument();
     });
 
-    it("should not show templates by default (collapsed)", () => {
+    it("should show templates expanded by default for new projects", () => {
       render(<AnalysisResults />);
 
-      // Templates should not be visible initially
+      // Templates should be visible by default for new projects (no detectionResult)
       const b2bButton = screen.queryByText("B2B SaaS");
-      expect(b2bButton).not.toBeInTheDocument();
+      expect(b2bButton).toBeInTheDocument();
     });
 
     it("should show Additional Services section", () => {
@@ -199,15 +199,12 @@ describe("AnalysisResults", () => {
   });
 
   describe("stack templates interaction", () => {
-    it("should expand templates section on click", () => {
+    // Note: Templates start expanded by default for new projects (detectionResult: null)
+
+    it("should show templates expanded by default for new projects", () => {
       render(<AnalysisResults />);
 
-      const trigger = screen.getByText(
-        /Starting a new project\? Try one of our recommended stacks/i
-      );
-      fireEvent.click(trigger);
-
-      // Templates should now be visible
+      // Templates should be visible by default (new project = no detectionResult)
       expect(screen.getByText("B2B SaaS")).toBeInTheDocument();
       expect(screen.getByText("API-First")).toBeInTheDocument();
     });
@@ -215,11 +212,7 @@ describe("AnalysisResults", () => {
     it("should show 12 template cards when expanded", () => {
       render(<AnalysisResults />);
 
-      const trigger = screen.getByText(
-        /Starting a new project\? Try one of our recommended stacks/i
-      );
-      fireEvent.click(trigger);
-
+      // Templates are already visible by default for new projects
       // All 12 templates should be visible
       expect(STACK_TEMPLATES).toHaveLength(12);
 
@@ -228,31 +221,29 @@ describe("AnalysisResults", () => {
       }
     });
 
-    it("should collapse templates section on second click", () => {
+    it("should toggle templates section on click", () => {
       render(<AnalysisResults />);
 
       const trigger = screen.getByText(
-        /Starting a new project\? Try one of our recommended stacks/i
+        /Quick Start Templates|Use a Template/i
       );
 
-      // Expand
-      fireEvent.click(trigger);
+      // Templates start expanded for new projects
       expect(screen.getByText("B2B SaaS")).toBeInTheDocument();
 
-      // Collapse
+      // First click collapses
       fireEvent.click(trigger);
       expect(screen.queryByText("B2B SaaS")).not.toBeInTheDocument();
+
+      // Second click expands
+      fireEvent.click(trigger);
+      expect(screen.getByText("B2B SaaS")).toBeInTheDocument();
     });
 
     it("clicking template should call applyTemplate", () => {
       render(<AnalysisResults />);
 
-      // Expand templates
-      const trigger = screen.getByText(
-        /Starting a new project\? Try one of our recommended stacks/i
-      );
-      fireEvent.click(trigger);
-
+      // Templates are already visible by default for new projects
       // Click B2B SaaS template
       const b2bTemplate = screen.getByText("B2B SaaS");
       fireEvent.click(b2bTemplate);
@@ -270,29 +261,19 @@ describe("AnalysisResults", () => {
     it("clicking template should collapse the section", () => {
       render(<AnalysisResults />);
 
-      // Expand templates
-      const trigger = screen.getByText(
-        /Starting a new project\? Try one of our recommended stacks/i
-      );
-      fireEvent.click(trigger);
-
+      // Templates are expanded by default for new projects (no detectionResult)
       // Click a template
       const b2bTemplate = screen.getByText("B2B SaaS");
       fireEvent.click(b2bTemplate);
 
-      // Templates section should be collapsed
+      // Templates section should be collapsed after selection
       expect(screen.queryByText("API-First")).not.toBeInTheDocument();
     });
 
     it("should show template descriptions", () => {
       render(<AnalysisResults />);
 
-      // Expand templates
-      const trigger = screen.getByText(
-        /Starting a new project\? Try one of our recommended stacks/i
-      );
-      fireEvent.click(trigger);
-
+      // Templates are expanded by default for new projects (no detectionResult)
       // Check for descriptions
       expect(
         screen.getByText("Full-stack app with auth, payments, and analytics")
