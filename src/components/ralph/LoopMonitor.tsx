@@ -22,6 +22,8 @@
  *
  * CLAUDE NOTES:
  * - Only "running" loops can be paused
+ * - Both "running" and "paused" loops can be killed
+ * - Failed/completed loops are in terminal state, no actions available
  * - Empty state shows when no loops exist
  * - Timestamps are formatted as relative time
  */
@@ -130,6 +132,14 @@ function LoopCard({
                 Kill
               </button>
             </div>
+          )}
+          {loop.status === "paused" && (
+            <button
+              onClick={() => onKill(loop.id)}
+              className="rounded px-2 py-1 text-xs font-medium text-red-400 transition-colors hover:bg-red-950"
+            >
+              Kill
+            </button>
           )}
         </div>
       </div>
