@@ -34,21 +34,27 @@ import type { ModuleStatus } from "@/types/module";
 interface BatchGeneratorProps {
   modules: ModuleStatus[];
   generating: boolean;
+  progress: { current: number; total: number } | null;
   onGenerateSelected: (paths: string[]) => void;
 }
 
 export function BatchGenerator({
   modules,
   generating,
+  progress,
   onGenerateSelected,
 }: BatchGeneratorProps) {
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+  const [showAllFiles, setShowAllFiles] = useState(false);
 
-  const actionableModules = modules.filter(
-    (m) => m.status === "missing" || m.status === "outdated"
-  );
   const missingModules = modules.filter((m) => m.status === "missing");
   const outdatedModules = modules.filter((m) => m.status === "outdated");
+  const currentModules = modules.filter((m) => m.status === "current");
+
+  // Show all files if user wants to regenerate current ones, otherwise just actionable
+  const displayedModules = showAllFiles
+    ? modules
+    : modules.filter((m) => m.status === "missing" || m.status === "outdated");
 
   const handleSelectAllMissing = () => {
     setSelectedPaths(missingModules.map((m) => m.path));
@@ -56,6 +62,16 @@ export function BatchGenerator({
 
   const handleSelectAllOutdated = () => {
     setSelectedPaths(outdatedModules.map((m) => m.path));
+  };
+
+  const handleSelectAllCurrent = () => {
+    setShowAllFiles(true);
+    setSelectedPaths(currentModules.map((m) => m.path));
+  };
+
+  const handleSelectAll = () => {
+    setShowAllFiles(true);
+    setSelectedPaths(modules.map((m) => m.path));
   };
 
   const handleToggle = (path: string) => {
@@ -66,11 +82,11 @@ export function BatchGenerator({
     );
   };
 
-  const handleSelectAll = () => {
-    if (selectedPaths.length === actionableModules.length) {
+  const handleToggleSelectAll = () => {
+    if (selectedPaths.length === displayedModules.length) {
       setSelectedPaths([]);
     } else {
-      setSelectedPaths(actionableModules.map((m) => m.path));
+      setSelectedPaths(displayedModules.map((m) => m.path));
     }
   };
 
@@ -93,7 +109,7 @@ export function BatchGenerator({
           disabled={missingModules.length === 0 || generating}
           className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Select All Missing
+          Missing
           {missingModules.length > 0 && (
             <span className="ml-1.5 inline-flex items-center rounded-full bg-red-500/20 px-1.5 py-0.5 text-xs text-red-400">
               {missingModules.length}
@@ -106,7 +122,7 @@ export function BatchGenerator({
           disabled={outdatedModules.length === 0 || generating}
           className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Select All Outdated
+          Outdated
           {outdatedModules.length > 0 && (
             <span className="ml-1.5 inline-flex items-center rounded-full bg-yellow-500/20 px-1.5 py-0.5 text-xs text-yellow-400">
               {outdatedModules.length}
@@ -115,12 +131,40 @@ export function BatchGenerator({
         </button>
 
         <button
+          onClick={handleSelectAllCurrent}
+          disabled={currentModules.length === 0 || generating}
+          className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40"
+          title="Regenerate documentation for files that already have docs"
+        >
+          Current
+          {currentModules.length > 0 && (
+            <span className="ml-1.5 inline-flex items-center rounded-full bg-green-500/20 px-1.5 py-0.5 text-xs text-green-400">
+              {currentModules.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={handleSelectAll}
+          disabled={modules.length === 0 || generating}
+          className="rounded-md border border-blue-700 bg-blue-900/30 px-3 py-1.5 text-xs font-medium text-blue-300 transition-colors hover:bg-blue-900/50 disabled:cursor-not-allowed disabled:opacity-40"
+          title="Regenerate ALL documentation using AI"
+        >
+          All Files
+          <span className="ml-1.5 inline-flex items-center rounded-full bg-blue-500/20 px-1.5 py-0.5 text-xs text-blue-400">
+            {modules.length}
+          </span>
+        </button>
+
+        <button
           onClick={handleGenerate}
           disabled={selectedPaths.length === 0 || generating}
           className={`ml-auto rounded-md px-4 py-1.5 text-xs font-medium transition-colors ${
-            selectedPaths.length === 0 || generating
-              ? "cursor-not-allowed bg-neutral-800 text-neutral-600"
-              : "bg-blue-600 text-white hover:bg-blue-500"
+            generating
+              ? "cursor-not-allowed bg-blue-600 text-white"
+              : selectedPaths.length === 0
+                ? "cursor-not-allowed bg-neutral-800 text-neutral-500"
+                : "bg-blue-600 text-white hover:bg-blue-500"
           }`}
         >
           {generating ? (
@@ -144,7 +188,7 @@ export function BatchGenerator({
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                 />
               </svg>
-              Generating...
+              {progress ? `Generating ${progress.current} of ${progress.total}...` : "Generating..."}
             </span>
           ) : (
             `Generate Selected (${selectedPaths.length})`
@@ -153,39 +197,54 @@ export function BatchGenerator({
       </div>
 
       {/* File list with checkboxes */}
-      {actionableModules.length === 0 ? (
+      {displayedModules.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-6 text-center">
           <p className="text-sm font-medium text-neutral-300">
             All files are documented
           </p>
           <p className="mt-1 text-xs text-neutral-500">
-            No missing or outdated documentation found.
+            Click "Current" or "All Files" to regenerate existing documentation.
           </p>
         </div>
       ) : (
         <>
           {/* Select all toggle */}
-          <div className="mb-2 border-b border-neutral-800 pb-2">
+          <div className="mb-2 flex items-center justify-between border-b border-neutral-800 pb-2">
             <label className="flex cursor-pointer items-center gap-2 text-xs text-neutral-500 hover:text-neutral-400">
               <input
                 type="checkbox"
                 checked={
-                  actionableModules.length > 0 &&
-                  selectedPaths.length === actionableModules.length
+                  displayedModules.length > 0 &&
+                  selectedPaths.length === displayedModules.length
                 }
-                onChange={handleSelectAll}
+                onChange={handleToggleSelectAll}
                 disabled={generating}
                 className="h-3.5 w-3.5 rounded border-neutral-600 bg-neutral-800 accent-blue-600"
               />
-              Select all ({actionableModules.length})
+              Select all ({displayedModules.length})
             </label>
+            {showAllFiles && (
+              <button
+                onClick={() => {
+                  setShowAllFiles(false);
+                  setSelectedPaths([]);
+                }}
+                className="text-xs text-neutral-500 hover:text-neutral-400"
+              >
+                Show only actionable
+              </button>
+            )}
           </div>
 
           <div className="max-h-[300px] space-y-1 overflow-y-auto">
-            {actionableModules.map((mod) => {
+            {displayedModules.map((mod) => {
               const isSelected = selectedPaths.includes(mod.path);
               const statusColor =
-                mod.status === "missing" ? "bg-red-500" : "bg-yellow-500";
+                mod.status === "missing"
+                  ? "bg-red-500"
+                  : mod.status === "outdated"
+                    ? "bg-yellow-500"
+                    : "bg-green-500";
 
               return (
                 <label

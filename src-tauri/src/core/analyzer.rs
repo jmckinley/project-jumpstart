@@ -211,42 +211,51 @@ pub async fn generate_module_doc_with_ai(
         .trim_end_matches(&format!(".{}", ext))
         .to_string();
 
-    // Truncate content to ~8k chars to stay within prompt limits
-    let truncated_content: String = content.chars().take(8000).collect();
+    // Truncate content to ~12k chars to provide more context while staying within limits
+    let truncated_content: String = content.chars().take(12000).collect();
 
-    let system = "You generate structured module documentation for source code files. \
-        The documentation will be placed at the top of source files to help AI coding assistants \
-        understand the module quickly without reading all the code. \
-        \
-        CRITICAL QUALITY REQUIREMENTS: \
-        - description MUST be specific and actionable, NOT generic like 'Task module' or 'Implements X logic'. \
-          Good: 'Renders grouped task list with Past Due, Today, Tomorrow sections and handles completion/snooze actions' \
-          Bad: 'Task list module' or 'Implements task list logic' \
-        - exports MUST include the TYPE (function, interface, type, class, const, hook) and what it actually does. \
-          Good: 'Task (interface) - Shape of a task with id, title, due_date, completed fields' \
-          Bad: 'Task - Exported function/value' \
-        - claude_notes MUST contain REAL insights from the code, not placeholder text. \
-          Good: 'Tasks are grouped by comparing due_date to today/tomorrow; completed tasks always sort last' \
-          Bad: 'Update this documentation when X changes' \
-        \
-        Return a JSON object with these exact fields: \
-        - description: string, one-line summary that explains WHAT this module does and WHY it exists (be specific!) \
-        - purpose: array of 2-4 strings, each a specific responsibility. Start with verbs. Include HOW it does things. \
-          Example: 'Group tasks into Past Due, Today, Tomorrow, Upcoming based on due_date comparison' \
-        - dependencies: array of strings in format 'import/path - specific reason this is imported' \
-          Example: '@supabase/auth-helpers-react - Provides useSession hook for auth state' \
-        - exports: array of strings in format 'name (type) - description'. Types: function, interface, type, class, const, hook, component \
-          Example: 'useTaskManager (hook) - Returns tasks, loading state, and CRUD actions for task management' \
-        - patterns: array of strings describing HOW to use this module with specific examples \
-          Example: 'Call useTaskManager() at component top; destructure { tasks, isLoading, syncData }' \
-        - claude_notes: array of 2-4 strings with REAL insights an AI needs to know. Include: \
-          * Data flow or state management approach used \
-          * Non-obvious behavior or edge cases \
-          * Related files that work together with this one \
-          * Common mistakes or things to watch out for \
-        \
-        Analyze the actual code to provide accurate, helpful documentation. \
-        Output ONLY valid JSON, no markdown fences or explanation.";
+    let system = r#"You are a technical documentation generator. Analyze source code and produce JSON documentation.
+
+ABSOLUTE REQUIREMENTS FOR EACH FIELD:
+
+description: ONE sentence about what this module DOES (use a verb) and its PRIMARY PURPOSE.
+  TERRIBLE: "Function module", "Helpers for X", "Component for rendering"
+  MEDIOCRE: "Renders task cards with status indicators"
+  EXCELLENT: "Custom hook managing form state, validation errors, and async submission with debounce"
+  BEST: "Zustand store for user authentication providing JWT token storage, session persistence, and auto-refresh"
+
+purpose: 2-4 bullet points each starting with an ACTION VERB. Be specific about WHAT the code does.
+  TERRIBLE: "Handle data", "Manage state", "Provide utilities"
+  GOOD: "Fetch user profiles from /api/users endpoint", "Cache responses in localStorage for 1 hour", "Retry failed requests with exponential backoff up to 3 times"
+
+exports: Format as "ExportName (type) - what it does/returns"
+  Types: function, interface, type, class, const, hook, component
+  TERRIBLE: "MyComponent - Component", "helper - Exported value"
+  GOOD: "calculateTotal (function) - Sums prices and applies membership discount percentage"
+  GOOD: "UserState (interface) - Shape with id, email, roles array, and lastLogin timestamp"
+
+dependencies: Format as "import/path - specific reason needed"
+  TERRIBLE: "react - React library"
+  GOOD: "@/stores/authStore - Provides useAuth hook for JWT token and user session"
+
+patterns: HOW to use this module with specific method calls
+  TERRIBLE: "Import as needed", "Use appropriately"
+  GOOD: "Call useAuth() at component top; destructure { user, isLoading, signOut }"
+
+claude_notes: 2-4 SPECIFIC insights about code behavior
+  TERRIBLE: "Update docs when changed", "See related files"
+  GOOD: "Uses optimistic updates - UI changes immediately, then syncs to server on success"
+  GOOD: "Tokens refresh 5 minutes before expiry to prevent mid-request failures"
+
+OUTPUT: Return ONLY valid JSON, no markdown fences or explanation.
+{
+  "description": "One sentence description here",
+  "purpose": ["Verb phrase 1", "Verb phrase 2"],
+  "dependencies": ["path - reason"],
+  "exports": ["Name (type) - description"],
+  "patterns": ["Specific usage instruction"],
+  "claude_notes": ["Actual insight from code"]
+}"#;
 
     let prompt = format!(
         "Generate module documentation for this file:\n\n\
@@ -264,8 +273,16 @@ pub async fn generate_module_doc_with_ai(
 
     let response = ai::call_claude(client, api_key, system, &prompt).await?;
 
+    // Strip markdown code fences if present (AI sometimes wraps in ```json ... ```)
+    let cleaned_response = response
+        .trim()
+        .trim_start_matches("```json")
+        .trim_start_matches("```")
+        .trim_end_matches("```")
+        .trim();
+
     // Parse AI response as JSON into ModuleDoc fields
-    match serde_json::from_str::<serde_json::Value>(&response) {
+    match serde_json::from_str::<serde_json::Value>(cleaned_response) {
         Ok(val) => {
             let get_string = |key: &str| -> String {
                 val.get(key)
@@ -298,7 +315,7 @@ pub async fn generate_module_doc_with_ai(
             // AI returned non-JSON; use the response as a description and fall back
             Ok(ModuleDoc {
                 module_path,
-                description: response.lines().next().unwrap_or("AI-generated module").to_string(),
+                description: cleaned_response.lines().next().unwrap_or("AI-generated module").to_string(),
                 purpose: vec!["See AI-generated description above".to_string()],
                 dependencies: imports
                     .iter()
@@ -515,6 +532,15 @@ pub fn detect_exports(content: &str, ext: &str) -> Vec<String> {
                     if let Some(name) = extract_ts_function_name(
                         trimmed.trim_start_matches("export default "),
                     ) {
+                        exports.push(format!("{} (default)", name));
+                    }
+                }
+                // export default Identifier (e.g., "export default Button")
+                else if trimmed.starts_with("export default ") && !trimmed.contains("function") && !trimmed.contains("{") {
+                    let rest = trimmed.trim_start_matches("export default ").trim();
+                    // Get the identifier (first word, stop at punctuation)
+                    let name: String = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+                    if !name.is_empty() && name.chars().next().map(|c| c.is_alphabetic()).unwrap_or(false) {
                         exports.push(format!("{} (default)", name));
                     }
                 }

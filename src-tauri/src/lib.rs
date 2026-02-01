@@ -43,7 +43,7 @@ use commands::activity::{get_recent_activities, log_activity};
 use commands::claude_md::{generate_claude_md, get_health_score, read_claude_md, write_claude_md};
 use commands::context::{create_checkpoint, get_context_health, get_mcp_status, list_checkpoints};
 use commands::freshness::{check_freshness, get_stale_files};
-use commands::modules::{apply_module_doc, batch_generate_docs, generate_module_doc, scan_modules};
+use commands::modules::{apply_module_doc, batch_generate_docs, generate_module_doc, parse_module_doc, scan_modules};
 use commands::onboarding::{check_git_installed, install_git, save_project, scan_project};
 use commands::project::{get_project, list_projects, remove_project};
 use commands::ralph::{
@@ -90,6 +90,7 @@ pub fn run() {
             generate_claude_md,
             get_health_score,
             scan_modules,
+            parse_module_doc,
             generate_module_doc,
             apply_module_doc,
             batch_generate_docs,

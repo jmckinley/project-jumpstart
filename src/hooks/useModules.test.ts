@@ -295,9 +295,11 @@ describe("useModules", () => {
   });
 
   describe("batchGenerate", () => {
-    it("should batch generate docs and refresh modules", async () => {
+    it("should batch generate docs one at a time and refresh modules", async () => {
+      const mockDoc = { modulePath: "a", description: "test", purpose: [], dependencies: [], exports: [], patterns: [], claudeNotes: [] };
       vi.mocked(invoke)
-        .mockResolvedValueOnce([{ path: "src/a.ts", status: "current", freshnessScore: 100 }]) // batchGenerateDocs
+        .mockResolvedValueOnce(mockDoc) // generateModuleDoc for first file
+        .mockResolvedValueOnce(undefined) // applyModuleDoc for first file
         .mockResolvedValueOnce(mockModules); // scanModules refresh
 
       const { result } = renderHook(() => useModules());
@@ -306,47 +308,53 @@ describe("useModules", () => {
         await result.current.batchGenerate(["/test/project/path/src/a.ts"]);
       });
 
-      expect(invoke).toHaveBeenCalledWith("batch_generate_docs", {
-        filePaths: ["/test/project/path/src/a.ts"],
+      expect(invoke).toHaveBeenCalledWith("generate_module_doc", {
+        filePath: "/test/project/path/src/a.ts",
         projectPath: mockProject.path,
+      });
+      expect(invoke).toHaveBeenCalledWith("apply_module_doc", {
+        filePath: "/test/project/path/src/a.ts",
+        doc: mockDoc,
       });
     });
 
     it("should set generating=true during batch operation", async () => {
-      let resolvePromise: (value: unknown) => void;
-      const pendingPromise = new Promise((resolve) => {
-        resolvePromise = resolve;
-      });
-      vi.mocked(invoke).mockReturnValue(pendingPromise);
+      const mockDoc = { modulePath: "a", description: "test", purpose: [], dependencies: [], exports: [], patterns: [], claudeNotes: [] };
+      vi.mocked(invoke)
+        .mockResolvedValueOnce(mockDoc) // generateModuleDoc
+        .mockResolvedValueOnce(undefined) // applyModuleDoc
+        .mockResolvedValueOnce(mockModules); // scanModules
 
       const { result } = renderHook(() => useModules());
 
-      // Start generating but don't await
-      act(() => {
-        result.current.batchGenerate(["/test/file.ts"]);
-      });
-
-      // Check generating is true immediately after starting
-      expect(result.current.generating).toBe(true);
-
-      // Resolve and finish (need to resolve twice: once for batchGenerate, once for scanModules)
-      await act(async () => {
-        resolvePromise!([]);
-        await pendingPromise;
-      });
-    });
-
-    it("should handle batch errors", async () => {
-      vi.mocked(invoke).mockRejectedValue(new Error("Batch failed"));
-
-      const { result } = renderHook(() => useModules());
-
+      // Start generating
       await act(async () => {
         await result.current.batchGenerate(["/test/file.ts"]);
       });
 
-      expect(result.current.error).toBe("Batch failed");
+      // After completion, generating should be false and progress null
       expect(result.current.generating).toBe(false);
+      expect(result.current.progress).toBeNull();
+    });
+
+    it("should handle individual file errors gracefully and continue", async () => {
+      // First file fails, but should continue and finish
+      vi.mocked(invoke)
+        .mockRejectedValueOnce(new Error("Generation failed")) // generateModuleDoc fails
+        .mockResolvedValueOnce(mockModules); // scanModules refresh still works
+
+      const { result } = renderHook(() => useModules());
+
+      let batchResult: unknown[];
+      await act(async () => {
+        batchResult = await result.current.batchGenerate(["/test/file.ts"]);
+      });
+
+      // Individual errors don't set global error - they just result in "missing" status
+      expect(result.current.error).toBeNull();
+      expect(result.current.generating).toBe(false);
+      // The result should indicate the file failed
+      expect(batchResult![0]).toMatchObject({ status: "missing" });
     });
   });
 });

@@ -64,6 +64,11 @@ const FAQS: FAQItem[] = [
       "No! That's exactly what Project Jumpstart is for. We install best practices automatically - CLAUDE.md templates, skills, agents, documentation standards - then keep them current as you build. You get what experienced users have learned, without the learning curve.",
   },
   {
+    question: "What are the important default settings, and how do I change them?",
+    answer:
+      "The key defaults are: (1) API Key - required for all AI features; add yours in Settings first. (2) Enforcement Mode - defaults to 'Auto-Update' which automatically generates missing documentation at commit time. Change this in Settings or the Enforcement tab. (3) Module Documentation - new projects auto-expand the file tree and show all files. (4) Git Hooks - installed automatically when you enable enforcement during onboarding. To change settings, click 'Settings' in the sidebar - enforcement level, API key, and preferences are all there.",
+  },
+  {
     question: "What is Project Kickstart?",
     answer:
       "Project Kickstart helps you bootstrap new or empty projects. Describe what you're building, your target users, and key features, and it generates a comprehensive starter prompt for Claude Code. It sets up the right foundation from day one - tech stack decisions, initial prompts, and project structure recommendations.",
@@ -71,7 +76,7 @@ const FAQS: FAQItem[] = [
   {
     question: "Why is adding an API key so important?",
     answer:
-      "The API key unlocks Project Jumpstart's most powerful features. Without it, you only get basic templates that require manual editing. With an API key, you get: (1) AI-generated CLAUDE.md tailored to your actual codebase, (2) Smart module documentation that understands your code's purpose and patterns, (3) Auto-update enforcement that generates missing docs at commit time, (4) Enhanced RALPH prompts with project-aware suggestions. The difference is dramatic - AI generation produces production-ready documentation in seconds.",
+      "Your Anthropic API key is required to use Project Jumpstart. It powers all the core features: (1) AI-generated CLAUDE.md tailored to your actual codebase, (2) Smart module documentation that understands your code's purpose and patterns, (3) Auto-update enforcement that generates missing docs at commit time, (4) Enhanced RALPH prompts with project-aware suggestions. AI generation produces production-ready documentation in seconds - what would take hours of manual work.",
   },
   {
     question: "Is my API key secure?",
@@ -386,42 +391,31 @@ export function HelpView() {
           </p>
         </div>
 
-        {/* API Key Importance - Highlighted Section */}
+        {/* API Key Required - Highlighted Section */}
         <div className="mb-8 rounded-lg border border-amber-500/30 bg-amber-500/10 p-6">
           <h2 className="mb-3 text-lg font-semibold text-amber-300">
-            Why Add Your API Key?
+            API Key Required
           </h2>
           <p className="text-sm leading-relaxed text-neutral-300">
-            <strong className="text-amber-300">Your API key is the difference between basic templates and intelligent documentation.</strong>{" "}
-            Without a key, you'll spend hours manually writing documentation. With a key, AI generates
-            production-ready content in seconds.
+            <strong className="text-amber-300">Your Anthropic API key powers all of Project Jumpstart's features.</strong>{" "}
+            Add it in Settings to get started. What would take hours of manual documentation
+            work happens in seconds with AI.
           </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-md bg-neutral-900/50 p-3">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-red-400">
-                Without API Key
-              </p>
-              <ul className="space-y-1 text-xs text-neutral-400">
-                <li>• Generic templates only</li>
-                <li>• Manual editing required</li>
-                <li>• No code analysis</li>
-                <li>• Basic prompt scoring</li>
-              </ul>
-            </div>
-            <div className="rounded-md bg-neutral-900/50 p-3">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-emerald-400">
-                With API Key
-              </p>
-              <ul className="space-y-1 text-xs text-neutral-400">
-                <li>• AI-generated CLAUDE.md</li>
-                <li>• Smart module documentation</li>
-                <li>• Code-aware analysis</li>
-                <li>• Enhanced RALPH prompts</li>
-              </ul>
-            </div>
+          <div className="mt-4 rounded-md bg-neutral-900/50 p-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-emerald-400">
+              What Your API Key Enables
+            </p>
+            <ul className="grid gap-1 text-xs text-neutral-400 sm:grid-cols-2">
+              <li>• AI-generated CLAUDE.md</li>
+              <li>• Smart module documentation</li>
+              <li>• Code-aware analysis</li>
+              <li>• Enhanced RALPH prompts</li>
+              <li>• Auto-update enforcement</li>
+              <li>• One-click doc refresh</li>
+            </ul>
           </div>
           <p className="mt-4 text-xs text-neutral-400">
-            Add your key in Settings. It's encrypted locally and never shared.
+            Your key is encrypted locally using AES-256-GCM and never shared with anyone except Anthropic's API.
           </p>
         </div>
 

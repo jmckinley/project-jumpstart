@@ -32,7 +32,8 @@
  *
  * Module Documentation:
  * - scanModules - Scan project files for documentation status
- * - generateModuleDoc - Generate doc template for a single file
+ * - parseModuleDoc - Parse existing doc header from a file (local, no AI)
+ * - generateModuleDoc - Generate doc template for a single file using AI
  * - applyModuleDoc - Apply doc header to a file on disk
  * - batchGenerateDocs - Generate and apply docs for multiple files
  * - checkFreshness - Check freshness of a single file
@@ -174,6 +175,14 @@ export async function getHealthScore(projectPath: string): Promise<HealthScore> 
 
 export async function scanModules(projectPath: string): Promise<ModuleStatus[]> {
   return invoke<ModuleStatus[]>("scan_modules", { projectPath });
+}
+
+/**
+ * Parse and return existing documentation from a file (local-only, no AI).
+ * Returns null if the file has no doc header.
+ */
+export async function parseModuleDoc(filePath: string, projectPath: string): Promise<ModuleDoc | null> {
+  return invoke<ModuleDoc | null>("parse_module_doc", { filePath, projectPath });
 }
 
 export async function generateModuleDoc(filePath: string, projectPath: string): Promise<ModuleDoc> {

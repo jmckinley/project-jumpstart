@@ -267,50 +267,92 @@ function ModulesView({ onDocApplied }: { onDocApplied?: () => void }) {
     generating,
     hasScanned,
     scan,
+    getExistingDoc,
     generateDoc,
     applyDoc,
     batchGenerate,
+    progress,
   } = useModules();
 
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [previewDoc, setPreviewDoc] = useState<ModuleDoc | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [applySuccess, setApplySuccess] = useState(false);
   const activeProject = useProjectStore((s) => s.activeProject);
 
   useEffect(() => {
     scan();
   }, [scan]);
 
+  // For files with existing docs, parse instantly. For missing, generate new.
   const handleSelect = useCallback(
     async (path: string) => {
       setSelectedPath(path);
       if (!activeProject) return;
       setPreviewLoading(true);
+
       const absolutePath = `${activeProject.path}/${path}`;
-      const doc = await generateDoc(absolutePath);
+      const module = modules.find((m) => m.path === path);
+      const hasExistingDoc = module?.status === "current" || module?.status === "outdated";
+
+      let doc: ModuleDoc | null = null;
+      if (hasExistingDoc) {
+        // Fast path: parse existing doc header (no AI call)
+        doc = await getExistingDoc(absolutePath);
+      }
+
+      // If no existing doc found (missing status or parsing failed), generate new
+      if (!doc) {
+        doc = await generateDoc(absolutePath);
+      }
+
       setPreviewDoc(doc);
       setPreviewLoading(false);
     },
-    [activeProject, generateDoc],
+    [activeProject, modules, getExistingDoc, generateDoc],
   );
 
   const handleApply = useCallback(async () => {
     if (!selectedPath || !previewDoc || !activeProject) return;
     setPreviewLoading(true);
-    const absolutePath = `${activeProject.path}/${selectedPath}`;
-    await applyDoc(absolutePath, previewDoc);
-    setPreviewLoading(false);
-    onDocApplied?.();
+    setApplySuccess(false);
+    try {
+      const absolutePath = `${activeProject.path}/${selectedPath}`;
+      const success = await applyDoc(absolutePath, previewDoc);
+      if (success) {
+        setApplySuccess(true);
+        // Clear success message after 2 seconds
+        setTimeout(() => setApplySuccess(false), 2000);
+      }
+      onDocApplied?.();
+    } catch (err) {
+      console.error("Failed to apply doc:", err);
+    } finally {
+      setPreviewLoading(false);
+    }
   }, [selectedPath, previewDoc, activeProject, applyDoc, onDocApplied]);
+
+  // Force regenerate documentation using AI (for files that already have docs)
+  const handleRegenerate = useCallback(async () => {
+    if (!selectedPath || !activeProject) return;
+    setPreviewLoading(true);
+    const absolutePath = `${activeProject.path}/${selectedPath}`;
+    const doc = await generateDoc(absolutePath);
+    setPreviewDoc(doc);
+    setPreviewLoading(false);
+  }, [selectedPath, activeProject, generateDoc]);
 
   const handleBatchGenerate = useCallback(
     async (paths: string[]) => {
       if (!activeProject) return;
       const absolutePaths = paths.map((p) => `${activeProject.path}/${p}`);
       await batchGenerate(absolutePaths);
+      // Force a rescan to ensure counts are up to date
+      // (batchGenerate does this internally, but this ensures the UI refreshes)
+      await scan();
       onDocApplied?.();
     },
-    [activeProject, batchGenerate, onDocApplied],
+    [activeProject, batchGenerate, scan, onDocApplied],
   );
 
   if (loading && modules.length === 0) {
@@ -349,7 +391,9 @@ function ModulesView({ onDocApplied }: { onDocApplied?: () => void }) {
             filePath={selectedPath ?? ""}
             doc={previewDoc}
             onApply={handleApply}
+            onRegenerate={handleRegenerate}
             loading={previewLoading}
+            applySuccess={applySuccess}
           />
         </div>
       </div>
@@ -357,6 +401,7 @@ function ModulesView({ onDocApplied }: { onDocApplied?: () => void }) {
       <BatchGenerator
         modules={modules}
         generating={generating}
+        progress={progress}
         onGenerateSelected={handleBatchGenerate}
       />
     </div>

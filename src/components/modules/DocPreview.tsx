@@ -6,6 +6,7 @@
  * - Display a formatted preview of a ModuleDoc (description, purpose, dependencies, exports, patterns, claude notes)
  * - Show a placeholder when no file is selected or no doc is available
  * - Provide an "Apply to File" button that writes the documentation header into the source file
+ * - Provide an optional "Regenerate" button to regenerate docs using AI
  *
  * DEPENDENCIES:
  * - @/types/module - ModuleDoc type for documentation content
@@ -32,7 +33,9 @@ interface DocPreviewProps {
   filePath: string;
   doc: ModuleDoc | null;
   onApply: () => void;
+  onRegenerate?: () => void;
   loading: boolean;
+  applySuccess?: boolean;
 }
 
 function Section({
@@ -74,7 +77,7 @@ function ListSection({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-export function DocPreview({ filePath, doc, onApply, loading }: DocPreviewProps) {
+export function DocPreview({ filePath, doc, onApply, onRegenerate, loading, applySuccess }: DocPreviewProps) {
   if (!doc) {
     return (
       <div className="flex h-full items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 p-8">
@@ -92,7 +95,7 @@ export function DocPreview({ filePath, doc, onApply, loading }: DocPreviewProps)
   }
 
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-5">
+    <div className="max-h-[400px] overflow-y-auto rounded-lg border border-neutral-800 bg-neutral-900 p-5">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div className="min-w-0 flex-1">
@@ -103,17 +106,35 @@ export function DocPreview({ filePath, doc, onApply, loading }: DocPreviewProps)
             {filePath}
           </p>
         </div>
-        <button
-          onClick={onApply}
-          disabled={loading}
-          className={`shrink-0 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-            loading
-              ? "cursor-not-allowed bg-neutral-800 text-neutral-600"
-              : "bg-green-600 text-white hover:bg-green-500"
-          }`}
-        >
-          {loading ? "Applying..." : "Apply to File"}
-        </button>
+        <div className="flex shrink-0 gap-2">
+          {onRegenerate && (
+            <button
+              onClick={onRegenerate}
+              disabled={loading}
+              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                loading
+                  ? "cursor-not-allowed bg-neutral-800 text-neutral-600"
+                  : "border border-neutral-700 bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
+              }`}
+              title="Regenerate documentation using AI"
+            >
+              {loading ? "Generating..." : "Regenerate"}
+            </button>
+          )}
+          <button
+            onClick={onApply}
+            disabled={loading}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+              loading
+                ? "cursor-not-allowed bg-neutral-800 text-neutral-600"
+                : applySuccess
+                  ? "bg-green-700 text-white"
+                  : "bg-green-600 text-white hover:bg-green-500"
+            }`}
+          >
+            {loading ? "Applying..." : applySuccess ? "Applied!" : "Apply to File"}
+          </button>
+        </div>
       </div>
 
       {/* Documentation Sections */}

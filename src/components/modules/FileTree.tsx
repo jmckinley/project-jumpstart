@@ -28,7 +28,7 @@
  * - Clicking a folder toggles expand/collapse; clicking a file triggers onSelect
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type { ModuleStatus } from "@/types/module";
 
 interface FileTreeProps {
@@ -211,7 +211,14 @@ function TreeNodeRow({
 export function FileTree({ modules, selectedPath, onSelect }: FileTreeProps) {
   const tree = useMemo(() => buildTree(modules), [modules]);
   const allFolders = useMemo(() => collectFolderPaths(tree), [tree]);
-  const [expanded, setExpanded] = useState<Set<string>>(allFolders);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  // Expand all folders by default when modules load
+  useEffect(() => {
+    if (allFolders.size > 0) {
+      setExpanded(allFolders);
+    }
+  }, [allFolders]);
 
   const handleToggle = (path: string) => {
     setExpanded((prev) => {
@@ -236,11 +243,11 @@ export function FileTree({ modules, selectedPath, onSelect }: FileTreeProps) {
   }
 
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-3">
-      <h3 className="mb-3 px-2 text-xs font-medium uppercase tracking-wider text-neutral-500">
-        Files
+    <div className="flex max-h-[350px] min-h-[250px] flex-col rounded-lg border border-neutral-800 bg-neutral-900 p-3">
+      <h3 className="mb-3 shrink-0 px-2 text-xs font-medium uppercase tracking-wider text-neutral-500">
+        Files ({modules.length})
       </h3>
-      <div className="max-h-[600px] overflow-y-auto">
+      <div className="flex-1 overflow-y-auto">
         {tree.map((node) => (
           <TreeNodeRow
             key={node.fullPath}
