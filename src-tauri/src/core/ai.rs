@@ -13,7 +13,7 @@
 //!
 //! EXPORTS:
 //! - call_claude - Send a prompt to the Claude API and return the text response
-//! - get_api_key - Read the Anthropic API key from the settings table
+//! - get_api_key - Read and decrypt the Anthropic API key from the settings table
 //!
 //! PATTERNS:
 //! - call_claude is async and returns Result<String, String>
@@ -22,7 +22,8 @@
 //! - Errors are mapped to descriptive strings for IPC
 //!
 //! CLAUDE NOTES:
-//! - The API key is stored in SQLite settings table (not system keychain for simplicity)
+//! - The API key is stored encrypted in SQLite settings table (prefixed with "enc:")
+//! - get_api_key automatically decrypts the key before returning
 //! - max_tokens defaults to 4096 for generation requests
 //! - Response format: { content: [{ type: "text", text: "..." }] }
 
@@ -85,14 +86,24 @@ pub async fn call_claude(
 }
 
 /// Read the Anthropic API key from the settings table.
+/// Automatically decrypts if the value is encrypted (prefixed with "enc:").
 /// Returns Ok(key) if found, Err if not configured.
 pub fn get_api_key(db: &Connection) -> Result<String, String> {
-    db.query_row(
-        "SELECT value FROM settings WHERE key = 'anthropic_api_key'",
-        [],
-        |row| row.get::<_, String>(0),
-    )
-    .map_err(|_| "Anthropic API key not configured. Set it in Settings.".to_string())
+    let value = db
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'anthropic_api_key'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .map_err(|_| "Anthropic API key not configured. Set it in Settings.".to_string())?;
+
+    // Decrypt if encrypted (prefixed with "enc:")
+    if value.starts_with("enc:") {
+        crate::core::crypto::decrypt(&value[4..])
+            .map_err(|e| format!("Failed to decrypt API key: {}", e))
+    } else {
+        Ok(value)
+    }
 }
 
 #[cfg(test)]
