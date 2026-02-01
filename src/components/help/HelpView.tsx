@@ -7,6 +7,8 @@
  * - Emphasize the importance of adding an API key for AI features
  * - Document all features: Kickstart, Dashboard, CLAUDE.md, Modules, Skills, Agents, RALPH, Context, Enforcement
  * - Explain enforcement modes (off, warn, block, auto-update)
+ * - Document Claude Code best practices: grill-me-on-changes, prove-it-works, fresh-start-pattern, two-claude-review
+ * - Document Skeptical Reviewer agent and RALPH mistake learning
  * - Answer frequently asked questions
  * - Help new and experienced users get the most out of the app
  *
@@ -28,6 +30,8 @@
  * - Focus on the "why" not just the "how"
  * - API key section uses amber styling to draw attention
  * - Refresh Docs is the first feature guide since it's the main dashboard action
+ * - Best practices skills have "universal" tag and work with any tech stack
+ * - Skeptical Reviewer is auto-added to new projects
  */
 
 import { useState } from "react";
@@ -107,7 +111,22 @@ const FAQS: FAQItem[] = [
   {
     question: "What is RALPH?",
     answer:
-      "RALPH is an automated agentic coding technique that repeatedly feeds your prompt to Claude Code until the task is complete. Each iteration starts with a fresh context, solving the 'context accumulation' problem where AI loses focus as conversations grow. The prompt analyzer scores your prompts on clarity, specificity, context, and scope.",
+      "RALPH is an automated agentic coding technique that repeatedly feeds your prompt to Claude Code until the task is complete. Each iteration starts with a fresh context, solving the 'context accumulation' problem where AI loses focus as conversations grow. The prompt analyzer scores your prompts on clarity, specificity, context, and scope. RALPH also learns from past mistakes - it shows 'Learned from Previous Loops' before you start, so you don't repeat the same errors.",
+  },
+  {
+    question: "What are the Claude Code Best Practices skills?",
+    answer:
+      "These are four prompting patterns recommended by the Claude Code team: (1) 'Grill Me On Changes' - ask Claude to aggressively review your code assuming bugs exist, (2) 'Prove It Works' - demand concrete test evidence instead of 'this should work', (3) 'Fresh Start Pattern' - the context rot escape hatch (save learnings to CLAUDE.md, start fresh), (4) 'Two-Claude Review' - use separate sessions for implementation vs. review. Find them in the Skills Library under the 'universal' tag.",
+  },
+  {
+    question: "What is the Skeptical Reviewer agent?",
+    answer:
+      "The Skeptical Reviewer is an advanced agent that's automatically added to new projects. It has a 6-step workflow: read CLAUDE.md and past mistakes, examine changes with suspicion, trace edge cases, challenge assumptions, check test coverage, and report findings with severity levels. Trigger it with words like 'review', 'check', 'grill', or 'find bugs'.",
+  },
+  {
+    question: "How does RALPH learn from mistakes?",
+    answer:
+      "RALPH now records mistakes during coding sessions. Before starting a new loop, you'll see a 'Learned from Previous Loops' banner showing recent mistakes and their resolutions. You can also 'learn patterns' which appends them to your CLAUDE.md file, making them persist across all future sessions. This prevents repeating the same errors.",
   },
   {
     question: "How do the sidebar checkmarks work?",
@@ -184,21 +203,25 @@ const FEATURE_GUIDES: FeatureGuide[] = [
   {
     title: "Skills Library",
     description:
-      "Pre-built prompt templates matched to your tech stack. Skills save time by giving you starting points for common tasks like commits, code reviews, and testing.",
+      "Pre-built prompt templates matched to your tech stack. Skills save time by giving you starting points for common tasks like commits, code reviews, and testing. Includes Claude Code Best Practices from the team itself.",
     tips: [
       "Check the 'Recommended' tab first - skills are matched to your project's tech stack",
       "60+ battle-tested skills available across multiple categories",
+      "Look for 'universal' tagged skills - they work with any project",
+      "Try 'Grill Me On Changes' and 'Prove It Works' for better code quality",
+      "'Fresh Start Pattern' is your escape hatch when context gets polluted",
       "Add skills to your project to customize them for your codebase",
-      "Create custom skills for repetitive tasks specific to your workflow",
     ],
   },
   {
     title: "Agents Library",
     description:
-      "More complex prompt templates that guide Claude through multi-step workflows. Agents are like skills but with structured instructions, tools, and trigger patterns.",
+      "More complex prompt templates that guide Claude through multi-step workflows. Agents are like skills but with structured instructions, tools, and trigger patterns. The Skeptical Reviewer agent is auto-added to new projects.",
     tips: [
-      "Use agents for complex tasks like refactoring, debugging, or code review",
+      "The Skeptical Reviewer has a 6-step workflow for finding bugs systematically",
       "Agents are tiered: Essential, Advanced, and Specialized",
+      "Check 'Recommended' tab - agents are matched to your tech stack",
+      "Trigger patterns let you invoke agents with keywords like 'review' or 'debug'",
       "Customize agent instructions with AI enhancement",
       "Agents can include workflow steps and tool configurations",
     ],
@@ -206,12 +229,15 @@ const FEATURE_GUIDES: FeatureGuide[] = [
   {
     title: "RALPH Loops",
     description:
-      "An automated agentic coding technique that repeatedly feeds your prompt to Claude Code until the task is complete. Each iteration starts fresh, solving the 'context accumulation' problem.",
+      "An automated agentic coding technique that repeatedly feeds your prompt to Claude Code until the task is complete. Each iteration starts fresh, solving the 'context accumulation' problem. Now with mistake learning!",
     tips: [
       "Aim for a quality score of 70+ before starting a loop",
       "Include specific file paths and function names in your prompt",
       "Define clear boundaries - what should NOT change",
       "Use the auto-enhance feature for low-scoring prompts",
+      "Check the 'Learned from Previous Loops' banner before starting - it shows past mistakes",
+      "Record mistakes during sessions so future loops can learn from them",
+      "Use 'Learn Pattern' to add discoveries to CLAUDE.md permanently",
       "Monitor active loops and pause/resume as needed",
     ],
   },
