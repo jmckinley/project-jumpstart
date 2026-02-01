@@ -5,10 +5,10 @@
  * PURPOSE:
  * - Explain what context rot is and why it matters
  * - Emphasize the importance of adding an API key for AI features
- * - Document the Refresh Docs one-click update feature
- * - Provide feature-by-feature guides
+ * - Document all features: Kickstart, Dashboard, CLAUDE.md, Modules, Skills, Agents, RALPH, Context, Enforcement
+ * - Explain enforcement modes (off, warn, block, auto-update)
  * - Answer frequently asked questions
- * - Help beta users understand and test the app
+ * - Help new and experienced users get the most out of the app
  *
  * DEPENDENCIES:
  * - None (self-contained presentational component)
@@ -55,48 +55,96 @@ const FAQS: FAQItem[] = [
       "Instead of relying on Claude's memory, we bake important information directly into your source files. CLAUDE.md provides project-level context, and module documentation headers ensure Claude understands each file it opens - even after context resets.",
   },
   {
+    question: "I'm new to Claude Code. Do I need to learn best practices first?",
+    answer:
+      "No! That's exactly what Project Jumpstart is for. We install best practices automatically - CLAUDE.md templates, skills, agents, documentation standards - then keep them current as you build. You get what experienced users have learned, without the learning curve.",
+  },
+  {
+    question: "What is Project Kickstart?",
+    answer:
+      "Project Kickstart helps you bootstrap new or empty projects. Describe what you're building, your target users, and key features, and it generates a comprehensive starter prompt for Claude Code. It sets up the right foundation from day one - tech stack decisions, initial prompts, and project structure recommendations.",
+  },
+  {
     question: "Why is adding an API key so important?",
     answer:
-      "The API key unlocks Project Jumpstart's most powerful features. Without it, you only get basic templates that require manual editing. With an API key, you get: (1) AI-generated CLAUDE.md tailored to your actual codebase, (2) Smart module documentation that understands your code's purpose and patterns, (3) Enhanced RALPH prompts with project-aware suggestions, (4) Agent instruction improvements based on your tech stack. The difference is dramatic - AI generation produces production-ready documentation in seconds, while templates require significant manual work.",
+      "The API key unlocks Project Jumpstart's most powerful features. Without it, you only get basic templates that require manual editing. With an API key, you get: (1) AI-generated CLAUDE.md tailored to your actual codebase, (2) Smart module documentation that understands your code's purpose and patterns, (3) Auto-update enforcement that generates missing docs at commit time, (4) Enhanced RALPH prompts with project-aware suggestions. The difference is dramatic - AI generation produces production-ready documentation in seconds.",
   },
   {
     question: "Is my API key secure?",
     answer:
-      "Yes. Your API key is encrypted using AES-256-GCM before being stored locally. The encryption key is derived from your machine's unique identifier, so the encrypted key only works on your computer. The key is never transmitted anywhere except directly to Anthropic's API.",
+      "Yes. Your API key is encrypted using AES-256-GCM before being stored locally in SQLite. The encryption key is derived from your machine's unique identifier, so the encrypted key only works on your computer. The key is never transmitted anywhere except directly to Anthropic's API.",
   },
   {
-    question: "What file types are supported for module documentation?",
+    question: "What are the enforcement modes?",
     answer:
-      "Currently supported: TypeScript (.ts, .tsx), JavaScript (.js, .jsx), Rust (.rs), Python (.py), Go (.go), Java (.java), Kotlin (.kt), and Swift (.swift). Each language uses its native documentation format (JSDoc, Rust doc comments, Python docstrings, Javadoc, KDoc, Swift markup, etc.).",
+      "There are four enforcement modes for git hooks: (1) Off - no documentation checks, (2) Warn - allows commits but shows warnings for missing docs, (3) Block - prevents commits with missing documentation headers, (4) Auto-Update (recommended) - automatically generates missing documentation using AI and stages it before committing. You can set this in Settings or the Enforcement tab - they stay in sync.",
+  },
+  {
+    question: "How does auto-update enforcement work?",
+    answer:
+      "When you commit with auto-update mode enabled, the pre-commit hook checks staged files for @module/@description headers. If any are missing, it calls the Claude API to generate documentation, prepends it to the file, and re-stages it. Your commit proceeds with properly documented code. This requires an API key configured in Settings.",
+  },
+  {
+    question: "What is the health score?",
+    answer:
+      "The health score (0-100) measures your project's documentation quality across six components: CLAUDE.md (25 points), Module docs (25 points), Freshness (15 points), Skills (15 points), Context (10 points), and Enforcement (10 points). Higher scores mean better context preservation. The dashboard shows a breakdown so you can see exactly where to improve.",
+  },
+  {
+    question: "What are Quick Wins?",
+    answer:
+      "Quick Wins are prioritized suggestions shown on the dashboard. They identify high-impact, low-effort improvements to boost your health score. Each shows the potential point gain and difficulty level. Click 'Fix' to jump directly to the relevant section.",
   },
   {
     question: "What does the 'Refresh Docs' button do?",
     answer:
-      "The 'Refresh Docs' button in the dashboard header is a one-click way to update all your documentation. It regenerates CLAUDE.md with fresh project analysis and updates any module files that have become stale (code changed since docs were written) or are missing documentation headers. The badge shows how many files need attention. This is perfect for keeping docs in sync after significant code changes.",
+      "The 'Refresh Docs' button in the dashboard header is a one-click way to update all your documentation. It regenerates CLAUDE.md with fresh project analysis and updates any module files that have become stale or are missing documentation headers. The badge shows how many files need attention.",
   },
   {
-    question: "How do I know when to refresh documentation?",
+    question: "What file types are supported?",
     answer:
-      "Check the dashboard for signs: (1) The 'Refresh Docs' badge shows a count greater than 1, (2) Your health score has dropped, (3) The Context Rot alert shows 'medium' or 'high' risk, (4) You've made significant changes to your codebase. Running 'Refresh Docs' periodically (e.g., weekly or after major features) keeps your documentation accurate.",
+      "Currently supported: TypeScript (.ts, .tsx), JavaScript (.js, .jsx), Rust (.rs), Python (.py), Go (.go), Java (.java), Kotlin (.kt), and Swift (.swift). Each language uses its native documentation format (JSDoc, Rust doc comments, Python docstrings, etc.).",
   },
   {
     question: "What is RALPH?",
     answer:
-      "RALPH is an automated agentic coding technique that repeatedly feeds your prompt to Claude Code until the task is complete. Each iteration starts with a fresh context, solving the 'context accumulation' problem where AI loses focus as conversations grow. The prompt analyzer scores your prompts on clarity, specificity, context, and scope to ensure high-quality inputs.",
+      "RALPH is an automated agentic coding technique that repeatedly feeds your prompt to Claude Code until the task is complete. Each iteration starts with a fresh context, solving the 'context accumulation' problem where AI loses focus as conversations grow. The prompt analyzer scores your prompts on clarity, specificity, context, and scope.",
   },
   {
     question: "How do the sidebar checkmarks work?",
     answer:
-      "Checkmarks indicate completed setup steps for each project: CLAUDE.md exists with content, at least one module has documentation, skills/agents are added, a RALPH loop has been started, and git hooks are installed. They're tracked per-project.",
+      "Checkmarks indicate completed setup steps for each project: CLAUDE.md exists with content, at least one module has documentation, skills/agents are added, a RALPH loop has been started, and git hooks are installed. They're tracked per-project and update automatically.",
   },
   {
     question: "Can I use this with multiple projects?",
     answer:
-      "Yes! Use the project dropdown at the top of the sidebar to switch between projects. Each project has its own isolated data - health scores, checkmarks, skills, and settings are all per-project.",
+      "Yes! Use the project dropdown at the top of the sidebar to switch between projects. Each project has its own isolated data - health scores, checkmarks, skills, agents, and enforcement settings are all per-project.",
   },
 ];
 
 const FEATURE_GUIDES: FeatureGuide[] = [
+  {
+    title: "Project Kickstart (New Projects)",
+    description:
+      "Starting a new project? Kickstart helps you set the right foundation from day one. Describe what you're building, your target users, and key features - it generates a comprehensive starter prompt for Claude Code with tech stack recommendations and project structure.",
+    tips: [
+      "Appears in the sidebar when you add an empty project folder",
+      "Fill in app purpose, target users, and at least one key feature",
+      "Optional fields let you specify framework, database, and styling preferences",
+      "The generated prompt gives Claude Code everything it needs to scaffold your project",
+      "After generating, the Kickstart section disappears and you can create your CLAUDE.md",
+    ],
+  },
+  {
+    title: "Dashboard & Health Score",
+    description:
+      "Your project health at a glance. The health score (0-100) measures documentation quality across six components. Quick Wins show prioritized improvements. The Context Rot alert warns when documentation is falling behind.",
+    tips: [
+      "Health score components: CLAUDE.md (25), Modules (25), Freshness (15), Skills (15), Context (10), Enforcement (10)",
+      "Click Quick Wins 'Fix' buttons to jump directly to issues",
+      "Green score (70+) means Claude has good context preservation",
+      "Check Recent Activity to see what's been happening in your project",
+    ],
+  },
   {
     title: "Refresh Docs (One-Click Update)",
     description:
@@ -114,7 +162,7 @@ const FEATURE_GUIDES: FeatureGuide[] = [
     description:
       "Your project's documentation hub. This file lives at the root of your project and tells Claude everything it needs to know: tech stack, commands, patterns, and architectural decisions.",
     tips: [
-      "Generate a template first, then customize it for your project",
+      "Generate with AI for best results - it analyzes your actual codebase",
       "Keep the Overview section concise - Claude reads this first",
       "Update the 'Current Focus' section when starting new work",
       "Add gotchas and common mistakes to CLAUDE NOTES",
@@ -130,61 +178,75 @@ const FEATURE_GUIDES: FeatureGuide[] = [
       "Use batch generation for multiple files at once",
       "Focus on PURPOSE and CLAUDE NOTES sections",
       "Update docs when you change exports or add dependencies",
-      "Use 'Refresh Docs' in the dashboard to update all stale files at once",
+      "Or use Auto-Update enforcement to generate docs automatically at commit time",
     ],
   },
   {
     title: "Skills Library",
     description:
-      "Pre-built prompt templates matched to your tech stack. Skills save time by giving you starting points for common tasks.",
+      "Pre-built prompt templates matched to your tech stack. Skills save time by giving you starting points for common tasks like commits, code reviews, and testing.",
     tips: [
-      "Check the 'Recommended' skills first - they match your project",
-      "Add skills to your project to customize them",
-      "Create custom skills for repetitive tasks specific to your codebase",
-      "Skills are project-specific, so different projects can have different sets",
+      "Check the 'Recommended' tab first - skills are matched to your project's tech stack",
+      "60+ battle-tested skills available across multiple categories",
+      "Add skills to your project to customize them for your codebase",
+      "Create custom skills for repetitive tasks specific to your workflow",
     ],
   },
   {
     title: "Agents Library",
     description:
-      "More complex prompt templates that guide Claude through multi-step workflows. Agents are like skills but with more structure.",
+      "More complex prompt templates that guide Claude through multi-step workflows. Agents are like skills but with structured instructions, tools, and trigger patterns.",
     tips: [
-      "Use agents for complex tasks like refactoring or debugging",
-      "Agents are tiered by complexity: Basic, Standard, Advanced",
-      "Customize agent instructions for your specific needs",
+      "Use agents for complex tasks like refactoring, debugging, or code review",
+      "Agents are tiered: Essential, Advanced, and Specialized",
+      "Customize agent instructions with AI enhancement",
+      "Agents can include workflow steps and tool configurations",
     ],
   },
   {
     title: "RALPH Loops",
     description:
-      "An automated agentic coding technique that repeatedly feeds your prompt to Claude Code until the task is complete. Each iteration starts fresh, solving the 'context accumulation' problem where AI loses focus as conversations grow. Write a clear prompt and let RALPH handle the rest.",
+      "An automated agentic coding technique that repeatedly feeds your prompt to Claude Code until the task is complete. Each iteration starts fresh, solving the 'context accumulation' problem.",
     tips: [
       "Aim for a quality score of 70+ before starting a loop",
-      "Include specific file paths and function names",
+      "Include specific file paths and function names in your prompt",
       "Define clear boundaries - what should NOT change",
       "Use the auto-enhance feature for low-scoring prompts",
-      "Each loop iteration gets fresh context - no memory buildup",
+      "Monitor active loops and pause/resume as needed",
     ],
   },
   {
     title: "Context Health",
     description:
-      "Monitor how much of Claude's context window your persistent documentation consumes. Shows token breakdown and MCP server status.",
+      "Monitor how much of Claude's context window your persistent documentation consumes. Shows token breakdown by category and MCP server status.",
     tips: [
       "Keep total persistent context under 20% of the window",
       "Large CLAUDE.md files can be trimmed if needed",
-      "MCP servers add to context - disable unused ones",
+      "MCP servers add to context - the status shows which are active",
+      "Create checkpoints to snapshot your context state",
     ],
   },
   {
     title: "Enforcement",
     description:
-      "Git hooks that check for documentation before commits. Helps teams maintain documentation standards.",
+      "Git hooks that check for documentation before commits. Four modes: Off (no checks), Warn (show warnings), Block (prevent commits), and Auto-Update (generate missing docs with AI).",
     tips: [
-      "Start with 'Warn' mode to see what would be flagged",
-      "Switch to 'Block' mode once the team is ready",
-      "Use the CI snippets for GitHub Actions or GitLab CI",
-      "Hooks check for @module and @description in staged files",
+      "Auto-Update mode (recommended) generates missing docs automatically at commit time",
+      "Start with 'Warn' mode to see what would be flagged without blocking",
+      "Settings and Enforcement tabs stay in sync - change in either place",
+      "Auto-Update requires an API key configured in Settings",
+      "Use the CI snippets for GitHub Actions or GitLab CI integration",
+      "Hooks check for @module and @description in staged source files",
+    ],
+  },
+  {
+    title: "Settings",
+    description:
+      "Configure your API key, notification preferences, and default enforcement level. Settings apply globally but enforcement can be customized per-project.",
+    tips: [
+      "API key is required for AI features - add it here first",
+      "Enforcement level syncs with the Enforcement tab",
+      "Your API key is encrypted and stored locally - never sent to our servers",
     ],
   },
 ];
@@ -394,7 +456,7 @@ export function HelpView() {
             Found a bug or have a suggestion? Open an issue on GitHub.
           </p>
           <a
-            href="https://github.com/jmckinley/claude-code-assistant/issues"
+            href="https://github.com/jmckinley/project-jumpstart/issues"
             target="_blank"
             rel="noopener noreferrer"
             className="mt-3 inline-block rounded-md bg-neutral-800 px-4 py-2 text-sm font-medium text-neutral-200 transition-colors hover:bg-neutral-700"
