@@ -115,6 +115,7 @@ import type { Agent, LibraryAgent, AgentWorkflowStep, AgentTool } from "@/types/
 import { CommandCenter } from "@/components/ralph/CommandCenter";
 import { PromptAnalyzer } from "@/components/ralph/PromptAnalyzer";
 import { LoopMonitor } from "@/components/ralph/LoopMonitor";
+import { MistakesPanel } from "@/components/ralph/MistakesPanel";
 import { useRalph } from "@/hooks/useRalph";
 import { HealthMonitor } from "@/components/context/HealthMonitor";
 import { TokenBreakdownChart } from "@/components/context/TokenBreakdown";
@@ -778,6 +779,7 @@ function AgentsView({ onAgentsChange }: { onAgentsChange?: () => void }) {
 function RalphView({ onLoopStarted }: { onLoopStarted?: () => void }) {
   const {
     loops,
+    mistakes,
     analysis,
     context,
     analyzing,
@@ -789,21 +791,24 @@ function RalphView({ onLoopStarted }: { onLoopStarted?: () => void }) {
     resumeLoop,
     killLoop,
     loadLoops,
+    loadMistakes,
     loadContext,
     clearAnalysis,
   } = useRalph();
 
   useEffect(() => {
     loadLoops();
+    loadMistakes();
     loadContext();
 
     // Poll for loop updates every 5 seconds while on RALPH tab
     const interval = setInterval(() => {
       loadLoops();
+      loadMistakes();
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [loadLoops, loadContext]);
+  }, [loadLoops, loadMistakes, loadContext]);
 
   const handleStartLoop = useCallback(
     async (prompt: string) => {
@@ -845,6 +850,12 @@ function RalphView({ onLoopStarted }: { onLoopStarted?: () => void }) {
         onResume={resumeLoop}
         onKill={killLoop}
         onRefresh={loadLoops}
+      />
+
+      <MistakesPanel
+        mistakes={mistakes}
+        loading={loading}
+        onRefresh={loadMistakes}
       />
     </div>
   );

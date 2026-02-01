@@ -30,7 +30,7 @@
  * - Call loadContext() to fetch CLAUDE.md + mistakes before analysis
  * - Call recordMistake() to record a new mistake for learning
  * - Call learnPattern() to add a pattern to CLAUDE.md
- * - Returns { loops, analysis, context, analyzing, loading, error, analyzePrompt, startLoop, pauseLoop, resumeLoop, killLoop, loadLoops, loadContext, recordMistake, learnPattern, clearAnalysis }
+ * - Returns { loops, mistakes, analysis, context, analyzing, loading, error, analyzePrompt, startLoop, pauseLoop, resumeLoop, killLoop, loadLoops, loadMistakes, loadContext, recordMistake, learnPattern, clearAnalysis }
  *
  * CLAUDE NOTES:
  * - analyzePrompt sets the analysis state for display in PromptAnalyzer
@@ -53,6 +53,7 @@ import {
   resumeRalphLoop,
   killRalphLoop,
   listRalphLoops,
+  listRalphMistakes,
   scanModules,
   getRalphContext,
   recordRalphMistake,
@@ -62,6 +63,7 @@ import type { RalphLoop, PromptAnalysis, RalphLoopContext, RalphMistake } from "
 
 interface RalphState {
   loops: RalphLoop[];
+  mistakes: RalphMistake[];
   analysis: PromptAnalysis | null;
   context: RalphLoopContext | null;
   analyzing: boolean;
@@ -75,6 +77,7 @@ export function useRalph() {
 
   const [state, setState] = useState<RalphState>({
     loops: [],
+    mistakes: [],
     analysis: null,
     context: null,
     analyzing: false,
@@ -94,6 +97,20 @@ export function useRalph() {
         loading: false,
         error: err instanceof Error ? err.message : "Failed to load loops",
       }));
+    }
+  }, [activeProject]);
+
+  /**
+   * Load captured mistakes for the active project.
+   */
+  const loadMistakes = useCallback(async () => {
+    if (!activeProject) return;
+    try {
+      const mistakes = await listRalphMistakes(activeProject.id);
+      setState((s) => ({ ...s, mistakes }));
+    } catch (err) {
+      // Mistakes loading failures are non-critical
+      console.warn("Failed to load mistakes:", err);
     }
   }, [activeProject]);
 
@@ -317,6 +334,7 @@ export function useRalph() {
   return {
     ...state,
     loadLoops,
+    loadMistakes,
     loadContext,
     analyzePrompt,
     startLoop,

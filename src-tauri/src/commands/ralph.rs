@@ -27,6 +27,7 @@
 //! - resume_ralph_loop - Resume a paused loop
 //! - kill_ralph_loop - Kill a running or paused loop and mark as failed
 //! - list_ralph_loops - Get loops for a project
+//! - list_ralph_mistakes - Get mistakes for a project (for UI display)
 //! - get_ralph_context - Get CLAUDE.md summary, recent mistakes, and project patterns
 //! - record_ralph_mistake - Record a mistake from a RALPH loop for learning
 //! - update_claude_md_with_pattern - Append learned pattern to CLAUDE.md CLAUDE NOTES section
@@ -680,6 +681,48 @@ pub async fn list_ralph_loops(
         .collect();
 
     Ok(loops)
+}
+
+/// List all RALPH mistakes for a project, ordered by creation time (newest first).
+#[tauri::command]
+pub async fn list_ralph_mistakes(
+    project_id: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<RalphMistake>, String> {
+    let db = state
+        .db
+        .lock()
+        .map_err(|e| format!("Failed to lock database: {}", e))?;
+
+    let mut stmt = db
+        .prepare(
+            "SELECT id, project_id, loop_id, mistake_type, description, context, resolution, learned_pattern, created_at
+             FROM ralph_mistakes
+             WHERE project_id = ?1
+             ORDER BY created_at DESC
+             LIMIT 50",
+        )
+        .map_err(|e| format!("Failed to query mistakes: {}", e))?;
+
+    let mistakes = stmt
+        .query_map(rusqlite::params![project_id], |row| {
+            Ok(RalphMistake {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                loop_id: row.get(2)?,
+                mistake_type: row.get(3)?,
+                description: row.get(4)?,
+                context: row.get(5)?,
+                resolution: row.get(6)?,
+                learned_pattern: row.get(7)?,
+                created_at: row.get(8)?,
+            })
+        })
+        .map_err(|e| format!("Failed to read mistakes: {}", e))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(mistakes)
 }
 
 // --- Scoring Heuristics ---

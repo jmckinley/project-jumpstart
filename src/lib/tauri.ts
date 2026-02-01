@@ -63,6 +63,7 @@
  * - resumeRalphLoop - Resume a paused RALPH loop
  * - killRalphLoop - Kill a running or paused RALPH loop
  * - listRalphLoops - List loops for a project
+ * - listRalphMistakes - List mistakes for a project
  * - getRalphContext - Get CLAUDE.md summary, recent mistakes, and project patterns
  * - recordRalphMistake - Record a mistake from a RALPH loop for learning
  * - updateClaudeMdWithPattern - Append learned pattern to CLAUDE.md
@@ -294,6 +295,10 @@ export async function killRalphLoop(loopId: string): Promise<void> {
 
 export async function listRalphLoops(projectId: string): Promise<RalphLoop[]> {
   return invoke<RalphLoop[]>("list_ralph_loops", { projectId });
+}
+
+export async function listRalphMistakes(projectId: string): Promise<RalphMistake[]> {
+  return invoke<RalphMistake[]>("list_ralph_mistakes", { projectId });
 }
 
 export async function getRalphContext(projectId: string, projectPath: string): Promise<RalphLoopContext> {
