@@ -24,12 +24,13 @@
  * - When useAi=true and API key is configured, uses AI for deeper analysis
  * - Call startLoop() to begin a RALPH loop (requires analysis first)
  * - Call pauseLoop() to pause an active loop
- * - Call killLoop() to kill a running loop and mark as failed
+ * - Call resumeLoop() to resume a paused loop
+ * - Call killLoop() to kill a running or paused loop and mark as failed
  * - Call loadLoops() to refresh loop history
  * - Call loadContext() to fetch CLAUDE.md + mistakes before analysis
  * - Call recordMistake() to record a new mistake for learning
  * - Call learnPattern() to add a pattern to CLAUDE.md
- * - Returns { loops, analysis, context, analyzing, loading, error, analyzePrompt, startLoop, pauseLoop, loadLoops, loadContext, recordMistake, learnPattern, clearAnalysis }
+ * - Returns { loops, analysis, context, analyzing, loading, error, analyzePrompt, startLoop, pauseLoop, resumeLoop, killLoop, loadLoops, loadContext, recordMistake, learnPattern, clearAnalysis }
  *
  * CLAUDE NOTES:
  * - analyzePrompt sets the analysis state for display in PromptAnalyzer
@@ -49,6 +50,7 @@ import {
   analyzeRalphPromptWithAi,
   startRalphLoop,
   pauseRalphLoop,
+  resumeRalphLoop,
   killRalphLoop,
   listRalphLoops,
   scanModules,
@@ -206,6 +208,27 @@ export function useRalph() {
     [],
   );
 
+  const resumeLoop = useCallback(
+    async (loopId: string) => {
+      setState((s) => ({ ...s, error: null }));
+      try {
+        await resumeRalphLoop(loopId);
+        setState((s) => ({
+          ...s,
+          loops: s.loops.map((l) =>
+            l.id === loopId ? { ...l, status: "running" as const } : l,
+          ),
+        }));
+      } catch (err) {
+        setState((s) => ({
+          ...s,
+          error: err instanceof Error ? err.message : "Failed to resume loop",
+        }));
+      }
+    },
+    [],
+  );
+
   const killLoop = useCallback(
     async (loopId: string) => {
       setState((s) => ({ ...s, error: null }));
@@ -298,6 +321,7 @@ export function useRalph() {
     analyzePrompt,
     startLoop,
     pauseLoop,
+    resumeLoop,
     killLoop,
     clearAnalysis,
     recordMistake,

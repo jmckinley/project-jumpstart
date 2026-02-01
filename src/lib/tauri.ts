@@ -60,7 +60,8 @@
  * - analyzeRalphPromptWithAi - AI-powered prompt analysis with project context
  * - startRalphLoop - Start a new RALPH loop
  * - pauseRalphLoop - Pause an active RALPH loop
- * - killRalphLoop - Kill a running RALPH loop
+ * - resumeRalphLoop - Resume a paused RALPH loop
+ * - killRalphLoop - Kill a running or paused RALPH loop
  * - listRalphLoops - List loops for a project
  * - getRalphContext - Get CLAUDE.md summary, recent mistakes, and project patterns
  * - recordRalphMistake - Record a mistake from a RALPH loop for learning
@@ -281,6 +282,10 @@ export async function startRalphLoop(
 
 export async function pauseRalphLoop(loopId: string): Promise<void> {
   return invoke<void>("pause_ralph_loop", { loopId });
+}
+
+export async function resumeRalphLoop(loopId: string): Promise<void> {
+  return invoke<void>("resume_ralph_loop", { loopId });
 }
 
 export async function killRalphLoop(loopId: string): Promise<void> {

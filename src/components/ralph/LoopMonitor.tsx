@@ -5,7 +5,8 @@
  * PURPOSE:
  * - Show list of RALPH loops for the current project
  * - Display loop status (running, paused, completed, failed)
- * - Allow pausing active loops
+ * - Allow pausing active loops and resuming paused loops
+ * - Allow killing running or paused loops
  * - Show loop metadata (quality score, iterations, timestamps)
  *
  * DEPENDENCIES:
@@ -22,6 +23,7 @@
  *
  * CLAUDE NOTES:
  * - Only "running" loops can be paused
+ * - Only "paused" loops can be resumed
  * - Both "running" and "paused" loops can be killed
  * - Failed/completed loops are in terminal state, no actions available
  * - Empty state shows when no loops exist
@@ -35,6 +37,7 @@ interface LoopMonitorProps {
   loops: RalphLoop[];
   loading: boolean;
   onPause: (loopId: string) => void;
+  onResume: (loopId: string) => void;
   onKill: (loopId: string) => void;
   onRefresh: () => void;
 }
@@ -71,10 +74,12 @@ function formatRelativeTime(isoString: string): string {
 function LoopCard({
   loop,
   onPause,
+  onResume,
   onKill,
 }: {
   loop: RalphLoop;
   onPause: (id: string) => void;
+  onResume: (id: string) => void;
   onKill: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -134,12 +139,20 @@ function LoopCard({
             </div>
           )}
           {loop.status === "paused" && (
-            <button
-              onClick={() => onKill(loop.id)}
-              className="rounded px-2 py-1 text-xs font-medium text-red-400 transition-colors hover:bg-red-950"
-            >
-              Kill
-            </button>
+            <div className="flex gap-1">
+              <button
+                onClick={() => onResume(loop.id)}
+                className="rounded px-2 py-1 text-xs font-medium text-blue-400 transition-colors hover:bg-blue-950"
+              >
+                Resume
+              </button>
+              <button
+                onClick={() => onKill(loop.id)}
+                className="rounded px-2 py-1 text-xs font-medium text-red-400 transition-colors hover:bg-red-950"
+              >
+                Kill
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -147,7 +160,7 @@ function LoopCard({
   );
 }
 
-export function LoopMonitor({ loops, loading, onPause, onKill, onRefresh }: LoopMonitorProps) {
+export function LoopMonitor({ loops, loading, onPause, onResume, onKill, onRefresh }: LoopMonitorProps) {
   const activeLoops = loops.filter((l) => l.status === "running");
   const recentLoops = loops.filter((l) => l.status !== "running");
 
@@ -177,7 +190,7 @@ export function LoopMonitor({ loops, loading, onPause, onKill, onRefresh }: Loop
             Active ({activeLoops.length})
           </h4>
           {activeLoops.map((loop) => (
-            <LoopCard key={loop.id} loop={loop} onPause={onPause} onKill={onKill} />
+            <LoopCard key={loop.id} loop={loop} onPause={onPause} onResume={onResume} onKill={onKill} />
           ))}
         </div>
       )}
@@ -189,7 +202,7 @@ export function LoopMonitor({ loops, loading, onPause, onKill, onRefresh }: Loop
             Recent ({recentLoops.length})
           </h4>
           {recentLoops.map((loop) => (
-            <LoopCard key={loop.id} loop={loop} onPause={onPause} onKill={onKill} />
+            <LoopCard key={loop.id} loop={loop} onPause={onPause} onResume={onResume} onKill={onKill} />
           ))}
         </div>
       )}

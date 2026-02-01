@@ -786,6 +786,7 @@ function RalphView({ onLoopStarted }: { onLoopStarted?: () => void }) {
     analyzePrompt,
     startLoop,
     pauseLoop,
+    resumeLoop,
     killLoop,
     loadLoops,
     loadContext,
@@ -841,6 +842,7 @@ function RalphView({ onLoopStarted }: { onLoopStarted?: () => void }) {
         loops={loops}
         loading={loading}
         onPause={pauseLoop}
+        onResume={resumeLoop}
         onKill={killLoop}
         onRefresh={loadLoops}
       />

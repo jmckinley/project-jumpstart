@@ -24,7 +24,8 @@
 //! - analyze_ralph_prompt_with_ai - AI-powered prompt analysis and enhancement
 //! - start_ralph_loop - Create loop and execute via Claude CLI in background
 //! - pause_ralph_loop - Pause an active loop
-//! - kill_ralph_loop - Kill a running loop and mark as failed
+//! - resume_ralph_loop - Resume a paused loop
+//! - kill_ralph_loop - Kill a running or paused loop and mark as failed
 //! - list_ralph_loops - Get loops for a project
 //! - get_ralph_context - Get CLAUDE.md summary, recent mistakes, and project patterns
 //! - record_ralph_mistake - Record a mistake from a RALPH loop for learning
@@ -472,7 +473,59 @@ pub async fn pause_ralph_loop(
     Ok(())
 }
 
-/// Kill a running RALPH loop by ID.
+/// Resume a paused RALPH loop by ID.
+/// Transitions status from "paused" back to "running" and re-executes the loop.
+#[tauri::command]
+pub async fn resume_ralph_loop(
+    loop_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    // Get loop details and project info
+    let (project_id, project_path, prompt) = {
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| format!("Failed to lock database: {}", e))?;
+
+        let mut stmt = db
+            .prepare("SELECT rl.project_id, p.path, COALESCE(rl.enhanced_prompt, rl.prompt) FROM ralph_loops rl JOIN projects p ON rl.project_id = p.id WHERE rl.id = ?1 AND rl.status = 'paused'")
+            .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
+        stmt.query_row(rusqlite::params![&loop_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })
+        .map_err(|_| "Loop not found or not currently paused.".to_string())?
+    };
+
+    // Update status to running
+    {
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| format!("Failed to lock database: {}", e))?;
+
+        db.execute(
+            "UPDATE ralph_loops SET status = 'running', paused_at = NULL WHERE id = ?1",
+            rusqlite::params![&loop_id],
+        )
+        .map_err(|e| format!("Failed to resume RALPH loop: {}", e))?;
+    }
+
+    // Re-execute in background
+    let lid = loop_id.clone();
+    let pid = project_id.clone();
+    tokio::spawn(async move {
+        execute_ralph_loop(lid, pid, project_path, prompt).await;
+    });
+
+    Ok(())
+}
+
+/// Kill a running or paused RALPH loop by ID.
 /// Marks the loop as failed and attempts to kill any associated Claude process.
 #[tauri::command]
 pub async fn kill_ralph_loop(
@@ -488,13 +541,13 @@ pub async fn kill_ralph_loop(
 
     let rows_updated = db
         .execute(
-            "UPDATE ralph_loops SET status = 'failed', outcome = 'Killed by user', completed_at = ?1 WHERE id = ?2 AND status = 'running'",
+            "UPDATE ralph_loops SET status = 'failed', outcome = 'Killed by user', completed_at = ?1 WHERE id = ?2 AND status IN ('running', 'paused')",
             rusqlite::params![now, loop_id],
         )
         .map_err(|e| format!("Failed to kill RALPH loop: {}", e))?;
 
     if rows_updated == 0 {
-        return Err("Loop not found or not currently running.".to_string());
+        return Err("Loop not found or already completed/failed.".to_string());
     }
 
     // Try to kill any Claude processes that might be running for this loop
