@@ -48,6 +48,7 @@ pub struct HookStatus {
     pub hook_path: String,
     pub mode: String,
     pub has_husky: bool,
+    pub has_git: bool,
 }
 
 /// CI integration template snippet.

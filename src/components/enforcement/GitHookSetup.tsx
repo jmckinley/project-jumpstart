@@ -6,6 +6,7 @@
  * - Display current git hook installation status
  * - Allow installing/updating pre-commit hooks with block, warn, or auto-update mode
  * - Show Husky detection if present
+ * - Provide one-click git initialization if no repository exists
  *
  * DEPENDENCIES:
  * - @/components/ui/card - Card layout
@@ -13,16 +14,18 @@
  * - @/components/ui/badge - Status badges
  * - @/types/enforcement - HookStatus type
  * - @/stores/settingsStore - Sync enforcement level to settings
- * - @/lib/tauri - saveSetting for persisting enforcement level
+ * - @/lib/tauri - saveSetting, initGit for persisting enforcement level and git init
  *
  * EXPORTS:
  * - GitHookSetup - Hook setup and status component
  *
  * PATTERNS:
- * - Receives hookStatus, loading, installing from parent
+ * - Receives hookStatus, projectPath, loading, installing from parent
  * - onInstall callback triggers hook installation with selected mode
  * - onRefresh callback refreshes hook status
  * - Shows status badge: green for installed, yellow for external, gray for not installed
+ * - Active mode button shows "(Active)" suffix with ring styling
+ * - No git repo shows warning with one-click "Initialize Git Repository" button
  *
  * CLAUDE NOTES:
  * - Hook modes:
@@ -30,20 +33,24 @@
  *   - "warn" (exit 0, allows commit with warning)
  *   - "auto-update" (generates missing docs via AI, stages them, allows commit)
  * - "external" mode means a non-Jumpstart hook is already present
- * - has_husky flag indicates Husky framework is detected alongside
+ * - hasGit flag indicates if .git directory exists
+ * - hasHusky flag indicates Husky framework is detected alongside
  * - Auto-update mode requires API key configured in Project Jumpstart settings
  * - Installing a hook syncs the mode to the Settings enforcement level
+ * - Auto-update button has blue fill, active buttons have ring styling
  */
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { HookStatus } from "@/types/enforcement";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { saveSetting } from "@/lib/tauri";
+import { saveSetting, initGit } from "@/lib/tauri";
 
 interface GitHookSetupProps {
   hookStatus: HookStatus | null;
+  projectPath: string;
   loading: boolean;
   installing: boolean;
   onInstall: (mode: "warn" | "block" | "auto-update") => void;
@@ -63,8 +70,9 @@ function getStatusBadge(status: HookStatus | null) {
   return <Badge variant="outline" className="text-neutral-500">Not Installed</Badge>;
 }
 
-export function GitHookSetup({ hookStatus, loading, installing, onInstall, onRefresh }: GitHookSetupProps) {
+export function GitHookSetup({ hookStatus, projectPath, loading, installing, onInstall, onRefresh }: GitHookSetupProps) {
   const setEnforcementLevel = useSettingsStore((s) => s.setEnforcementLevel);
+  const [initializingGit, setInitializingGit] = useState(false);
 
   async function handleInstall(mode: "warn" | "block" | "auto-update") {
     // Sync with settings store
@@ -73,6 +81,20 @@ export function GitHookSetup({ hookStatus, loading, installing, onInstall, onRef
     // Call the actual install
     onInstall(mode);
   }
+
+  async function handleInitGit() {
+    setInitializingGit(true);
+    try {
+      await initGit(projectPath);
+      onRefresh();
+    } catch (err) {
+      console.error("Failed to initialize git:", err);
+    } finally {
+      setInitializingGit(false);
+    }
+  }
+
+  const isActive = (mode: string) => hookStatus?.installed && hookStatus?.mode === mode;
 
   return (
     <Card className="border-neutral-800 bg-neutral-900">
@@ -89,6 +111,29 @@ export function GitHookSetup({ hookStatus, loading, installing, onInstall, onRef
           <code className="rounded bg-neutral-800 px-1 py-0.5 text-xs">@description</code> headers will be flagged.
         </p>
 
+        {/* No git repository detected */}
+        {hookStatus && !hookStatus.hasGit && (
+          <div className="rounded-md border border-amber-800 bg-amber-950/40 p-4 space-y-3">
+            <div className="flex items-center gap-2 text-amber-400">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span className="font-medium">No Git Repository</span>
+            </div>
+            <p className="text-sm text-amber-300/80">
+              This project doesn't have a git repository. Initialize git to enable pre-commit hooks.
+            </p>
+            <Button
+              size="sm"
+              onClick={handleInitGit}
+              disabled={initializingGit}
+              className="bg-amber-600 hover:bg-amber-500 text-white"
+            >
+              {initializingGit ? "Initializing..." : "Initialize Git Repository"}
+            </Button>
+          </div>
+        )}
+
         {hookStatus?.hasHusky && (
           <div className="rounded-md border border-yellow-900 bg-yellow-950/30 px-3 py-2 text-xs text-yellow-400">
             Husky detected — the hook will be installed alongside your existing Husky setup.
@@ -101,53 +146,68 @@ export function GitHookSetup({ hookStatus, loading, installing, onInstall, onRef
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            size="sm"
-            onClick={() => handleInstall("auto-update")}
-            disabled={installing || loading}
-            className="bg-blue-600 hover:bg-blue-500"
-          >
-            {installing ? "Installing..." : "Auto-Update (Recommended)"}
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={() => handleInstall("block")}
-            disabled={installing || loading}
-          >
-            {installing ? "Installing..." : "Block"}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleInstall("warn")}
-            disabled={installing || loading}
-            className="border-neutral-700 text-neutral-300 hover:bg-neutral-800"
-          >
-            {installing ? "Installing..." : "Warn"}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onRefresh}
-            disabled={loading}
-            className="text-neutral-400 hover:text-neutral-200"
-          >
-            Refresh
-          </Button>
-        </div>
+        {/* Only show hook buttons if git exists */}
+        {hookStatus?.hasGit && (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => handleInstall("auto-update")}
+                disabled={installing || loading}
+                className={isActive("auto-update")
+                  ? "bg-blue-500 hover:bg-blue-500 ring-2 ring-blue-400 ring-offset-2 ring-offset-neutral-900"
+                  : "bg-blue-600 hover:bg-blue-500"
+                }
+              >
+                {installing ? "Installing..." : isActive("auto-update") ? "Auto-Update (Active)" : "Auto-Update (Recommended)"}
+              </Button>
+              <Button
+                size="sm"
+                variant={isActive("block") ? "default" : "destructive"}
+                onClick={() => handleInstall("block")}
+                disabled={installing || loading}
+                className={isActive("block")
+                  ? "bg-red-500 hover:bg-red-500 ring-2 ring-red-400 ring-offset-2 ring-offset-neutral-900"
+                  : ""
+                }
+              >
+                {installing ? "Installing..." : isActive("block") ? "Block (Active)" : "Block"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleInstall("warn")}
+                disabled={installing || loading}
+                className={isActive("warn")
+                  ? "border-yellow-500 bg-yellow-500/20 text-yellow-400 ring-2 ring-yellow-400 ring-offset-2 ring-offset-neutral-900"
+                  : "border-neutral-700 text-neutral-300 hover:bg-neutral-800"
+                }
+              >
+                {installing ? "Installing..." : isActive("warn") ? "Warn (Active)" : "Warn"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={onRefresh}
+                disabled={loading}
+                className="text-neutral-400 hover:text-neutral-200"
+              >
+                Refresh
+              </Button>
+            </div>
 
-        <div className="text-xs text-neutral-500 space-y-1">
-          <p><span className="font-medium text-blue-400">Auto-update</span> — Generates missing docs via AI, stages them, then commits</p>
-          <p><span className="font-medium text-red-400">Block</span> — Prevents commits with missing doc headers (must fix manually)</p>
-          <p><span className="font-medium text-yellow-400">Warn</span> — Allows commits but prints warnings about missing docs</p>
-        </div>
+            <div className="text-xs text-neutral-500 space-y-1">
+              <p><span className="font-medium text-blue-400">Auto-update</span> — Generates missing docs via AI, stages them, then commits</p>
+              <p><span className="font-medium text-red-400">Block</span> — Prevents commits with missing doc headers (must fix manually)</p>
+              <p><span className="font-medium text-yellow-400">Warn</span> — Allows commits but prints warnings about missing docs</p>
+            </div>
 
-        {hookStatus?.installed && (
-          <div className="rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-xs text-neutral-500">
-            Hook path: {hookStatus.hookPath}
-          </div>
+            {hookStatus?.installed && (
+              <div className="rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-xs text-neutral-500">
+                Hook path: {hookStatus.hookPath}
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

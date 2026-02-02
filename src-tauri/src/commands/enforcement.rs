@@ -202,6 +202,7 @@ exit 0
         hook_path: hook_path.to_string_lossy().to_string(),
         mode,
         has_husky,
+        has_git: true,
     })
 }
 
@@ -293,19 +294,50 @@ exit 0
     Ok(())
 }
 
+/// Initialize a git repository in the project directory.
+#[tauri::command]
+pub async fn init_git(project_path: String) -> Result<(), String> {
+    let path = Path::new(&project_path);
+
+    if !path.exists() {
+        return Err("Project path does not exist".to_string());
+    }
+
+    if path.join(".git").exists() {
+        return Ok(()); // Already a git repo
+    }
+
+    // Run git init
+    let output = std::process::Command::new("git")
+        .arg("init")
+        .current_dir(path)
+        .output()
+        .map_err(|e| format!("Failed to run git init: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("git init failed: {}", stderr));
+    }
+
+    Ok(())
+}
+
 /// Check the current status of git hooks for a project.
 #[tauri::command]
 pub async fn get_hook_status(project_path: String) -> Result<HookStatus, String> {
     let path = Path::new(&project_path);
-    let hook_path = path.join(".git").join("hooks").join("pre-commit");
+    let git_dir = path.join(".git");
+    let has_git = git_dir.exists();
+    let hook_path = git_dir.join("hooks").join("pre-commit");
     let has_husky = path.join(".husky").exists();
 
-    if !hook_path.exists() {
+    if !has_git || !hook_path.exists() {
         return Ok(HookStatus {
             installed: false,
             hook_path: hook_path.to_string_lossy().to_string(),
             mode: "none".to_string(),
             has_husky,
+            has_git,
         });
     }
 
@@ -330,6 +362,7 @@ pub async fn get_hook_status(project_path: String) -> Result<HookStatus, String>
         hook_path: hook_path.to_string_lossy().to_string(),
         mode,
         has_husky,
+        has_git,
     })
 }
 

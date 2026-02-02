@@ -42,6 +42,7 @@ export interface HookStatus {
   hookPath: string;
   mode: string;
   hasHusky: boolean;
+  hasGit: boolean;
 }
 
 export interface CiSnippet {

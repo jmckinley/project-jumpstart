@@ -26,16 +26,26 @@ vi.mock("@/stores/settingsStore", () => ({
     selector({ setEnforcementLevel: mockSetEnforcementLevel }),
 }));
 
-// Mock tauri saveSetting
+// Mock tauri functions
 vi.mock("@/lib/tauri", () => ({
   saveSetting: vi.fn().mockResolvedValue(undefined),
+  initGit: vi.fn().mockResolvedValue(undefined),
 }));
 
 const mockOnInstall = vi.fn();
 const mockOnRefresh = vi.fn();
 
+const defaultHookStatus: HookStatus = {
+  installed: false,
+  hookPath: "/path/.git/hooks/pre-commit",
+  mode: "none",
+  hasHusky: false,
+  hasGit: true,
+};
+
 const defaultProps = {
-  hookStatus: null,
+  hookStatus: defaultHookStatus,
+  projectPath: "/test/project",
   loading: false,
   installing: false,
   onInstall: mockOnInstall,
@@ -100,6 +110,7 @@ describe("GitHookSetup", () => {
         hookPath: "/path/.git/hooks/pre-commit",
         mode: "auto-update",
         hasHusky: false,
+        hasGit: true,
       };
       render(<GitHookSetup {...defaultProps} hookStatus={hookStatus} />);
 
@@ -112,6 +123,7 @@ describe("GitHookSetup", () => {
         hookPath: "/path/.git/hooks/pre-commit",
         mode: "external",
         hasHusky: false,
+        hasGit: true,
       };
       render(<GitHookSetup {...defaultProps} hookStatus={hookStatus} />);
 
@@ -124,6 +136,7 @@ describe("GitHookSetup", () => {
         hookPath: "/path/.git/hooks/pre-commit",
         mode: "none",
         hasHusky: false,
+        hasGit: true,
       };
       render(<GitHookSetup {...defaultProps} hookStatus={hookStatus} />);
 
@@ -138,6 +151,7 @@ describe("GitHookSetup", () => {
         hookPath: "/path/.git/hooks/pre-commit",
         mode: "none",
         hasHusky: true,
+        hasGit: true,
       };
       render(<GitHookSetup {...defaultProps} hookStatus={hookStatus} />);
 
@@ -152,6 +166,7 @@ describe("GitHookSetup", () => {
         hookPath: "/path/.git/hooks/pre-commit",
         mode: "none",
         hasHusky: false,
+        hasGit: true,
       };
       render(<GitHookSetup {...defaultProps} hookStatus={hookStatus} />);
 
@@ -166,6 +181,7 @@ describe("GitHookSetup", () => {
         hookPath: "/path/.git/hooks/pre-commit",
         mode: "external",
         hasHusky: false,
+        hasGit: true,
       };
       render(<GitHookSetup {...defaultProps} hookStatus={hookStatus} />);
 
@@ -182,6 +198,7 @@ describe("GitHookSetup", () => {
         hookPath: "/test/project/.git/hooks/pre-commit",
         mode: "block",
         hasHusky: false,
+        hasGit: true,
       };
       render(<GitHookSetup {...defaultProps} hookStatus={hookStatus} />);
 
@@ -196,6 +213,7 @@ describe("GitHookSetup", () => {
         hookPath: "/test/project/.git/hooks/pre-commit",
         mode: "none",
         hasHusky: false,
+        hasGit: true,
       };
       render(<GitHookSetup {...defaultProps} hookStatus={hookStatus} />);
 
@@ -281,6 +299,7 @@ describe("GitHookSetup", () => {
         hookPath: "/path/.git/hooks/pre-commit",
         mode: "block",
         hasHusky: false,
+        hasGit: true,
       };
       render(<GitHookSetup {...defaultProps} hookStatus={hookStatus} />);
 
@@ -293,6 +312,7 @@ describe("GitHookSetup", () => {
         hookPath: "/path/.git/hooks/pre-commit",
         mode: "warn",
         hasHusky: false,
+        hasGit: true,
       };
       render(<GitHookSetup {...defaultProps} hookStatus={hookStatus} />);
 
@@ -305,10 +325,115 @@ describe("GitHookSetup", () => {
         hookPath: "/path/.git/hooks/pre-commit",
         mode: "auto-update",
         hasHusky: false,
+        hasGit: true,
       };
       render(<GitHookSetup {...defaultProps} hookStatus={hookStatus} />);
 
       expect(screen.getByText("Installed (auto-update)")).toBeInTheDocument();
+    });
+  });
+
+  describe("no git repository", () => {
+    it("should show warning when hasGit is false", () => {
+      const hookStatus: HookStatus = {
+        installed: false,
+        hookPath: "/path/.git/hooks/pre-commit",
+        mode: "none",
+        hasHusky: false,
+        hasGit: false,
+      };
+      render(<GitHookSetup {...defaultProps} hookStatus={hookStatus} />);
+
+      expect(screen.getByText("No Git Repository")).toBeInTheDocument();
+      expect(screen.getByText(/This project doesn't have a git repository/)).toBeInTheDocument();
+    });
+
+    it("should show Initialize Git Repository button when hasGit is false", () => {
+      const hookStatus: HookStatus = {
+        installed: false,
+        hookPath: "/path/.git/hooks/pre-commit",
+        mode: "none",
+        hasHusky: false,
+        hasGit: false,
+      };
+      render(<GitHookSetup {...defaultProps} hookStatus={hookStatus} />);
+
+      expect(screen.getByRole("button", { name: "Initialize Git Repository" })).toBeInTheDocument();
+    });
+
+    it("should hide hook installation buttons when hasGit is false", () => {
+      const hookStatus: HookStatus = {
+        installed: false,
+        hookPath: "/path/.git/hooks/pre-commit",
+        mode: "none",
+        hasHusky: false,
+        hasGit: false,
+      };
+      render(<GitHookSetup {...defaultProps} hookStatus={hookStatus} />);
+
+      expect(screen.queryByRole("button", { name: "Auto-Update (Recommended)" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Block" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Warn" })).not.toBeInTheDocument();
+    });
+
+    it("should call initGit and refresh when Initialize button clicked", async () => {
+      const { initGit } = await import("@/lib/tauri");
+      const hookStatus: HookStatus = {
+        installed: false,
+        hookPath: "/path/.git/hooks/pre-commit",
+        mode: "none",
+        hasHusky: false,
+        hasGit: false,
+      };
+      render(<GitHookSetup {...defaultProps} hookStatus={hookStatus} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Initialize Git Repository" }));
+
+      await waitFor(() => {
+        expect(initGit).toHaveBeenCalledWith("/test/project");
+      });
+      expect(mockOnRefresh).toHaveBeenCalled();
+    });
+  });
+
+  describe("active state buttons", () => {
+    it("should show Auto-Update (Active) when auto-update mode is installed", () => {
+      const hookStatus: HookStatus = {
+        installed: true,
+        hookPath: "/path/.git/hooks/pre-commit",
+        mode: "auto-update",
+        hasHusky: false,
+        hasGit: true,
+      };
+      render(<GitHookSetup {...defaultProps} hookStatus={hookStatus} />);
+
+      expect(screen.getByRole("button", { name: "Auto-Update (Active)" })).toBeInTheDocument();
+    });
+
+    it("should show Block (Active) when block mode is installed", () => {
+      const hookStatus: HookStatus = {
+        installed: true,
+        hookPath: "/path/.git/hooks/pre-commit",
+        mode: "block",
+        hasHusky: false,
+        hasGit: true,
+      };
+      render(<GitHookSetup {...defaultProps} hookStatus={hookStatus} />);
+
+      expect(screen.getByRole("button", { name: "Block (Active)" })).toBeInTheDocument();
+    });
+
+    it("should show Warn (Active) when warn mode is installed", () => {
+      const hookStatus: HookStatus = {
+        installed: true,
+        hookPath: "/path/.git/hooks/pre-commit",
+        mode: "warn",
+        hasHusky: false,
+        hasGit: true,
+      };
+      render(<GitHookSetup {...defaultProps} hookStatus={hookStatus} />);
+
+      expect(screen.getByRole("button", { name: "Warn (Active)" })).toBeInTheDocument();
     });
   });
 });

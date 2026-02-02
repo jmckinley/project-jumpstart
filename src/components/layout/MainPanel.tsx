@@ -923,6 +923,7 @@ function ContextView() {
 }
 
 function EnforcementView({ onHooksInstalled }: { onHooksInstalled?: () => void }) {
+  const activeProject = useProjectStore((s) => s.activeProject);
   const {
     hookStatus,
     snippets,
@@ -958,6 +959,7 @@ function EnforcementView({ onHooksInstalled }: { onHooksInstalled?: () => void }
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <GitHookSetup
           hookStatus={hookStatus}
+          projectPath={activeProject?.path ?? ""}
           loading={loading}
           installing={installing}
           onInstall={handleInstall}

@@ -77,6 +77,7 @@
  *
  * Enforcement:
  * - installGitHooks - Install pre-commit hook for doc enforcement
+ * - initGit - Initialize a git repository in project directory
  * - getHookStatus - Check if hooks are installed
  * - getEnforcementEvents - List recent enforcement events
  * - getCiSnippets - Generate CI integration templates
@@ -360,6 +361,10 @@ export async function listCheckpoints(projectId: string): Promise<Checkpoint[]> 
 
 export async function installGitHooks(projectPath: string, mode: string): Promise<HookStatus> {
   return invoke<HookStatus>("install_git_hooks", { projectPath, mode });
+}
+
+export async function initGit(projectPath: string): Promise<void> {
+  return invoke<void>("init_git", { projectPath });
 }
 
 export async function getHookStatus(projectPath: string): Promise<HookStatus> {
