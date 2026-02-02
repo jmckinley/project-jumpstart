@@ -153,4 +153,4 @@ MIT License - see LICENSE file for details.
 
 ## Feedback
 
-Please report issues at: https://github.com/jmckinley/project-jumpstart/issues
+Please report issues at: https://github.com/jmckinley/project-jumpstart-feedback/issues

@@ -631,7 +631,7 @@ export function HelpView() {
             Found a bug or have a suggestion? Open an issue on GitHub.
           </p>
           <a
-            href="https://github.com/jmckinley/project-jumpstart/issues"
+            href="https://github.com/jmckinley/project-jumpstart-feedback/issues"
             target="_blank"
             rel="noopener noreferrer"
             className="mt-3 inline-block rounded-md bg-neutral-800 px-4 py-2 text-sm font-medium text-neutral-200 transition-colors hover:bg-neutral-700"
