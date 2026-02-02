@@ -163,8 +163,8 @@ interface CommandCenterProps {
   analyzing: boolean;
   loading: boolean;
   onAnalyze: (prompt: string) => void;
-  onStartLoop: (prompt: string) => void;
-  onStartLoopPrd: (prdJson: string) => void;
+  onStartLoop: (prompt: string) => Promise<void>;
+  onStartLoopPrd: (prdJson: string) => Promise<void>;
   onClearAnalysis: () => void;
 }
 
@@ -182,6 +182,7 @@ export function CommandCenter({
   const [prompt, setPrompt] = useState("");
   const [prdJson, setPrdJson] = useState(() => JSON.stringify(DEFAULT_PRD, null, 2));
   const [prdError, setPrdError] = useState<string | null>(null);
+  const [loopStarted, setLoopStarted] = useState(false);
 
   // Validate PRD JSON
   const parsedPrd = useMemo(() => {
@@ -205,18 +206,22 @@ export function CommandCenter({
     }
   }, [prompt, onAnalyze]);
 
-  const handleStartLoop = useCallback(() => {
+  const handleStartLoop = useCallback(async () => {
     if (prompt.trim()) {
-      onStartLoop(prompt.trim());
+      await onStartLoop(prompt.trim());
       setPrompt("");
       onClearAnalysis();
+      setLoopStarted(true);
+      setTimeout(() => setLoopStarted(false), 3000);
     }
   }, [prompt, onStartLoop, onClearAnalysis]);
 
-  const handleStartLoopPrd = useCallback(() => {
+  const handleStartLoopPrd = useCallback(async () => {
     if (parsedPrd) {
-      onStartLoopPrd(prdJson);
+      await onStartLoopPrd(prdJson);
       setPrdJson(JSON.stringify(DEFAULT_PRD, null, 2));
+      setLoopStarted(true);
+      setTimeout(() => setLoopStarted(false), 3000);
     }
   }, [parsedPrd, prdJson, onStartLoopPrd]);
 
@@ -233,7 +238,7 @@ export function CommandCenter({
   }, []);
 
   const canAnalyze = prompt.trim().length > 0 && !analyzing;
-  const canStart = analysis !== null && !loading;
+  const canStart = prompt.trim().length > 0 && !loading;
   const canStartPrd = parsedPrd !== null && !loading;
 
   return (
@@ -373,6 +378,29 @@ export function CommandCenter({
             />
           </div>
 
+          {/* Auto-Enhance Inline */}
+          {analysis?.enhancedPrompt && (
+            <button
+              onClick={() => handleApplyEnhanced(analysis.enhancedPrompt!)}
+              className="flex w-full items-center gap-2 rounded-md border border-blue-900 bg-blue-950/30 px-3 py-2 text-left text-sm text-blue-400 transition-colors hover:bg-blue-950/50"
+            >
+              <span className="shrink-0 font-medium">Auto-Enhance</span>
+              <span className="text-xs text-blue-500">
+                Apply RALPH structure to improve prompt quality
+              </span>
+            </button>
+          )}
+
+          {/* Loop Started Success Message */}
+          {loopStarted && (
+            <div className="flex items-center gap-2 rounded-md border border-green-800 bg-green-950/50 px-3 py-2 text-sm text-green-400">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              <span>RALPH loop started! Check the Loop Monitor below for progress.</span>
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="flex items-center gap-3">
             <button
@@ -386,7 +414,7 @@ export function CommandCenter({
             <button
               onClick={handleStartLoop}
               disabled={!canStart}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-neutral-900 disabled:cursor-not-allowed disabled:bg-blue-600/50"
             >
               {loading ? "Starting..." : "Start RALPH Loop"}
             </button>
@@ -402,19 +430,6 @@ export function CommandCenter({
               </span>
             )}
           </div>
-
-          {/* Auto-Enhance Inline */}
-          {analysis?.enhancedPrompt && (
-            <button
-              onClick={() => handleApplyEnhanced(analysis.enhancedPrompt!)}
-              className="flex w-full items-center gap-2 rounded-md border border-blue-900 bg-blue-950/30 px-3 py-2 text-left text-sm text-blue-400 transition-colors hover:bg-blue-950/50"
-            >
-              <span className="shrink-0 font-medium">Auto-Enhance</span>
-              <span className="text-xs text-blue-500">
-                Apply RALPH structure to improve prompt quality
-              </span>
-            </button>
-          )}
         </>
       )}
 
