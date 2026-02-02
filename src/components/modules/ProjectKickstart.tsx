@@ -70,6 +70,7 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
   // Review state
   const [inferring, setInferring] = useState(false);
   const [inferredStack, setInferredStack] = useState<InferredStack | null>(null);
+  const [reviewedLanguage, setReviewedLanguage] = useState<string>("");
   const [reviewedFramework, setReviewedFramework] = useState<string>("");
   const [reviewedDatabase, setReviewedDatabase] = useState<string>("");
   const [reviewedStyling, setReviewedStyling] = useState<string>("");
@@ -114,20 +115,19 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
     setKeyFeatures(updated);
   };
 
-  // Validation
+  // Validation - language is optional since AI will suggest it
   const isValid = useMemo(() => {
     return (
       appPurpose.trim().length > 0 &&
       targetUsers.trim().length > 0 &&
-      keyFeatures.some((f) => f.trim().length > 0) &&
-      language.length > 0
+      keyFeatures.some((f) => f.trim().length > 0)
     );
-  }, [appPurpose, targetUsers, keyFeatures, language]);
+  }, [appPurpose, targetUsers, keyFeatures]);
 
   // Check if stack is incomplete (missing optional but recommended fields)
   const isStackIncomplete = useMemo(() => {
-    return !framework || !database || !styling;
-  }, [framework, database, styling]);
+    return !language || !framework || !database || !styling;
+  }, [language, framework, database, styling]);
 
   // Handle next step from form
   const handleNextFromForm = useCallback(async () => {
@@ -158,6 +158,7 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
       setInferredStack(result);
 
       // Pre-fill reviewed values with current selections or suggestions
+      setReviewedLanguage(language || result.language?.value || "");
       setReviewedFramework(framework || result.framework?.value || "");
       setReviewedDatabase(database || result.database?.value || "");
       setReviewedStyling(styling || result.styling?.value || "");
@@ -173,6 +174,9 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
   // Accept all suggestions
   const handleAcceptAll = () => {
     if (inferredStack) {
+      if (inferredStack.language && !language) {
+        setReviewedLanguage(inferredStack.language.value);
+      }
       if (inferredStack.framework && !framework) {
         setReviewedFramework(inferredStack.framework.value);
       }
@@ -187,6 +191,7 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
 
   // Keep original selections
   const handleKeepMine = () => {
+    setReviewedLanguage(language);
     setReviewedFramework(framework);
     setReviewedDatabase(database);
     setReviewedStyling(styling);
@@ -201,6 +206,7 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
     setGeneratedPrompt(null);
 
     // Use reviewed values if in review step, otherwise use form values
+    const finalLanguage = step === "review" ? reviewedLanguage : language;
     const finalFramework = step === "review" ? reviewedFramework : framework;
     const finalDatabase = step === "review" ? reviewedDatabase : database;
     const finalStyling = step === "review" ? reviewedStyling : styling;
@@ -210,7 +216,7 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
       targetUsers: targetUsers.trim(),
       keyFeatures: keyFeatures.filter((f) => f.trim().length > 0),
       techPreferences: {
-        language,
+        language: finalLanguage || null,
         framework: finalFramework || null,
         database: finalDatabase || null,
         styling: finalStyling || null,
@@ -228,7 +234,7 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
     } finally {
       setGenerating(false);
     }
-  }, [isValid, step, appPurpose, targetUsers, keyFeatures, language, framework, database, styling, reviewedFramework, reviewedDatabase, reviewedStyling, constraints]);
+  }, [isValid, step, appPurpose, targetUsers, keyFeatures, language, framework, database, styling, reviewedLanguage, reviewedFramework, reviewedDatabase, reviewedStyling, constraints]);
 
   // Copy to clipboard
   const handleCopy = async () => {
@@ -249,6 +255,7 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
     setCreatingClaudeMd(true);
     setError(null);
 
+    const finalLanguage = step === "review" ? reviewedLanguage : language;
     const finalFramework = step === "review" ? reviewedFramework : framework;
     const finalDatabase = step === "review" ? reviewedDatabase : database;
     const finalStyling = step === "review" ? reviewedStyling : styling;
@@ -258,7 +265,7 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
       targetUsers: targetUsers.trim(),
       keyFeatures: keyFeatures.filter((f) => f.trim().length > 0),
       techPreferences: {
-        language,
+        language: finalLanguage || null,
         framework: finalFramework || null,
         database: finalDatabase || null,
         styling: finalStyling || null,
@@ -277,7 +284,7 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
     }
   }, [activeProject, isValid, step, appPurpose, targetUsers, keyFeatures, language, framework, database, styling, reviewedFramework, reviewedDatabase, reviewedStyling, constraints, onClaudeMdCreated]);
 
-  // Render suggestion row for review step
+  // Render suggestion row for review step - always editable
   const renderSuggestionRow = (
     label: string,
     userValue: string,
@@ -286,7 +293,15 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
     setReviewedValue: (v: string) => void,
     options: readonly string[]
   ) => {
+    const isUserChoice = !!userValue;
     const hasSuggestion = suggestion && !userValue;
+
+    // Determine styling based on source
+    const selectClass = isUserChoice
+      ? "rounded-lg border border-green-500/50 bg-green-950/30 px-3 py-1.5 text-sm text-neutral-100 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+      : hasSuggestion
+      ? "rounded-lg border border-purple-500/50 bg-purple-950/30 px-3 py-1.5 text-sm text-neutral-100 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+      : "rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
 
     return (
       <div className="flex items-start gap-4 py-3 border-b border-neutral-800 last:border-0">
@@ -294,28 +309,25 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
           <span className="text-sm font-medium text-neutral-300">{label}</span>
         </div>
         <div className="flex-1 space-y-2">
-          {userValue ? (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-neutral-100">{userValue}</span>
+          <div className="flex items-center gap-2">
+            <select
+              value={reviewedValue}
+              onChange={(e) => setReviewedValue(e.target.value)}
+              className={selectClass}
+            >
+              <option value="">None</option>
+              {options.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+            {isUserChoice ? (
               <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
                 Your choice
               </span>
-            </div>
-          ) : hasSuggestion ? (
-            <>
-              <div className="flex items-center gap-2">
-                <select
-                  value={reviewedValue}
-                  onChange={(e) => setReviewedValue(e.target.value)}
-                  className="rounded-lg border border-purple-500/50 bg-purple-950/30 px-3 py-1.5 text-sm text-neutral-100 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                >
-                  <option value="">None</option>
-                  {options.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
+            ) : hasSuggestion ? (
+              <>
                 <span className="rounded-full bg-purple-500/20 px-2 py-0.5 text-xs text-purple-400">
                   AI suggested
                 </span>
@@ -328,25 +340,13 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
                 }`}>
                   {suggestion.confidence} confidence
                 </span>
-              </div>
-              <p className="text-xs text-neutral-500">{suggestion.reason}</p>
-            </>
-          ) : (
-            <div className="flex items-center gap-2">
-              <select
-                value={reviewedValue}
-                onChange={(e) => setReviewedValue(e.target.value)}
-                className="rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="">None</option>
-                {options.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-              <span className="text-xs text-neutral-500">No suggestion available</span>
-            </div>
+              </>
+            ) : (
+              <span className="text-xs text-neutral-500">Optional</span>
+            )}
+          </div>
+          {hasSuggestion && suggestion.reason && (
+            <p className="text-xs text-neutral-500">{suggestion.reason}</p>
           )}
         </div>
       </div>
@@ -548,17 +548,15 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
 
             {/* Stack Review */}
             <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 divide-y divide-neutral-800">
-              {/* Language - always user's choice */}
-              <div className="flex items-center gap-4 py-3 px-4">
-                <div className="w-24 flex-shrink-0">
-                  <span className="text-sm font-medium text-neutral-300">Language</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-neutral-100">{language}</span>
-                  <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
-                    Your choice
-                  </span>
-                </div>
+              <div className="px-4">
+                {renderSuggestionRow(
+                  "Language",
+                  language,
+                  inferredStack.language,
+                  reviewedLanguage,
+                  setReviewedLanguage,
+                  LANGUAGES
+                )}
               </div>
 
               <div className="px-4">
@@ -727,7 +725,7 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-neutral-300">
-                  Language <span className="text-red-400">*</span>
+                  Language
                 </label>
                 <select
                   value={language}

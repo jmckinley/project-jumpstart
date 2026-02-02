@@ -177,6 +177,15 @@ export const DATABASES = [
   "Supabase",
   "Firebase",
   "DynamoDB",
+  "Pinecone",
+  "Weaviate",
+  "Qdrant",
+  "Chroma",
+  "Milvus",
+  "PlanetScale",
+  "CockroachDB",
+  "Neon",
+  "Turso",
 ] as const;
 
 export const TESTING_FRAMEWORKS: Record<string, string[]> = {
