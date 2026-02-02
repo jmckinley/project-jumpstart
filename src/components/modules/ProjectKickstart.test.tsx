@@ -140,9 +140,9 @@ describe("ProjectKickstart", () => {
       expect(screen.getByText("App Basics")).toBeInTheDocument();
       expect(screen.getByText("What does your app do?")).toBeInTheDocument();
       expect(screen.getByText("Who are the target users?")).toBeInTheDocument();
-      // Check for required indicators
+      // Check for required indicators (appPurpose and targetUsers only - language is optional)
       const requiredIndicators = screen.getAllByText("*");
-      expect(requiredIndicators.length).toBeGreaterThanOrEqual(3); // appPurpose, targetUsers, language
+      expect(requiredIndicators.length).toBeGreaterThanOrEqual(2); // appPurpose, targetUsers
     });
 
     it("should render Features section with one empty feature input", () => {
@@ -203,7 +203,7 @@ describe("ProjectKickstart", () => {
       expect(button).toBeEnabled();
     });
 
-    it("should require appPurpose, targetUsers, at least one feature, and language", async () => {
+    it("should require appPurpose, targetUsers, and at least one feature (language is optional)", async () => {
       const user = userEvent.setup();
       render(<ProjectKickstart />);
 
@@ -218,13 +218,8 @@ describe("ProjectKickstart", () => {
       await user.type(screen.getByPlaceholderText(/Small to medium/), "Users");
       expect(button).toBeDisabled();
 
-      // Add feature - still disabled
+      // Add feature - now enabled (language is optional, AI will suggest)
       await user.type(screen.getByPlaceholderText("Feature 1..."), "Feature");
-      expect(button).toBeDisabled();
-
-      // Add language - now enabled
-      const languageSelect = getSelectByLabelText(/Language/);
-      await user.selectOptions(languageSelect, "TypeScript");
       expect(button).toBeEnabled();
     });
 

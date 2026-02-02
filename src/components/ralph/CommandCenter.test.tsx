@@ -223,15 +223,19 @@ describe("CommandCenter", () => {
       expect(checkButton).toBeDisabled();
     });
 
-    it("should disable Start Loop when no analysis", () => {
+    it("should disable Start Loop when prompt is empty", () => {
       render(<CommandCenter {...defaultProps} />);
 
       const startButton = screen.getByText("Start RALPH Loop");
       expect(startButton).toBeDisabled();
     });
 
-    it("should enable Start Loop when analysis exists", () => {
-      render(<CommandCenter {...defaultProps} analysis={mockAnalysis} />);
+    it("should enable Start Loop when prompt has text (no analysis required)", async () => {
+      const user = userEvent.setup();
+      render(<CommandCenter {...defaultProps} />);
+
+      const textarea = screen.getByPlaceholderText(/Describe what you want/);
+      await user.type(textarea, "Test prompt text");
 
       const startButton = screen.getByText("Start RALPH Loop");
       expect(startButton).not.toBeDisabled();
