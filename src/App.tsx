@@ -127,6 +127,7 @@ function App() {
     saveSetting("last_active_project_id", project.id).catch(console.error);
     resetOnboarding();
     setShowOnboarding(false);
+    setActiveSection("dashboard"); // Navigate to dashboard after onboarding
   };
 
   const handleWelcomeComplete = () => {
