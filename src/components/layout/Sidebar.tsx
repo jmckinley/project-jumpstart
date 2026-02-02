@@ -28,7 +28,7 @@
  * - Kickstart shown when isEmptyProject=true AND CLAUDE.md not yet created
  *
  * CLAUDE NOTES:
- * - Sections: Dashboard, CLAUDE.md, Modules, Skills, Agents, RALPH, Context, Enforcement, Settings
+ * - Sections: Dashboard, CLAUDE.md, Modules, Skills, Agents, RALPH, Context Health, Enforcement, Settings
  * - Kickstart section is temporary - disappears after CLAUDE.md is created
  * - Sections with completion tracking: claude-md, modules, skills, agents, ralph, enforcement
  * - Project selector is at the top of the sidebar
@@ -57,7 +57,7 @@ const sections = [
   { id: "skills", label: "Skills" },
   { id: "agents", label: "Agents" },
   { id: "ralph", label: "RALPH" },
-  { id: "context", label: "Context" },
+  { id: "context", label: "Context Health" },
   { id: "enforcement", label: "Enforcement" },
   { id: "settings", label: "Settings" },
   { id: "help", label: "Help" },
