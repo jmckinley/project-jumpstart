@@ -32,12 +32,11 @@ import { saveSetting, validateApiKey } from "@/lib/tauri";
 import { useSettingsStore } from "@/stores/settingsStore";
 
 const FEATURES = [
-  "Auto-generate CLAUDE.md files",
-  "Track module documentation freshness",
-  "Skills & agents library",
-  "RALPH loop prompt optimization",
-  "One-click fixes",
-  "Avoid context rot!",
+  "One-click updates all your project documentation",
+  "Latest best practices from the Claude Code team built-in",
+  "Claude remembers your project—even in new conversations",
+  "Pre-built skills & agents for commits, PRs, reviews & more",
+  "Use RALPH to work behind the scenes",
 ];
 
 interface FirstUseWelcomeProps {
