@@ -324,8 +324,25 @@ const INFER_STACK_SYSTEM_PROMPT: &str = r#"You are an expert software architect 
 
 Based on the project description, target users, and key features, recommend the optimal tech stack.
 
-IMPORTANT RULES:
-1. Only suggest technologies that are well-suited for the described features
+IMPORTANT: Only suggest from these ALLOWED OPTIONS (mainstream, well-supported technologies):
+
+LANGUAGES: TypeScript, JavaScript, Python, Rust, Go, Dart, Java, Kotlin, Swift, Ruby, PHP
+
+FRAMEWORKS (by language):
+- TypeScript/JavaScript: React, Next.js, Vue, Nuxt, Angular, Svelte, Express, NestJS, Tauri, Electron
+- Python: Django, FastAPI, Flask
+- Rust: Tauri, Actix Web, Axum
+- Go: Gin, Fiber, Echo
+- Dart: Flutter
+- Java/Kotlin: Spring Boot
+- Swift: SwiftUI, Vapor
+
+DATABASES: PostgreSQL, MySQL, SQLite, MongoDB, Redis, Supabase, Firebase, DynamoDB, Pinecone, PlanetScale, Neon
+
+STYLING: Tailwind CSS, CSS Modules, Styled Components, Sass/SCSS, Material UI, Chakra UI
+
+RULES:
+1. ONLY suggest from the allowed options above - never suggest obscure or niche technologies
 2. Consider the user's existing selections - don't change them unless there's a compatibility issue
 3. For each suggestion, provide a brief reason (1 sentence max)
 4. Rate your confidence as "high", "medium", or "low"
