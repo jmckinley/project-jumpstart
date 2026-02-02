@@ -483,7 +483,7 @@ describe("ProjectKickstart", () => {
       });
     });
 
-    it("should return to form when Edit is clicked", async () => {
+    it("should return to form when Start Over is clicked", async () => {
       const user = userEvent.setup();
       render(<ProjectKickstart />);
 
@@ -491,14 +491,42 @@ describe("ProjectKickstart", () => {
       await user.click(screen.getByRole("button", { name: /generate kickstart prompt/i }));
 
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /edit/i })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /start over/i })).toBeInTheDocument();
       });
 
-      await user.click(screen.getByRole("button", { name: /edit/i }));
+      await user.click(screen.getByRole("button", { name: /start over/i }));
 
       // Should be back to form
       expect(screen.getByText("App Basics")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /generate kickstart prompt/i })).toBeInTheDocument();
+    });
+
+    it("should allow editing the generated prompt when Edit is clicked", async () => {
+      const user = userEvent.setup();
+      mockGenerateKickstartPrompt.mockResolvedValue({
+        fullPrompt: "# Original Prompt",
+        tokenEstimate: 100,
+      });
+
+      render(<ProjectKickstart />);
+
+      await fillRequiredFields(user);
+      await user.click(screen.getByRole("button", { name: /generate kickstart prompt/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /^edit$/i })).toBeInTheDocument();
+      });
+
+      // Click Edit to enter edit mode
+      await user.click(screen.getByRole("button", { name: /^edit$/i }));
+
+      // Should show textarea for editing
+      const textarea = screen.getByRole("textbox");
+      expect(textarea).toBeInTheDocument();
+      expect(textarea).toHaveValue("# Original Prompt");
+
+      // Button should now say "Done"
+      expect(screen.getByRole("button", { name: /done/i })).toBeInTheDocument();
     });
 
     it("should show error message when generation fails", async () => {
@@ -516,7 +544,7 @@ describe("ProjectKickstart", () => {
     });
   });
 
-  describe("Create CLAUDE.md", () => {
+  describe("Automatic CLAUDE.md Creation", () => {
     async function fillAndGenerate(user: ReturnType<typeof userEvent.setup>) {
       await user.type(screen.getByPlaceholderText(/A task management app/), "A note app");
       await user.type(screen.getByPlaceholderText(/Small to medium/), "Developers");
@@ -533,29 +561,11 @@ describe("ProjectKickstart", () => {
       await user.click(screen.getByRole("button", { name: /generate kickstart prompt/i }));
     }
 
-    it("should show 'Create CLAUDE.md' card after prompt is generated", async () => {
+    it("should automatically call generateKickstartClaudeMd after prompt generation", async () => {
       const user = userEvent.setup();
       render(<ProjectKickstart />);
 
       await fillAndGenerate(user);
-
-      await waitFor(() => {
-        expect(screen.getByText("Create Initial CLAUDE.md")).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: /create claude\.md/i })).toBeInTheDocument();
-      });
-    });
-
-    it("should call generateKickstartClaudeMd when button is clicked", async () => {
-      const user = userEvent.setup();
-      render(<ProjectKickstart />);
-
-      await fillAndGenerate(user);
-
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: /create claude\.md/i })).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByRole("button", { name: /create claude\.md/i }));
 
       await waitFor(() => {
         expect(mockGenerateKickstartClaudeMd).toHaveBeenCalledWith(
@@ -575,48 +585,18 @@ describe("ProjectKickstart", () => {
       });
     });
 
-    it("should show loading state during CLAUDE.md creation", async () => {
-      const user = userEvent.setup();
-      let resolveCreation: (value: string) => void;
-      mockGenerateKickstartClaudeMd.mockImplementation(
-        () => new Promise<string>((resolve) => { resolveCreation = resolve; })
-      );
-
-      render(<ProjectKickstart />);
-
-      await fillAndGenerate(user);
-
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: /create claude\.md/i })).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByRole("button", { name: /create claude\.md/i }));
-
-      expect(screen.getByText(/creating/i)).toBeInTheDocument();
-
-      // Cleanup
-      resolveCreation!("done");
-    });
-
-    it("should show success state when CLAUDE.md is created", async () => {
+    it("should show success state when CLAUDE.md is created automatically", async () => {
       const user = userEvent.setup();
       render(<ProjectKickstart />);
 
       await fillAndGenerate(user);
 
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /create claude\.md/i })).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByRole("button", { name: /create claude\.md/i }));
-
-      await waitFor(() => {
-        expect(screen.getByText("CLAUDE.md Created")).toBeInTheDocument();
-        expect(screen.getByText(/Your initial CLAUDE.md has been saved/)).toBeInTheDocument();
+        expect(screen.getByText(/CLAUDE\.md has been created/i)).toBeInTheDocument();
       });
     });
 
-    it("should show error message when creation fails", async () => {
+    it("should not fail prompt generation if CLAUDE.md creation fails", async () => {
       const user = userEvent.setup();
       mockGenerateKickstartClaudeMd.mockRejectedValue(new Error("Failed to write file"));
 
@@ -624,14 +604,9 @@ describe("ProjectKickstart", () => {
 
       await fillAndGenerate(user);
 
+      // Prompt should still be displayed even if CLAUDE.md creation failed
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /create claude\.md/i })).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByRole("button", { name: /create claude\.md/i }));
-
-      await waitFor(() => {
-        expect(screen.getByText("Failed to write file")).toBeInTheDocument();
+        expect(screen.getByText("Generated Prompt")).toBeInTheDocument();
       });
     });
   });
@@ -1029,19 +1004,14 @@ describe("ProjectKickstart", () => {
       await user.click(screen.getByRole("button", { name: /generate kickstart prompt/i }));
     }
 
-    it("should call onClaudeMdCreated when CLAUDE.md is created", async () => {
+    it("should call onClaudeMdCreated automatically after generation", async () => {
       const user = userEvent.setup();
       const mockCallback = vi.fn();
       render(<ProjectKickstart onClaudeMdCreated={mockCallback} />);
 
       await fillAndGenerate(user);
 
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: /create claude\.md/i })).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByRole("button", { name: /create claude\.md/i }));
-
+      // CLAUDE.md is created automatically after prompt generation
       await waitFor(() => {
         expect(mockCallback).toHaveBeenCalledTimes(1);
       });
@@ -1055,16 +1025,12 @@ describe("ProjectKickstart", () => {
 
       await fillAndGenerate(user);
 
+      // Wait for prompt to be generated (CLAUDE.md creation fails silently)
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /create claude\.md/i })).toBeInTheDocument();
+        expect(screen.getByText("Generated Prompt")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByRole("button", { name: /create claude\.md/i }));
-
-      await waitFor(() => {
-        expect(screen.getByText("Failed")).toBeInTheDocument();
-      });
-
+      // Callback should not have been called since creation failed
       expect(mockCallback).not.toHaveBeenCalled();
     });
   });

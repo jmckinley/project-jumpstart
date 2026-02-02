@@ -50,11 +50,12 @@ const ALL_FRAMEWORKS = Object.values(FRAMEWORKS).flat();
 
 interface ProjectKickstartProps {
   onClaudeMdCreated?: () => void;
+  onNavigate?: (section: string) => void;
 }
 
 type Step = "form" | "review" | "result";
 
-export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
+export function ProjectKickstart({ onClaudeMdCreated, onNavigate }: ProjectKickstartProps) {
   const activeProject = useProjectStore((s) => s.activeProject);
 
   // Current step
@@ -87,6 +88,7 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
   const [generatedPrompt, setGeneratedPrompt] = useState<string | null>(null);
   const [tokenEstimate, setTokenEstimate] = useState<number>(0);
   const [copied, setCopied] = useState(false);
+  const [isEditingPrompt, setIsEditingPrompt] = useState(false);
 
   // Available frameworks based on selected language
   const availableFrameworks = useMemo(() => {
@@ -255,12 +257,27 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
       setGeneratedPrompt(result.fullPrompt);
       setTokenEstimate(result.tokenEstimate);
       setStep("result");
+
+      // Automatically create CLAUDE.md if there's an active project
+      if (activeProject) {
+        setCreatingClaudeMd(true);
+        try {
+          await generateKickstartClaudeMd(input, activeProject.path);
+          setClaudeMdCreated(true);
+          onClaudeMdCreated?.();
+        } catch (claudeErr) {
+          // Don't fail the whole operation, just note the CLAUDE.md creation failed
+          console.error("Failed to create CLAUDE.md:", claudeErr);
+        } finally {
+          setCreatingClaudeMd(false);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate prompt");
     } finally {
       setGenerating(false);
     }
-  }, [isValid, step, appPurpose, targetUsers, keyFeatures, language, framework, database, styling, reviewedLanguage, reviewedFramework, reviewedDatabase, reviewedStyling, constraints]);
+  }, [isValid, step, appPurpose, targetUsers, keyFeatures, language, framework, database, styling, reviewedLanguage, reviewedFramework, reviewedDatabase, reviewedStyling, constraints, activeProject, onClaudeMdCreated]);
 
   // Copy to clipboard
   const handleCopy = async () => {
@@ -273,49 +290,6 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
       setError("Failed to copy to clipboard");
     }
   };
-
-  // Create CLAUDE.md from kickstart input
-  const handleCreateClaudeMd = useCallback(async () => {
-    if (!activeProject || !isValid) return;
-
-    setCreatingClaudeMd(true);
-    setError(null);
-
-    const finalLanguage = step === "review" ? reviewedLanguage : language;
-    const finalFramework = step === "review" ? reviewedFramework : framework;
-    const finalDatabase = step === "review" ? reviewedDatabase : database;
-    const finalStyling = step === "review" ? reviewedStyling : styling;
-
-    // Build constraints including additional tech and AI recommendations
-    const fullConstraints = [
-      constraints.trim(),
-      additionalTech.trim() ? `Additional technologies to include: ${additionalTech.trim()}` : "",
-      inferredStack?.warnings?.length ? `Recommendations: ${inferredStack.warnings.join(". ")}` : "",
-    ].filter(Boolean).join("\n\n") || undefined;
-
-    const input: KickstartInput = {
-      appPurpose: appPurpose.trim(),
-      targetUsers: targetUsers.trim(),
-      keyFeatures: keyFeatures.filter((f) => f.trim().length > 0),
-      techPreferences: {
-        language: finalLanguage || null,
-        framework: finalFramework || null,
-        database: finalDatabase || null,
-        styling: finalStyling || null,
-      },
-      constraints: fullConstraints,
-    };
-
-    try {
-      await generateKickstartClaudeMd(input, activeProject.path);
-      setClaudeMdCreated(true);
-      onClaudeMdCreated?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create CLAUDE.md");
-    } finally {
-      setCreatingClaudeMd(false);
-    }
-  }, [activeProject, isValid, step, appPurpose, targetUsers, keyFeatures, language, framework, database, styling, reviewedFramework, reviewedDatabase, reviewedStyling, constraints, onClaudeMdCreated]);
 
   return (
     <div className="space-y-6">
@@ -395,83 +369,83 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
                 )}
               </button>
               <button
+                onClick={() => setIsEditingPrompt(!isEditingPrompt)}
+                className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                  isEditingPrompt
+                    ? "border-blue-500 bg-blue-600 text-white hover:bg-blue-500"
+                    : "border-neutral-700 bg-neutral-800 text-neutral-300 hover:border-neutral-600 hover:bg-neutral-700"
+                }`}
+              >
+                {isEditingPrompt ? "Done" : "Edit"}
+              </button>
+              <button
                 onClick={() => {
                   setStep("form");
                   setGeneratedPrompt(null);
+                  setIsEditingPrompt(false);
                 }}
                 className="rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:bg-neutral-700"
               >
-                Edit
+                Start Over
               </button>
             </div>
           </div>
 
           {/* Generated Content */}
-          <div className="max-h-[400px] overflow-auto rounded-xl border border-neutral-800 bg-neutral-950 p-6">
-            <pre className="whitespace-pre-wrap font-mono text-sm text-neutral-300">
-              {generatedPrompt}
-            </pre>
+          <div className="rounded-xl border border-neutral-800 bg-neutral-950">
+            {isEditingPrompt ? (
+              <textarea
+                value={generatedPrompt || ""}
+                onChange={(e) => {
+                  setGeneratedPrompt(e.target.value);
+                  setTokenEstimate(Math.round(e.target.value.length / 4));
+                }}
+                className="h-[400px] w-full resize-none rounded-xl bg-transparent p-6 font-mono text-sm text-neutral-300 focus:outline-none"
+              />
+            ) : (
+              <div className="max-h-[400px] overflow-auto p-6">
+                <pre className="whitespace-pre-wrap font-mono text-sm text-neutral-300">
+                  {generatedPrompt}
+                </pre>
+              </div>
+            )}
           </div>
 
-          {/* Create CLAUDE.md Card */}
-          {claudeMdCreated ? (
-            <div className="rounded-xl border border-green-500/30 bg-green-950/20 p-6">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/20">
+          {/* CLAUDE.md Status */}
+          {creatingClaudeMd ? (
+            <div className="flex items-center gap-3 rounded-xl border border-blue-500/30 bg-blue-950/20 px-4 py-3">
+              <svg className="h-5 w-5 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <span className="text-sm text-blue-300">Creating CLAUDE.md...</span>
+            </div>
+          ) : claudeMdCreated ? (
+            <div className="rounded-xl border border-green-500/30 bg-green-950/20 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
                   <svg className="h-5 w-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
-                </div>
-                <div>
-                  <h4 className="font-medium text-green-300">CLAUDE.md Created</h4>
-                  <p className="text-sm text-green-400/70">
-                    Your initial CLAUDE.md has been saved to the project.
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-blue-500/30 bg-gradient-to-br from-blue-950/30 to-purple-950/30 p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500/20">
-                    <svg className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
                   <div>
-                    <h4 className="font-medium text-neutral-200">Create Initial CLAUDE.md</h4>
-                    <p className="mt-1 text-sm text-neutral-400">
-                      Generate and save an initial CLAUDE.md file based on your project details.
-                      This gives Claude Code essential context about your project.
-                    </p>
+                    <span className="text-sm font-medium text-green-300">Project Kickstart Complete!</span>
+                    <p className="text-xs text-green-400/70">CLAUDE.md has been created and saved to your project.</p>
                   </div>
                 </div>
-                <button
-                  onClick={handleCreateClaudeMd}
-                  disabled={creatingClaudeMd}
-                  className="flex-shrink-0 flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {creatingClaudeMd ? (
-                    <>
-                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                      </svg>
-                      Create CLAUDE.md
-                    </>
-                  )}
-                </button>
+                {onNavigate && (
+                  <button
+                    onClick={() => onNavigate("dashboard")}
+                    className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-500"
+                  >
+                    Go to Dashboard
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                  </button>
+                )}
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       ) : step === "review" && inferredStack ? (
         /* Step: Review - Layered Tech Stack */

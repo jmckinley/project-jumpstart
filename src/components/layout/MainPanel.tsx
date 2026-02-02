@@ -257,7 +257,7 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
   );
 }
 
-function ModulesView({ onDocApplied }: { onDocApplied?: () => void }) {
+function ModulesView({ onDocApplied, onNavigate }: { onDocApplied?: () => void; onNavigate?: (section: string) => void }) {
   const {
     modules,
     totalFiles,
@@ -367,7 +367,7 @@ function ModulesView({ onDocApplied }: { onDocApplied?: () => void }) {
   // Show Kickstart for empty projects (no source files found after scanning)
   const isEmptyProject = hasScanned && !loading && modules.length === 0;
   if (isEmptyProject) {
-    return <ProjectKickstart onClaudeMdCreated={onDocApplied} />;
+    return <ProjectKickstart onClaudeMdCreated={onDocApplied} onNavigate={onNavigate} />;
   }
 
   return (
@@ -975,8 +975,8 @@ function EnforcementView({ onHooksInstalled }: { onHooksInstalled?: () => void }
   );
 }
 
-function KickstartView({ onClaudeMdCreated }: { onClaudeMdCreated?: () => void }) {
-  return <ProjectKickstart onClaudeMdCreated={onClaudeMdCreated} />;
+function KickstartView({ onClaudeMdCreated, onNavigate }: { onClaudeMdCreated?: () => void; onNavigate?: (section: string) => void }) {
+  return <ProjectKickstart onClaudeMdCreated={onClaudeMdCreated} onNavigate={onNavigate} />;
 }
 
 function renderSection(
@@ -988,11 +988,11 @@ function renderSection(
     case "dashboard":
       return <DashboardView onNavigate={onNavigate} />;
     case "kickstart":
-      return <KickstartView onClaudeMdCreated={onCompletionChange} />;
+      return <KickstartView onClaudeMdCreated={onCompletionChange} onNavigate={onNavigate} />;
     case "claude-md":
       return <Editor onSave={onCompletionChange} />;
     case "modules":
-      return <ModulesView onDocApplied={onCompletionChange} />;
+      return <ModulesView onDocApplied={onCompletionChange} onNavigate={onNavigate} />;
     case "skills":
       return <SkillsView onSkillsChange={onCompletionChange} />;
     case "agents":
