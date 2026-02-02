@@ -86,9 +86,12 @@ export function GitHookSetup({ hookStatus, projectPath, loading, installing, onI
     setInitializingGit(true);
     try {
       await initGit(projectPath);
+      // Auto-install auto-update hook after git init
+      await handleInstall("auto-update");
       onRefresh();
     } catch (err) {
       console.error("Failed to initialize git:", err);
+      onRefresh(); // Still refresh to show git was created
     } finally {
       setInitializingGit(false);
     }
@@ -127,7 +130,7 @@ export function GitHookSetup({ hookStatus, projectPath, loading, installing, onI
               size="sm"
               onClick={handleInitGit}
               disabled={initializingGit}
-              className="bg-amber-600 hover:bg-amber-500 text-white"
+              className="bg-amber-500 hover:bg-amber-400 text-neutral-900 font-medium"
             >
               {initializingGit ? "Initializing..." : "Initialize Git Repository"}
             </Button>
