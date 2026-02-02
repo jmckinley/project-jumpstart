@@ -58,7 +58,8 @@
  * RALPH:
  * - analyzeRalphPrompt - Analyze prompt quality for RALPH loops (heuristic)
  * - analyzeRalphPromptWithAi - AI-powered prompt analysis with project context
- * - startRalphLoop - Start a new RALPH loop
+ * - startRalphLoop - Start a new RALPH loop (iterative mode)
+ * - startRalphLoopPrd - Start a new RALPH loop in PRD mode (fresh context per story)
  * - pauseRalphLoop - Pause an active RALPH loop
  * - resumeRalphLoop - Resume a paused RALPH loop
  * - killRalphLoop - Kill a running or paused RALPH loop
@@ -279,6 +280,13 @@ export async function startRalphLoop(
   qualityScore: number,
 ): Promise<RalphLoop> {
   return invoke<RalphLoop>("start_ralph_loop", { projectId, prompt, enhancedPrompt, qualityScore });
+}
+
+export async function startRalphLoopPrd(
+  projectId: string,
+  prdJson: string,
+): Promise<RalphLoop> {
+  return invoke<RalphLoop>("start_ralph_loop_prd", { projectId, prdJson });
 }
 
 export async function pauseRalphLoop(loopId: string): Promise<void> {

@@ -48,8 +48,8 @@ use commands::onboarding::{check_git_installed, install_git, save_project, scan_
 use commands::project::{get_project, list_projects, remove_project};
 use commands::ralph::{
     analyze_ralph_prompt, analyze_ralph_prompt_with_ai, kill_ralph_loop, list_ralph_loops,
-    list_ralph_mistakes, pause_ralph_loop, resume_ralph_loop, start_ralph_loop, get_ralph_context,
-    record_ralph_mistake, update_claude_md_with_pattern,
+    list_ralph_mistakes, pause_ralph_loop, resume_ralph_loop, start_ralph_loop, start_ralph_loop_prd,
+    get_ralph_context, record_ralph_mistake, update_claude_md_with_pattern,
 };
 use commands::enforcement::{
     get_ci_snippets, get_enforcement_events, get_hook_status, install_git_hooks,
@@ -112,6 +112,7 @@ pub fn run() {
             analyze_ralph_prompt,
             analyze_ralph_prompt_with_ai,
             start_ralph_loop,
+            start_ralph_loop_prd,
             pause_ralph_loop,
             resume_ralph_loop,
             kill_ralph_loop,

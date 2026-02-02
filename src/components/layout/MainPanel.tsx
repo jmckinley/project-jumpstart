@@ -786,6 +786,7 @@ function RalphView({ onLoopStarted }: { onLoopStarted?: () => void }) {
     error,
     analyzePrompt,
     startLoop,
+    startLoopPrd,
     pauseLoop,
     resumeLoop,
     killLoop,
@@ -817,6 +818,14 @@ function RalphView({ onLoopStarted }: { onLoopStarted?: () => void }) {
     [startLoop, onLoopStarted],
   );
 
+  const handleStartLoopPrd = useCallback(
+    async (prdJson: string) => {
+      await startLoopPrd(prdJson);
+      onLoopStarted?.();
+    },
+    [startLoopPrd, onLoopStarted],
+  );
+
   return (
     <div className="space-y-6">
       {error && (
@@ -834,6 +843,7 @@ function RalphView({ onLoopStarted }: { onLoopStarted?: () => void }) {
             loading={loading}
             onAnalyze={analyzePrompt}
             onStartLoop={handleStartLoop}
+            onStartLoopPrd={handleStartLoopPrd}
             onClearAnalysis={clearAnalysis}
           />
         </div>

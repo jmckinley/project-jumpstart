@@ -80,6 +80,7 @@ const defaultProps = {
   loading: false,
   onAnalyze: vi.fn(),
   onStartLoop: vi.fn(),
+  onStartLoopPrd: vi.fn(),
   onClearAnalysis: vi.fn(),
 };
 

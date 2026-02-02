@@ -4,7 +4,8 @@
 //! PURPOSE:
 //! - Analyze prompt quality for RALPH loops (clarity, specificity, context, scope)
 //! - Start and pause RALPH loops with DB persistence
-//! - Execute RALPH loops via Claude Code CLI in background
+//! - Execute RALPH loops via Claude Code CLI in background with iterative refinement
+//! - Extract issues from Claude output using AI and feed to next iteration
 //! - List loop history for the active project
 //! - Provide auto-enhanced prompts based on quality analysis
 //! - AI-powered prompt enhancement when API key is available
@@ -15,9 +16,10 @@
 //! - models::ralph - RalphLoop, PromptAnalysis, PromptCriterion types
 //! - uuid - Loop ID generation
 //! - chrono - Timestamp handling
-//! - core::ai - Claude API for AI-powered enhancement
+//! - core::ai - Claude API for AI-powered enhancement and issue extraction
 //! - std::process::Command - Execute Claude CLI
 //! - tokio - Async runtime for background execution
+//! - reqwest - HTTP client for AI API calls in background tasks
 //!
 //! EXPORTS:
 //! - analyze_ralph_prompt - Score prompt quality and generate suggestions (heuristic)
@@ -36,9 +38,11 @@
 //! - analyze_ralph_prompt uses fast heuristics for immediate feedback
 //! - analyze_ralph_prompt_with_ai uses Claude for deeper analysis (when API key available)
 //! - start_ralph_loop stores loop in DB then spawns background task to execute claude CLI
+//! - execute_ralph_loop runs iteratively: up to 5 iterations, extracting issues via AI after each
 //! - pause_ralph_loop transitions "running" to "paused"
 //! - Loop statuses: idle -> running -> paused/completed/failed
 //! - Failed/killed loops automatically record mistakes for learning (categorized by error type)
+//! - Iteration count updates in real-time for UI progress display
 //!
 //! CLAUDE NOTES:
 //! - RALPH = Review, Analyze, List, Plan, Handoff
@@ -46,6 +50,10 @@
 //! - Heuristic analysis is instant; AI analysis takes 2-5 seconds
 //! - AI enhancement provides project-aware suggestions when context is provided
 //! - Claude CLI is executed with: claude -p "prompt" --allowedTools ... in project directory
+//! - Iterative refinement: after each Claude run, AI extracts issues → feeds to next iteration
+//! - MAX_ITERATIONS = 5 prevents infinite loops; exits early if no issues found
+//! - Each iteration's issues are stored as mistakes for learning
+//! - Prior issues are included in subsequent prompts for context-aware fixing
 //! - get_ralph_context reads CLAUDE.md from project path and fetches recent mistakes from DB
 //! - update_claude_md_with_pattern appends to CLAUDE NOTES section in CLAUDE.md file
 
@@ -277,7 +285,7 @@ ENHANCED PROMPT REQUIREMENTS:
     }
 }
 
-/// Start a new RALPH loop for a project.
+/// Start a new RALPH loop for a project (iterative mode).
 /// Creates a loop record in the DB with "running" status and executes via Claude CLI.
 #[tauri::command]
 pub async fn start_ralph_loop(
@@ -313,13 +321,13 @@ pub async fn start_ralph_loop(
             .map_err(|e| format!("Failed to lock database: {}", e))?;
 
         db.execute(
-            "INSERT INTO ralph_loops (id, project_id, prompt, enhanced_prompt, status, quality_score, iterations, outcome, started_at, created_at) VALUES (?1, ?2, ?3, ?4, 'running', ?5, 0, NULL, ?6, ?6)",
+            "INSERT INTO ralph_loops (id, project_id, prompt, enhanced_prompt, status, quality_score, iterations, outcome, started_at, created_at, mode) VALUES (?1, ?2, ?3, ?4, 'running', ?5, 0, NULL, ?6, ?6, 'iterative')",
             rusqlite::params![&id, &project_id, &prompt, &enhanced_prompt, quality_score, &now],
         )
         .map_err(|e| format!("Failed to create RALPH loop: {}", e))?;
 
         // Log activity
-        let _ = db::log_activity_db(&db, &project_id, "generate", "Started RALPH loop");
+        let _ = db::log_activity_db(&db, &project_id, "generate", "Started RALPH loop (iterative mode)");
     }
 
     // Create the loop result to return immediately
@@ -336,6 +344,9 @@ pub async fn start_ralph_loop(
         paused_at: None,
         completed_at: None,
         created_at: now,
+        mode: "iterative".to_string(),
+        current_story: None,
+        total_stories: None,
     };
 
     // Prepare data for background task
@@ -350,13 +361,109 @@ pub async fn start_ralph_loop(
     Ok(loop_result)
 }
 
+/// Start a new RALPH loop in PRD mode (fresh context per story, git commits between).
+/// Parses the PRD JSON and executes each story sequentially.
+#[tauri::command]
+pub async fn start_ralph_loop_prd(
+    project_id: String,
+    prd_json: String,
+    state: State<'_, AppState>,
+) -> Result<RalphLoop, String> {
+    use crate::models::ralph::PrdFile;
+
+    // Parse the PRD JSON
+    let prd: PrdFile = serde_json::from_str(&prd_json)
+        .map_err(|e| format!("Invalid PRD JSON: {}", e))?;
+
+    if prd.stories.is_empty() {
+        return Err("PRD must contain at least one story".to_string());
+    }
+
+    let total_stories = prd.stories.len() as u32;
+
+    // Get project path
+    let project_path = {
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| format!("Failed to lock database: {}", e))?;
+
+        let mut stmt = db
+            .prepare("SELECT path FROM projects WHERE id = ?1")
+            .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
+        stmt.query_row(rusqlite::params![&project_id], |row| row.get::<_, String>(0))
+            .map_err(|e| format!("Project not found: {}", e))?
+    };
+
+    let id = uuid::Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+
+    // Create a summary prompt for display
+    let prompt_summary = format!(
+        "PRD: {} ({} stories)\n{}",
+        prd.name,
+        total_stories,
+        prd.description.as_deref().unwrap_or("No description")
+    );
+
+    // Insert loop record
+    {
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| format!("Failed to lock database: {}", e))?;
+
+        db.execute(
+            "INSERT INTO ralph_loops (id, project_id, prompt, enhanced_prompt, status, quality_score, iterations, outcome, started_at, created_at, mode, current_story, total_stories) VALUES (?1, ?2, ?3, ?4, 'running', 100, 0, NULL, ?5, ?5, 'prd', 0, ?6)",
+            rusqlite::params![&id, &project_id, &prompt_summary, &prd_json, &now, total_stories],
+        )
+        .map_err(|e| format!("Failed to create RALPH loop: {}", e))?;
+
+        // Log activity
+        let _ = db::log_activity_db(&db, &project_id, "generate", &format!("Started RALPH PRD loop: {}", prd.name));
+    }
+
+    // Create the loop result to return immediately
+    let loop_result = RalphLoop {
+        id: id.clone(),
+        project_id: project_id.clone(),
+        prompt: prompt_summary,
+        enhanced_prompt: Some(prd_json.clone()),
+        status: "running".to_string(),
+        quality_score: 100,
+        iterations: 0,
+        outcome: None,
+        started_at: Some(now.clone()),
+        paused_at: None,
+        completed_at: None,
+        created_at: now,
+        mode: "prd".to_string(),
+        current_story: Some(0),
+        total_stories: Some(total_stories),
+    };
+
+    // Spawn background task to execute PRD
+    let loop_id = id.clone();
+    tokio::spawn(async move {
+        execute_ralph_loop_prd(loop_id, project_id, project_path, prd).await;
+    });
+
+    Ok(loop_result)
+}
+
+/// Maximum iterations for a RALPH loop (prevents infinite loops)
+const MAX_ITERATIONS: u32 = 5;
+
 /// Execute a RALPH loop via the Claude CLI in a background task.
-/// Updates the loop record with outcome and status when complete.
+/// Runs iteratively: after each execution, uses AI to extract issues and feeds them
+/// to the next iteration until no issues remain or max iterations reached.
+/// Updates iteration count in real-time for UI progress display.
 async fn execute_ralph_loop(
     loop_id: String,
     project_id: String,
     project_path: String,
-    prompt: String,
+    initial_prompt: String,
 ) {
     // Open a fresh database connection for this background task
     let db = match open_db_connection() {
@@ -366,6 +473,12 @@ async fn execute_ralph_loop(
             return;
         }
     };
+
+    // Create HTTP client for AI calls
+    let http_client = reqwest::Client::new();
+
+    // Try to get API key for AI-powered issue extraction
+    let api_key = ai::get_api_key(&db).ok();
 
     // Check if claude CLI is available
     let claude_check = Command::new("which")
@@ -394,90 +507,644 @@ async fn execute_ralph_loop(
         }
     };
 
-    // Execute claude with the prompt
-    // Using -p for print mode (non-interactive) and allowing common tools
-    let result = Command::new(&claude_path)
-        .arg("-p")
-        .arg(&prompt)
-        .arg("--allowedTools")
-        .arg("Read,Write,Edit,Bash,Glob,Grep")
-        .current_dir(&project_path)
-        .output();
+    // Track accumulated issues across iterations
+    let mut all_issues: Vec<ExtractedIssue> = Vec::new();
+    let mut current_prompt = initial_prompt.clone();
+    let mut final_outcome = String::new();
+    let mut final_status = "completed".to_string();
 
-    let (status, outcome) = match result {
-        Ok(output) => {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let stderr = String::from_utf8_lossy(&output.stderr);
+    // Iterative loop
+    for iteration in 1..=MAX_ITERATIONS {
+        // Check if loop was paused or killed
+        let loop_status: Option<String> = db
+            .query_row(
+                "SELECT status FROM ralph_loops WHERE id = ?1",
+                rusqlite::params![&loop_id],
+                |row| row.get(0),
+            )
+            .ok();
 
-            if output.status.success() {
-                // Truncate output if too long (max 10000 chars)
-                let outcome_text = if stdout.len() > 10000 {
-                    format!("{}...\n[Output truncated]", &stdout[..10000])
-                } else {
-                    stdout.to_string()
-                };
-                ("completed".to_string(), outcome_text)
-            } else {
-                let error_msg = if stderr.is_empty() {
-                    format!("Claude exited with code: {:?}", output.status.code())
-                } else {
-                    stderr.to_string()
-                };
-                ("failed".to_string(), error_msg)
+        if let Some(status) = loop_status {
+            if status != "running" {
+                // Loop was paused or killed, stop execution
+                return;
             }
         }
-        Err(e) => {
-            ("failed".to_string(), format!("Failed to execute Claude: {}", e))
-        }
-    };
 
-    // Update loop record with result
+        // Update iteration count immediately (real-time progress)
+        let _ = db.execute(
+            "UPDATE ralph_loops SET iterations = ?1 WHERE id = ?2",
+            rusqlite::params![iteration, &loop_id],
+        );
+
+        // Execute claude with the current prompt
+        let result = Command::new(&claude_path)
+            .arg("-p")
+            .arg(&current_prompt)
+            .arg("--allowedTools")
+            .arg("Read,Write,Edit,Bash,Glob,Grep")
+            .current_dir(&project_path)
+            .output();
+
+        let (output_text, execution_failed) = match result {
+            Ok(output) => {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let stderr = String::from_utf8_lossy(&output.stderr);
+
+                if output.status.success() {
+                    (stdout.to_string(), false)
+                } else {
+                    let error_msg = if stderr.is_empty() {
+                        format!("Claude exited with code: {:?}\n{}", output.status.code(), stdout)
+                    } else {
+                        format!("{}\n{}", stderr, stdout)
+                    };
+                    (error_msg, true)
+                }
+            }
+            Err(e) => {
+                (format!("Failed to execute Claude: {}", e), true)
+            }
+        };
+
+        // If execution failed completely, mark as failed and exit
+        if execution_failed && iteration == 1 {
+            final_status = "failed".to_string();
+            final_outcome = output_text.clone();
+
+            // Record the failure as a mistake
+            record_iteration_mistake(
+                &db,
+                &project_id,
+                &loop_id,
+                &output_text,
+                &current_prompt,
+            );
+            break;
+        }
+
+        // Extract issues from the output using AI (if API key available)
+        let extracted_issues = if let Some(ref key) = api_key {
+            extract_issues_with_ai(&http_client, key, &output_text).await
+        } else {
+            // Fallback: simple heuristic issue extraction
+            extract_issues_heuristic(&output_text)
+        };
+
+        // Record each extracted issue as a mistake for learning
+        for issue in &extracted_issues {
+            let mistake_id = uuid::Uuid::new_v4().to_string();
+            let now = Utc::now().to_rfc3339();
+            let _ = db.execute(
+                "INSERT INTO ralph_mistakes (id, project_id, loop_id, mistake_type, description, context, resolution, learned_pattern, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, ?8)",
+                rusqlite::params![
+                    mistake_id,
+                    project_id,
+                    loop_id,
+                    issue.issue_type,
+                    issue.description,
+                    format!("Iteration {}: {}", iteration, current_prompt),
+                    issue.suggested_fix,
+                    now
+                ],
+            );
+        }
+
+        // If no issues found, we're done successfully
+        if extracted_issues.is_empty() {
+            final_status = "completed".to_string();
+            // Truncate output if too long
+            final_outcome = if output_text.len() > 10000 {
+                format!("{}...\n[Output truncated]", &output_text[..10000])
+            } else {
+                output_text
+            };
+            break;
+        }
+
+        // Add issues to accumulated list
+        all_issues.extend(extracted_issues.clone());
+
+        // If this is the last iteration, mark as completed with issues noted
+        if iteration == MAX_ITERATIONS {
+            final_status = "completed".to_string();
+            final_outcome = format!(
+                "Completed after {} iterations. {} issues addressed.\n\n{}",
+                iteration,
+                all_issues.len(),
+                if output_text.len() > 8000 {
+                    format!("{}...\n[Output truncated]", &output_text[..8000])
+                } else {
+                    output_text
+                }
+            );
+            break;
+        }
+
+        // Build enhanced prompt for next iteration with context from prior issues
+        current_prompt = build_iteration_prompt(&initial_prompt, &all_issues, iteration);
+
+        // Store intermediate outcome
+        final_outcome = output_text;
+    }
+
+    // Update loop record with final result
     let now = Utc::now().to_rfc3339();
     let _ = db.execute(
-        "UPDATE ralph_loops SET status = ?1, outcome = ?2, completed_at = ?3, iterations = iterations + 1 WHERE id = ?4",
-        rusqlite::params![&status, &outcome, &now, &loop_id],
+        "UPDATE ralph_loops SET status = ?1, outcome = ?2, completed_at = ?3 WHERE id = ?4",
+        rusqlite::params![&final_status, &final_outcome, &now, &loop_id],
     );
 
     // Log completion activity
-    let activity_msg = if status == "completed" {
+    let activity_msg = if final_status == "completed" {
         "RALPH loop completed successfully"
     } else {
         "RALPH loop failed"
     };
     let _ = db::log_activity_db(&db, &project_id, "generate", activity_msg);
 
-    // Automatically record mistakes for failed loops (learning from errors)
-    if status == "failed" {
-        let mistake_id = uuid::Uuid::new_v4().to_string();
-        let mistake_type = categorize_mistake(&outcome);
-        let description = if outcome.len() > 500 {
-            format!("{}...", &outcome[..500])
-        } else {
-            outcome.clone()
-        };
+    // Prune old mistakes (keep only most recent 50 per project)
+    let _ = db.execute(
+        "DELETE FROM ralph_mistakes WHERE project_id = ?1 AND id NOT IN (
+            SELECT id FROM ralph_mistakes WHERE project_id = ?1 ORDER BY created_at DESC LIMIT 50
+        )",
+        rusqlite::params![project_id],
+    );
+}
 
-        let _ = db.execute(
-            "INSERT INTO ralph_mistakes (id, project_id, loop_id, mistake_type, description, context, resolution, learned_pattern, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, NULL, ?7)",
-            rusqlite::params![
-                mistake_id,
-                project_id,
-                loop_id,
-                mistake_type,
-                description,
-                prompt, // Store the original prompt as context
-                now
-            ],
-        );
+/// Execute a RALPH loop in PRD mode (fresh context per story).
+/// Like the original "Ralph Wiggum" approach: each story gets a fresh Claude context,
+/// git commits between stories, validation runs after each story.
+async fn execute_ralph_loop_prd(
+    loop_id: String,
+    project_id: String,
+    project_path: String,
+    prd: crate::models::ralph::PrdFile,
+) {
+    use std::process::Command as StdCommand;
 
-        // Prune old mistakes (keep only most recent 50 per project)
-        let _ = db.execute(
-            "DELETE FROM ralph_mistakes WHERE project_id = ?1 AND id NOT IN (
-                SELECT id FROM ralph_mistakes WHERE project_id = ?1 ORDER BY created_at DESC LIMIT 50
-            )",
-            rusqlite::params![project_id],
-        );
+    // Open a fresh database connection
+    let db = match open_db_connection() {
+        Ok(conn) => conn,
+        Err(e) => {
+            eprintln!("RALPH PRD: Failed to open database connection: {}", e);
+            return;
+        }
+    };
+
+    // Check if claude CLI is available
+    let claude_path = match find_claude_cli() {
+        Some(path) => path,
+        None => {
+            let now = Utc::now().to_rfc3339();
+            let _ = db.execute(
+                "UPDATE ralph_loops SET status = 'failed', outcome = ?1, completed_at = ?2 WHERE id = ?3",
+                rusqlite::params!["Claude CLI not found. Install with: npm install -g @anthropic-ai/claude-code", &now, &loop_id],
+            );
+            return;
+        }
+    };
+
+    let total_stories = prd.stories.len();
+    let mut completed_count = 0;
+    let mut outcomes: Vec<String> = Vec::new();
+
+    // Create or checkout branch if specified
+    if prd.branch != "main" && prd.branch != "master" {
+        let _ = StdCommand::new("git")
+            .args(["checkout", "-B", &prd.branch])
+            .current_dir(&project_path)
+            .output();
     }
+
+    // Process each story
+    for (index, story) in prd.stories.iter().enumerate() {
+        // Check if loop was paused or killed
+        let loop_status: Option<String> = db
+            .query_row(
+                "SELECT status FROM ralph_loops WHERE id = ?1",
+                rusqlite::params![&loop_id],
+                |row| row.get(0),
+            )
+            .ok();
+
+        if let Some(status) = loop_status {
+            if status != "running" {
+                return;
+            }
+        }
+
+        // Update current story progress
+        let _ = db.execute(
+            "UPDATE ralph_loops SET current_story = ?1, iterations = ?2 WHERE id = ?3",
+            rusqlite::params![index as u32, index as u32 + 1, &loop_id],
+        );
+
+        // Skip completed stories
+        if story.completed {
+            completed_count += 1;
+            continue;
+        }
+
+        // Build prompt for this story
+        let story_prompt = build_story_prompt(&story, &prd);
+
+        // Execute Claude with fresh context for this story
+        let mut story_iterations = 0;
+        let max_story_iterations = prd.max_iterations_per_story;
+        let mut story_success = false;
+
+        while story_iterations < max_story_iterations && !story_success {
+            story_iterations += 1;
+
+            let result = Command::new(&claude_path)
+                .arg("-p")
+                .arg(&story_prompt)
+                .arg("--allowedTools")
+                .arg("Read,Write,Edit,Bash,Glob,Grep")
+                .current_dir(&project_path)
+                .output();
+
+            let (output_text, execution_success) = match result {
+                Ok(output) => {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    (stdout.to_string(), output.status.success())
+                }
+                Err(e) => {
+                    (format!("Failed to execute: {}", e), false)
+                }
+            };
+
+            // Run validation if configured
+            let validation_passed = if execution_success {
+                run_prd_validation(&project_path, &prd)
+            } else {
+                false
+            };
+
+            if validation_passed {
+                story_success = true;
+
+                // Git commit the changes
+                let commit_msg = format!("feat: {} [RALPH PRD]", story.title);
+                let _ = StdCommand::new("git")
+                    .args(["add", "-A"])
+                    .current_dir(&project_path)
+                    .output();
+                let commit_output = StdCommand::new("git")
+                    .args(["commit", "-m", &commit_msg])
+                    .current_dir(&project_path)
+                    .output();
+
+                let commit_hash = if let Ok(output) = commit_output {
+                    if output.status.success() {
+                        // Get the commit hash
+                        StdCommand::new("git")
+                            .args(["rev-parse", "--short", "HEAD"])
+                            .current_dir(&project_path)
+                            .output()
+                            .ok()
+                            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                outcomes.push(format!(
+                    "✓ Story {}: {} (commit: {})",
+                    index + 1,
+                    story.title,
+                    commit_hash.as_deref().unwrap_or("no commit")
+                ));
+                completed_count += 1;
+            } else {
+                // Record the failure as a mistake
+                let mistake_id = uuid::Uuid::new_v4().to_string();
+                let now = Utc::now().to_rfc3339();
+                let _ = db.execute(
+                    "INSERT INTO ralph_mistakes (id, project_id, loop_id, mistake_type, description, context, created_at)
+                     VALUES (?1, ?2, ?3, 'implementation', ?4, ?5, ?6)",
+                    rusqlite::params![
+                        mistake_id,
+                        project_id,
+                        loop_id,
+                        format!("Story '{}' iteration {} failed validation", story.title, story_iterations),
+                        output_text.chars().take(500).collect::<String>(),
+                        now
+                    ],
+                );
+
+                if story_iterations >= max_story_iterations {
+                    outcomes.push(format!(
+                        "✗ Story {}: {} (failed after {} iterations)",
+                        index + 1, story.title, story_iterations
+                    ));
+                }
+            }
+        }
+    }
+
+    // Final outcome
+    let final_status = if completed_count == total_stories {
+        "completed"
+    } else if completed_count > 0 {
+        "completed" // Partial success is still "completed"
+    } else {
+        "failed"
+    };
+
+    let final_outcome = format!(
+        "PRD: {}\nCompleted: {}/{} stories\n\n{}",
+        prd.name,
+        completed_count,
+        total_stories,
+        outcomes.join("\n")
+    );
+
+    let now = Utc::now().to_rfc3339();
+    let _ = db.execute(
+        "UPDATE ralph_loops SET status = ?1, outcome = ?2, completed_at = ?3, current_story = ?4 WHERE id = ?5",
+        rusqlite::params![final_status, final_outcome, now, total_stories as u32, loop_id],
+    );
+
+    // Log completion
+    let _ = db::log_activity_db(
+        &db,
+        &project_id,
+        "generate",
+        &format!("RALPH PRD completed: {}/{} stories", completed_count, total_stories),
+    );
+}
+
+/// Find the Claude CLI path
+fn find_claude_cli() -> Option<String> {
+    // Check if claude CLI is available via which
+    let claude_check = Command::new("which")
+        .arg("claude")
+        .output();
+
+    match claude_check {
+        Ok(output) if output.status.success() => {
+            Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
+        }
+        _ => {
+            // Try common paths
+            if Path::new("/usr/local/bin/claude").exists() {
+                Some("/usr/local/bin/claude".to_string())
+            } else if Path::new("/opt/homebrew/bin/claude").exists() {
+                Some("/opt/homebrew/bin/claude".to_string())
+            } else {
+                None
+            }
+        }
+    }
+}
+
+/// Build a prompt for a single PRD story
+fn build_story_prompt(story: &crate::models::ralph::PrdStory, prd: &crate::models::ralph::PrdFile) -> String {
+    let mut prompt = format!("## Task: {}\n\n", story.title);
+    prompt.push_str(&story.description);
+    prompt.push_str("\n\n");
+
+    if let Some(ref criteria) = story.acceptance_criteria {
+        prompt.push_str("### Acceptance Criteria\n");
+        prompt.push_str(criteria);
+        prompt.push_str("\n\n");
+    }
+
+    prompt.push_str("### Instructions\n");
+    prompt.push_str("1. Implement the task described above\n");
+    prompt.push_str("2. Make sure all code compiles/type-checks\n");
+    if prd.test_command.is_some() {
+        prompt.push_str("3. Ensure all tests pass\n");
+    }
+    prompt.push_str("4. Keep changes focused on this single task\n");
+
+    prompt
+}
+
+/// Run validation commands for PRD (typecheck and tests)
+fn run_prd_validation(project_path: &str, prd: &crate::models::ralph::PrdFile) -> bool {
+    use std::process::Command as StdCommand;
+
+    // Run typecheck if configured
+    if let Some(ref cmd) = prd.typecheck_command {
+        let parts: Vec<&str> = cmd.split_whitespace().collect();
+        if !parts.is_empty() {
+            let result = StdCommand::new(parts[0])
+                .args(&parts[1..])
+                .current_dir(project_path)
+                .output();
+
+            if let Ok(output) = result {
+                if !output.status.success() {
+                    return false;
+                }
+            }
+        }
+    }
+
+    // Run tests if configured
+    if let Some(ref cmd) = prd.test_command {
+        let parts: Vec<&str> = cmd.split_whitespace().collect();
+        if !parts.is_empty() {
+            let result = StdCommand::new(parts[0])
+                .args(&parts[1..])
+                .current_dir(project_path)
+                .output();
+
+            if let Ok(output) = result {
+                if !output.status.success() {
+                    return false;
+                }
+            }
+        }
+    }
+
+    true
+}
+
+/// Extracted issue from Claude output
+#[derive(Clone)]
+struct ExtractedIssue {
+    issue_type: String,
+    description: String,
+    suggested_fix: Option<String>,
+}
+
+/// Extract issues from Claude output using AI
+async fn extract_issues_with_ai(
+    client: &reqwest::Client,
+    api_key: &str,
+    output: &str,
+) -> Vec<ExtractedIssue> {
+    let system = r#"You analyze Claude Code CLI output to extract issues that need to be addressed.
+Look for:
+- Errors or exceptions
+- Failed tests
+- Type errors or lint warnings
+- Missing files or dependencies
+- Incomplete implementations
+- TODOs or FIXMEs that were introduced
+
+OUTPUT FORMAT (JSON only, no markdown fences):
+{
+  "issues": [
+    {
+      "type": "error|warning|incomplete|test_failure|type_error|missing_dependency",
+      "description": "Brief description of the issue",
+      "suggestedFix": "How to fix it (optional)"
+    }
+  ]
+}
+
+If there are no issues and the output looks successful, return: {"issues": []}
+Be conservative - only extract clear issues, not general observations."#;
+
+    let user_prompt = format!(
+        "Analyze this Claude Code output and extract any issues:\n\n```\n{}\n```",
+        if output.len() > 8000 { &output[..8000] } else { output }
+    );
+
+    match ai::call_claude(client, api_key, system, &user_prompt).await {
+        Ok(response) => {
+            // Parse the JSON response
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&response) {
+                if let Some(issues) = val.get("issues").and_then(|v| v.as_array()) {
+                    return issues.iter().filter_map(|issue| {
+                        let issue_type = issue.get("type")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("implementation")
+                            .to_string();
+                        let description = issue.get("description")
+                            .and_then(|v| v.as_str())?
+                            .to_string();
+                        let suggested_fix = issue.get("suggestedFix")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+
+                        Some(ExtractedIssue {
+                            issue_type,
+                            description,
+                            suggested_fix,
+                        })
+                    }).collect();
+                }
+            }
+            Vec::new()
+        }
+        Err(_) => {
+            // Fall back to heuristic extraction on API error
+            extract_issues_heuristic(output)
+        }
+    }
+}
+
+/// Heuristic issue extraction when AI is not available
+fn extract_issues_heuristic(output: &str) -> Vec<ExtractedIssue> {
+    let mut issues = Vec::new();
+    let lower = output.to_lowercase();
+
+    // Check for common error patterns
+    if lower.contains("error:") || lower.contains("error]") || lower.contains("failed") {
+        // Try to extract the error line
+        for line in output.lines() {
+            let line_lower = line.to_lowercase();
+            if line_lower.contains("error") || line_lower.contains("failed") {
+                issues.push(ExtractedIssue {
+                    issue_type: "error".to_string(),
+                    description: line.trim().chars().take(200).collect(),
+                    suggested_fix: None,
+                });
+                break; // Just capture first error to avoid noise
+            }
+        }
+    }
+
+    if lower.contains("warning:") {
+        for line in output.lines() {
+            if line.to_lowercase().contains("warning:") {
+                issues.push(ExtractedIssue {
+                    issue_type: "warning".to_string(),
+                    description: line.trim().chars().take(200).collect(),
+                    suggested_fix: None,
+                });
+                break;
+            }
+        }
+    }
+
+    if lower.contains("test failed") || lower.contains("tests failed") || lower.contains("assertion") {
+        issues.push(ExtractedIssue {
+            issue_type: "test_failure".to_string(),
+            description: "One or more tests failed".to_string(),
+            suggested_fix: Some("Review test output and fix failing tests".to_string()),
+        });
+    }
+
+    issues
+}
+
+/// Build an enhanced prompt for the next iteration, including context from prior issues
+fn build_iteration_prompt(original_prompt: &str, prior_issues: &[ExtractedIssue], iteration: u32) -> String {
+    let mut prompt = format!(
+        "## RALPH Loop - Iteration {} (Addressing Prior Issues)\n\n",
+        iteration + 1
+    );
+
+    prompt.push_str("### Prior Issues to Address\n");
+    prompt.push_str("The previous iteration(s) identified these issues that need to be fixed:\n\n");
+
+    for (i, issue) in prior_issues.iter().enumerate() {
+        prompt.push_str(&format!("{}. **[{}]** {}\n", i + 1, issue.issue_type, issue.description));
+        if let Some(ref fix) = issue.suggested_fix {
+            prompt.push_str(&format!("   - Suggested fix: {}\n", fix));
+        }
+    }
+
+    prompt.push_str("\n### Original Task\n");
+    prompt.push_str(original_prompt);
+    prompt.push_str("\n\n### Instructions\n");
+    prompt.push_str("1. First, address all the prior issues listed above\n");
+    prompt.push_str("2. Then continue with the original task if needed\n");
+    prompt.push_str("3. Verify your changes work correctly before finishing\n");
+
+    prompt
+}
+
+/// Record a mistake from a failed iteration
+fn record_iteration_mistake(
+    db: &Connection,
+    project_id: &str,
+    loop_id: &str,
+    error_output: &str,
+    prompt: &str,
+) {
+    let mistake_id = uuid::Uuid::new_v4().to_string();
+    let mistake_type = categorize_mistake(error_output);
+    let description = if error_output.len() > 500 {
+        format!("{}...", &error_output[..500])
+    } else {
+        error_output.to_string()
+    };
+    let now = Utc::now().to_rfc3339();
+
+    let _ = db.execute(
+        "INSERT INTO ralph_mistakes (id, project_id, loop_id, mistake_type, description, context, resolution, learned_pattern, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, NULL, ?7)",
+        rusqlite::params![
+            mistake_id,
+            project_id,
+            loop_id,
+            mistake_type,
+            description,
+            prompt,
+            now
+        ],
+    );
 }
 
 /// Categorize a mistake based on error message content.
@@ -655,7 +1322,7 @@ pub async fn list_ralph_loops(
 
     let mut stmt = db
         .prepare(
-            "SELECT id, project_id, prompt, enhanced_prompt, status, quality_score, iterations, outcome, started_at, paused_at, completed_at, created_at FROM ralph_loops WHERE project_id = ?1 ORDER BY created_at DESC",
+            "SELECT id, project_id, prompt, enhanced_prompt, status, quality_score, iterations, outcome, started_at, paused_at, completed_at, created_at, COALESCE(mode, 'iterative'), current_story, total_stories FROM ralph_loops WHERE project_id = ?1 ORDER BY created_at DESC",
         )
         .map_err(|e| format!("Failed to query loops: {}", e))?;
 
@@ -674,6 +1341,9 @@ pub async fn list_ralph_loops(
                 paused_at: row.get(9)?,
                 completed_at: row.get(10)?,
                 created_at: row.get(11)?,
+                mode: row.get(12)?,
+                current_story: row.get(13)?,
+                total_stories: row.get(14)?,
             })
         })
         .map_err(|e| format!("Failed to read loops: {}", e))?

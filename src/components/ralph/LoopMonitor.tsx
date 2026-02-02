@@ -131,10 +131,20 @@ function LoopCard({
             >
               {status.label}
             </span>
+            {loop.mode === "prd" && (
+              <span className="inline-block rounded bg-purple-950 px-2 py-0.5 text-xs font-medium text-purple-300">
+                PRD
+              </span>
+            )}
             <span className="text-xs text-neutral-500">
               Score: {loop.qualityScore}/100
             </span>
-            {loop.iterations > 0 && (
+            {loop.mode === "prd" && loop.totalStories !== null && (
+              <span className="text-xs text-purple-300">
+                Story {(loop.currentStory ?? 0) + 1}/{loop.totalStories}
+              </span>
+            )}
+            {loop.mode !== "prd" && loop.iterations > 0 && (
               <span className="text-xs text-neutral-500">
                 {loop.iterations} iterations
               </span>

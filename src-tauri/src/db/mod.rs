@@ -91,6 +91,8 @@ pub fn init_db() -> Result<Connection, String> {
     // Run migrations for existing databases
     schema::migrate_add_stack_extras(&conn)
         .map_err(|e| format!("Failed to migrate stack_extras: {}", e))?;
+    schema::migrate_add_prd_columns(&conn)
+        .map_err(|e| format!("Failed to migrate PRD columns: {}", e))?;
 
     Ok(conn)
 }

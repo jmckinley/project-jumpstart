@@ -22,7 +22,8 @@
  * PATTERNS:
  * - Call analyzePrompt(prompt, useAi) to score prompt quality before starting
  * - When useAi=true and API key is configured, uses AI for deeper analysis
- * - Call startLoop() to begin a RALPH loop (requires analysis first)
+ * - Call startLoop() to begin a RALPH loop in iterative mode
+ * - Call startLoopPrd(prdJson) to begin a RALPH loop in PRD mode (fresh context per story)
  * - Call pauseLoop() to pause an active loop
  * - Call resumeLoop() to resume a paused loop
  * - Call killLoop() to kill a running or paused loop and mark as failed
@@ -30,7 +31,7 @@
  * - Call loadContext() to fetch CLAUDE.md + mistakes before analysis
  * - Call recordMistake() to record a new mistake for learning
  * - Call learnPattern() to add a pattern to CLAUDE.md
- * - Returns { loops, mistakes, analysis, context, analyzing, loading, error, analyzePrompt, startLoop, pauseLoop, resumeLoop, killLoop, loadLoops, loadMistakes, loadContext, recordMistake, learnPattern, clearAnalysis }
+ * - Returns { loops, mistakes, analysis, context, analyzing, loading, error, analyzePrompt, startLoop, startLoopPrd, pauseLoop, resumeLoop, killLoop, loadLoops, loadMistakes, loadContext, recordMistake, learnPattern, clearAnalysis }
  *
  * CLAUDE NOTES:
  * - analyzePrompt sets the analysis state for display in PromptAnalyzer
@@ -49,6 +50,7 @@ import {
   analyzeRalphPrompt,
   analyzeRalphPromptWithAi,
   startRalphLoop,
+  startRalphLoopPrd,
   pauseRalphLoop,
   resumeRalphLoop,
   killRalphLoop,
@@ -204,6 +206,32 @@ export function useRalph() {
     [activeProject, state.analysis],
   );
 
+  /**
+   * Start a RALPH loop in PRD mode (fresh context per story, git commits between).
+   * @param prdJson - JSON string of the PrdFile object
+   */
+  const startLoopPrd = useCallback(
+    async (prdJson: string) => {
+      if (!activeProject) return;
+      setState((s) => ({ ...s, loading: true, error: null }));
+      try {
+        const loop = await startRalphLoopPrd(activeProject.id, prdJson);
+        setState((s) => ({
+          ...s,
+          loops: [loop, ...s.loops],
+          loading: false,
+        }));
+      } catch (err) {
+        setState((s) => ({
+          ...s,
+          loading: false,
+          error: err instanceof Error ? err.message : "Failed to start PRD loop",
+        }));
+      }
+    },
+    [activeProject],
+  );
+
   const pauseLoop = useCallback(
     async (loopId: string) => {
       setState((s) => ({ ...s, error: null }));
@@ -338,6 +366,7 @@ export function useRalph() {
     loadContext,
     analyzePrompt,
     startLoop,
+    startLoopPrd,
     pauseLoop,
     resumeLoop,
     killLoop,

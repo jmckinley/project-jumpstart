@@ -11,6 +11,8 @@
 //!
 //! EXPORTS:
 //! - create_tables - Creates all tables if they don't exist
+//! - migrate_add_stack_extras - Migration for stack_extras column
+//! - migrate_add_prd_columns - Migration for PRD mode columns (mode, current_story, total_stories)
 //!
 //! PATTERNS:
 //! - Uses CREATE TABLE IF NOT EXISTS for idempotent setup
@@ -23,6 +25,7 @@
 //!   activities (Phase 10), ralph_mistakes (for learning from loop errors)
 //! - freshness_history stores per-file freshness snapshots for trend analysis
 //! - ralph_loops tracks RALPH loop execution with status (idle/running/paused/completed/failed)
+//! - ralph_loops.mode: "iterative" (default, accumulated context) or "prd" (fresh context per story)
 //! - ralph_mistakes stores mistakes and learned patterns for RALPH context enhancement
 //! - See spec Part 6.2 for full table definitions
 //! - Add new tables here and call in create_tables()
@@ -40,6 +43,31 @@ pub fn migrate_add_stack_extras(conn: &Connection) -> Result<(), rusqlite::Error
 
     if !has_column {
         conn.execute("ALTER TABLE projects ADD COLUMN stack_extras TEXT", [])?;
+    }
+    Ok(())
+}
+
+/// Migrate existing database to add PRD mode columns to ralph_loops.
+/// Adds: mode, current_story, total_stories
+pub fn migrate_add_prd_columns(conn: &Connection) -> Result<(), rusqlite::Error> {
+    // Check if mode column exists
+    let has_mode = conn
+        .prepare("SELECT mode FROM ralph_loops LIMIT 1")
+        .is_ok();
+
+    if !has_mode {
+        conn.execute(
+            "ALTER TABLE ralph_loops ADD COLUMN mode TEXT NOT NULL DEFAULT 'iterative'",
+            [],
+        )?;
+        conn.execute(
+            "ALTER TABLE ralph_loops ADD COLUMN current_story INTEGER",
+            [],
+        )?;
+        conn.execute(
+            "ALTER TABLE ralph_loops ADD COLUMN total_stories INTEGER",
+            [],
+        )?;
     }
     Ok(())
 }
@@ -136,6 +164,9 @@ pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
             paused_at       TEXT,
             completed_at    TEXT,
             created_at      TEXT NOT NULL,
+            mode            TEXT NOT NULL DEFAULT 'iterative',
+            current_story   INTEGER,
+            total_stories   INTEGER,
             FOREIGN KEY (project_id) REFERENCES projects(id)
         );
 
