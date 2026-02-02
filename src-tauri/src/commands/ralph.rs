@@ -1048,12 +1048,28 @@ fn extract_issues_heuristic(output: &str) -> Vec<ExtractedIssue> {
     let mut issues = Vec::new();
     let lower = output.to_lowercase();
 
-    // Check for common error patterns
-    if lower.contains("error:") || lower.contains("error]") || lower.contains("failed") {
+    // Check for test failures FIRST - these have specific patterns that shouldn't be caught as generic errors
+    // Patterns: "test ... FAILED", "test failed", "tests failed", "assertion"
+    let is_test_failure = lower.contains("test failed")
+        || lower.contains("tests failed")
+        || lower.contains("assertion")
+        || (lower.contains("... failed") && lower.contains("test"));
+
+    if is_test_failure {
+        issues.push(ExtractedIssue {
+            issue_type: "test_failure".to_string(),
+            description: "One or more tests failed".to_string(),
+            suggested_fix: Some("Review test output and fix failing tests".to_string()),
+        });
+        return issues; // Test failures are a specific category, don't mix with generic errors
+    }
+
+    // Check for common error patterns (excluding test failure patterns)
+    if lower.contains("error:") || lower.contains("error]") {
         // Try to extract the error line
         for line in output.lines() {
             let line_lower = line.to_lowercase();
-            if line_lower.contains("error") || line_lower.contains("failed") {
+            if line_lower.contains("error:") || line_lower.contains("error]") {
                 issues.push(ExtractedIssue {
                     issue_type: "error".to_string(),
                     description: line.trim().chars().take(200).collect(),
@@ -1075,14 +1091,6 @@ fn extract_issues_heuristic(output: &str) -> Vec<ExtractedIssue> {
                 break;
             }
         }
-    }
-
-    if lower.contains("test failed") || lower.contains("tests failed") || lower.contains("assertion") {
-        issues.push(ExtractedIssue {
-            issue_type: "test_failure".to_string(),
-            description: "One or more tests failed".to_string(),
-            suggested_fix: Some("Review test output and fix failing tests".to_string()),
-        });
     }
 
     issues
@@ -1907,5 +1915,130 @@ mod tests {
         let specific_score = score_specificity(specific);
         let vague_score = score_specificity(vague);
         assert!(specific_score.score > vague_score.score);
+    }
+
+    #[test]
+    fn test_extract_issues_heuristic_finds_errors() {
+        let output_with_error = "Compiling project...\nerror: cannot find value `foo` in this scope\n  --> src/main.rs:10:5";
+        let issues = extract_issues_heuristic(output_with_error);
+        assert!(!issues.is_empty());
+        assert_eq!(issues[0].issue_type, "error");
+    }
+
+    #[test]
+    fn test_extract_issues_heuristic_finds_warnings() {
+        let output_with_warning = "Compiling project...\nwarning: unused variable: `x`\n  --> src/lib.rs:5:9";
+        let issues = extract_issues_heuristic(output_with_warning);
+        assert!(!issues.is_empty());
+        assert_eq!(issues[0].issue_type, "warning");
+    }
+
+    #[test]
+    fn test_extract_issues_heuristic_finds_test_failures() {
+        let output_with_test_failure = "running 5 tests\ntest my_test ... FAILED\n\ntest result: FAILED. 4 passed; 1 failed";
+        let issues = extract_issues_heuristic(output_with_test_failure);
+        assert!(!issues.is_empty());
+        assert_eq!(issues[0].issue_type, "test_failure");
+    }
+
+    #[test]
+    fn test_extract_issues_heuristic_no_issues_on_success() {
+        let clean_output = "Compiling project...\nFinished dev [unoptimized + debuginfo] target(s) in 2.5s\nAll tests passed!";
+        let issues = extract_issues_heuristic(clean_output);
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn test_build_iteration_prompt_includes_prior_issues() {
+        let original = "Fix the bug in login";
+        let issues = vec![
+            ExtractedIssue {
+                issue_type: "error".to_string(),
+                description: "undefined variable 'user'".to_string(),
+                suggested_fix: Some("Define user before using".to_string()),
+            },
+        ];
+        let prompt = build_iteration_prompt(original, &issues, 1);
+
+        assert!(prompt.contains("Iteration 2"));
+        assert!(prompt.contains("Prior Issues"));
+        assert!(prompt.contains("undefined variable 'user'"));
+        assert!(prompt.contains("Define user before using"));
+        assert!(prompt.contains("Fix the bug in login"));
+    }
+
+    #[test]
+    fn test_prd_parsing() {
+        use crate::models::ralph::PrdFile;
+
+        let prd_json = r#"{
+            "name": "Test Feature",
+            "description": "A test PRD",
+            "branch": "feature/test",
+            "testCommand": "cargo test",
+            "maxIterationsPerStory": 3,
+            "stories": [
+                {
+                    "id": "story-1",
+                    "title": "First story",
+                    "description": "Do the first thing",
+                    "priority": 1,
+                    "completed": false
+                }
+            ]
+        }"#;
+
+        let prd: PrdFile = serde_json::from_str(prd_json).expect("PRD should parse");
+        assert_eq!(prd.name, "Test Feature");
+        assert_eq!(prd.branch, "feature/test");
+        assert_eq!(prd.stories.len(), 1);
+        assert_eq!(prd.stories[0].title, "First story");
+        assert!(!prd.stories[0].completed);
+    }
+
+    #[test]
+    fn test_build_story_prompt() {
+        use crate::models::ralph::{PrdFile, PrdStory};
+
+        let story = PrdStory {
+            id: "test-1".to_string(),
+            title: "Add login form".to_string(),
+            description: "Create a login form component".to_string(),
+            acceptance_criteria: Some("Form renders with email and password fields".to_string()),
+            priority: 1,
+            completed: false,
+            commit_hash: None,
+        };
+
+        let prd = PrdFile {
+            name: "Auth Feature".to_string(),
+            description: None,
+            branch: "main".to_string(),
+            test_command: Some("pnpm test".to_string()),
+            typecheck_command: None,
+            max_iterations_per_story: 3,
+            stories: vec![story.clone()],
+        };
+
+        let prompt = build_story_prompt(&story, &prd);
+
+        assert!(prompt.contains("Add login form"));
+        assert!(prompt.contains("Create a login form component"));
+        assert!(prompt.contains("Acceptance Criteria"));
+        assert!(prompt.contains("Form renders with email and password fields"));
+        assert!(prompt.contains("Ensure all tests pass"));
+    }
+
+    #[test]
+    fn test_categorize_mistake() {
+        assert_eq!(categorize_mistake("file not found: src/main.rs"), "file_not_found");
+        assert_eq!(categorize_mistake("permission denied"), "permission_error");
+        assert_eq!(categorize_mistake("syntax error on line 5"), "syntax_error");
+        assert_eq!(categorize_mistake("type mismatch: expected i32"), "type_error");
+        assert_eq!(categorize_mistake("connection timeout"), "timeout");
+        assert_eq!(categorize_mistake("network error: failed to connect"), "network_error");
+        assert_eq!(categorize_mistake("out of memory"), "resource_error");
+        assert_eq!(categorize_mistake("process killed by user"), "user_cancelled");
+        assert_eq!(categorize_mistake("something went wrong"), "implementation");
     }
 }
