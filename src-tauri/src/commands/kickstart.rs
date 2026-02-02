@@ -41,7 +41,7 @@ use crate::db::AppState;
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TechPreferences {
-    pub language: String,
+    pub language: Option<String>,
     pub framework: Option<String>,
     pub database: Option<String>,
     pub styling: Option<String>,
@@ -159,7 +159,7 @@ pub async fn generate_kickstart_prompt(
 
     let tech_stack = format!(
         "Language: {}\nFramework: {}\nDatabase: {}\nStyling: {}",
-        input.tech_preferences.language,
+        input.tech_preferences.language.as_deref().unwrap_or("None specified"),
         input.tech_preferences.framework.as_deref().unwrap_or("None specified"),
         input.tech_preferences.database.as_deref().unwrap_or("None specified"),
         input.tech_preferences.styling.as_deref().unwrap_or("None specified"),
@@ -268,7 +268,7 @@ pub async fn generate_kickstart_claude_md(
 
     let tech_stack = format!(
         "Language: {}\nFramework: {}\nDatabase: {}\nStyling: {}",
-        input.tech_preferences.language,
+        input.tech_preferences.language.as_deref().unwrap_or("None"),
         input.tech_preferences.framework.as_deref().unwrap_or("None"),
         input.tech_preferences.database.as_deref().unwrap_or("None"),
         input.tech_preferences.styling.as_deref().unwrap_or("None"),
@@ -471,7 +471,7 @@ mod tests {
         let input: KickstartInput = serde_json::from_str(json).unwrap();
         assert_eq!(input.app_purpose, "A todo app");
         assert_eq!(input.key_features.len(), 2);
-        assert_eq!(input.tech_preferences.language, "TypeScript");
+        assert_eq!(input.tech_preferences.language, Some("TypeScript".to_string()));
         assert_eq!(input.tech_preferences.framework, Some("React".to_string()));
         assert!(input.tech_preferences.database.is_none());
     }

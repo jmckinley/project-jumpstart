@@ -618,9 +618,22 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
             {inferredStack.warnings.length > 0 && (
               <div className="mb-3 rounded-lg bg-neutral-800/50 px-3 py-2">
                 <p className="mb-1.5 text-xs font-medium text-neutral-400">AI Recommendations:</p>
-                <ul className="space-y-1">
+                <ul className="space-y-1.5">
                   {inferredStack.warnings.map((warning, i) => (
-                    <li key={i} className="text-xs text-neutral-500">• {warning}</li>
+                    <li key={i} className="flex items-start justify-between gap-2">
+                      <span className="text-xs text-neutral-500">• {warning}</span>
+                      <button
+                        onClick={() => {
+                          const newTech = additionalTech.trim()
+                            ? `${additionalTech.trim()}, ${warning}`
+                            : warning;
+                          setAdditionalTech(newTech);
+                        }}
+                        className="flex-shrink-0 rounded bg-neutral-700 px-1.5 py-0.5 text-[10px] font-medium text-neutral-300 transition-colors hover:bg-neutral-600"
+                      >
+                        + Add
+                      </button>
+                    </li>
                   ))}
                 </ul>
               </div>
