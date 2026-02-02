@@ -4,8 +4,9 @@
  *
  * PURPOSE:
  * - Show a list of detected recurring patterns in the project
- * - Display frequency badge per pattern
+ * - Display impact badge per pattern (High/Medium/Low based on frequency)
  * - Provide a "Create Skill" button per pattern to pre-fill a new skill from the suggested content
+ * - Pass pattern ID to parent so pattern can be removed after skill creation
  * - Allow triggering a fresh pattern detection scan
  *
  * DEPENDENCIES:
@@ -16,15 +17,17 @@
  *
  * PATTERNS:
  * - "Detect Patterns" button triggers onDetect (parent calls detectProjectPatterns)
- * - Each pattern row shows description, frequency as a colored badge, and a "Create Skill" button
- * - "Create Skill" calls onCreateFromPattern(description, suggestedSkill) to pre-fill the skill editor
+ * - Each pattern row shows description, impact badge, and a "Create Skill" button
+ * - "Create Skill" calls onCreateFromPattern(patternId, description, suggestedSkill) to pre-fill the skill editor
  * - Only patterns with a non-null suggestedSkill show the "Create Skill" button
  *
  * CLAUDE NOTES:
  * - detecting prop controls the spinner state on the "Detect Patterns" button
- * - Frequency badge color: >= 10 = green (high), >= 5 = yellow (medium), < 5 = neutral (low)
+ * - Impact badge: >= 10 = "High Impact" (green), >= 5 = "Medium Impact" (yellow), < 5 = "Low Impact" (neutral)
+ * - Badge shows frequency count in tooltip on hover
  * - If no patterns are found, a placeholder message is shown
  * - The parent is responsible for managing the transition from pattern to skill editor
+ * - Parent should call removePattern(patternId) after creating a skill to remove it from list
  */
 
 import type { Pattern } from "@/types/skill";
@@ -33,24 +36,30 @@ interface PatternDetectorProps {
   patterns: Pattern[];
   detecting: boolean;
   onDetect: () => void;
-  onCreateFromPattern: (description: string, content: string) => void;
+  onCreateFromPattern: (patternId: string, description: string, content: string) => void;
 }
 
-function FrequencyBadge({ frequency }: { frequency: number }) {
+function ImpactBadge({ frequency }: { frequency: number }) {
   let colorClasses: string;
+  let label: string;
+
   if (frequency >= 10) {
     colorClasses = "bg-green-500/20 text-green-400";
+    label = "High Impact";
   } else if (frequency >= 5) {
     colorClasses = "bg-yellow-500/20 text-yellow-400";
+    label = "Medium Impact";
   } else {
     colorClasses = "bg-neutral-700 text-neutral-400";
+    label = "Low Impact";
   }
 
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${colorClasses}`}
+      title={`Found ${frequency} times in codebase`}
     >
-      {frequency}x
+      {label}
     </span>
   );
 }
@@ -129,14 +138,15 @@ export function PatternDetector({
                 </p>
               </div>
 
-              {/* Frequency badge */}
-              <FrequencyBadge frequency={pattern.frequency} />
+              {/* Impact badge */}
+              <ImpactBadge frequency={pattern.frequency} />
 
               {/* Create Skill button */}
               {pattern.suggestedSkill && (
                 <button
                   onClick={() =>
                     onCreateFromPattern(
+                      pattern.id,
                       pattern.description,
                       pattern.suggestedSkill!,
                     )

@@ -159,6 +159,14 @@ export function useSkills() {
     }
   }, []);
 
+  // Remove a pattern from the list (after creating a skill from it)
+  const removePattern = useCallback((patternId: string) => {
+    setState((s) => ({
+      ...s,
+      patterns: s.patterns.filter((p) => p.id !== patternId),
+    }));
+  }, []);
+
   return {
     ...state,
     loadSkills,
@@ -167,5 +175,6 @@ export function useSkills() {
     removeSkill,
     detectProjectPatterns,
     bumpUsage,
+    removePattern,
   };
 }

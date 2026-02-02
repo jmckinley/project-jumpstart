@@ -420,6 +420,7 @@ function SkillsView({ onSkillsChange }: { onSkillsChange?: () => void }) {
     editSkill,
     removeSkill,
     detectProjectPatterns,
+    removePattern,
   } = useSkills();
 
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
@@ -472,7 +473,9 @@ function SkillsView({ onSkillsChange }: { onSkillsChange?: () => void }) {
   );
 
   const handleCreateFromPattern = useCallback(
-    (description: string, content: string) => {
+    (patternId: string, description: string, content: string) => {
+      // Remove pattern from list immediately so user sees feedback
+      removePattern(patternId);
       setEditing(true);
       setSelectedSkill({
         id: "",
@@ -485,7 +488,7 @@ function SkillsView({ onSkillsChange }: { onSkillsChange?: () => void }) {
         updatedAt: "",
       });
     },
-    [],
+    [removePattern],
   );
 
   const handleAddFromLibrary = useCallback(
