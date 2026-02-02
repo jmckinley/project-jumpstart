@@ -31,7 +31,7 @@
  * Tech stack preferences for the new project
  */
 export interface TechPreferences {
-  language: string;
+  language: string | null;
   framework: string | null;
   database: string | null;
   styling: string | null;
