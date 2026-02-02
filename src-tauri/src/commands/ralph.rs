@@ -1658,13 +1658,13 @@ pub async fn get_ralph_context(
         "No CLAUDE.md found".to_string()
     };
 
-    // Get recent mistakes from DB
+    // Get recent mistakes from DB (exclude user_cancelled - those are just operational messages)
     let db = state.db.lock().map_err(|e| format!("DB lock error: {}", e))?;
     let mut stmt = db
         .prepare(
             "SELECT id, project_id, loop_id, mistake_type, description, context, resolution, learned_pattern, created_at
              FROM ralph_mistakes
-             WHERE project_id = ?1
+             WHERE project_id = ?1 AND mistake_type != 'user_cancelled'
              ORDER BY created_at DESC
              LIMIT 10",
         )
