@@ -8,6 +8,7 @@
  * - Test tech stack dropdown interactions
  * - Test prompt generation flow
  * - Test CLAUDE.md creation flow
+ * - Test review step with layered tech stack UI
  *
  * DEPENDENCIES:
  * - vitest - Test framework
@@ -18,16 +19,21 @@
  * - None (test file)
  *
  * PATTERNS:
- * - Mock @/lib/tauri for generateKickstartPrompt and generateKickstartClaudeMd
+ * - Mock @/lib/tauri for generateKickstartPrompt, generateKickstartClaudeMd, inferTechStack
  * - Mock @/stores/projectStore for activeProject
  * - Mock navigator.clipboard.writeText for copy functionality
  * - Use userEvent for form interactions
+ * - goToReviewStep helper navigates to "Suggested Tech Stack" step
  *
  * CLAUDE NOTES:
- * - Required fields: appPurpose, targetUsers, at least one feature, language
+ * - Required fields: appPurpose, targetUsers, at least one feature (language is optional)
  * - Optional fields: framework, database, styling, constraints
  * - Features list starts with one empty input
  * - Framework dropdown depends on selected language
+ * - Review step uses layered UI with Core, Data, UI sections
+ * - "Accept & Generate" button replaces old "Accept Suggestions" + "Generate" flow
+ * - "Regenerate" button calls inferTechStack again for alternative suggestions
+ * - "Additional Technologies" input allows adding extra tech to constraints
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -244,11 +250,11 @@ describe("ProjectKickstart", () => {
 
       // Verify we enter the review step where AI provides suggestions
       await waitFor(() => {
-        expect(screen.getByText("Review Tech Stack")).toBeInTheDocument();
+        expect(screen.getByText("Suggested Tech Stack")).toBeInTheDocument();
       });
 
       // Verify user can see their original language selection
-      expect(screen.getByText("Python")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("Python")).toBeInTheDocument();
     });
   });
 
@@ -693,7 +699,7 @@ describe("ProjectKickstart", () => {
       await user.click(screen.getByRole("button", { name: /review & generate/i }));
 
       await waitFor(() => {
-        expect(screen.getByText("Review Tech Stack")).toBeInTheDocument();
+        expect(screen.getByText("Suggested Tech Stack")).toBeInTheDocument();
       });
     });
 
@@ -742,48 +748,24 @@ describe("ProjectKickstart", () => {
       // Don't fill optional fields to trigger review step
       await user.click(screen.getByRole("button", { name: /review & generate/i }));
       await waitFor(() => {
-        expect(screen.getByText("Review Tech Stack")).toBeInTheDocument();
+        expect(screen.getByText("Suggested Tech Stack")).toBeInTheDocument();
       });
     }
 
     describe("Rendering", () => {
-      it("should display user selections with 'Your choice' badge", async () => {
+      it("should show layered tech stack UI with Core, Data, and UI sections", async () => {
         const user = userEvent.setup();
         render(<ProjectKickstart />);
 
         await goToReviewStep(user);
 
-        // Language should show "Your choice" badge
-        const yourChoiceBadges = screen.getAllByText("Your choice");
-        expect(yourChoiceBadges.length).toBeGreaterThanOrEqual(1);
-        expect(screen.getByText("TypeScript")).toBeInTheDocument();
+        // Should show layer headings
+        expect(screen.getByText("Core")).toBeInTheDocument();
+        expect(screen.getByText("Data")).toBeInTheDocument();
+        expect(screen.getByText("UI")).toBeInTheDocument();
       });
 
-      it("should display AI suggestions with confidence badges", async () => {
-        const user = userEvent.setup();
-        mockInferTechStack.mockResolvedValue({
-          language: null,
-          framework: { value: "React", reason: "Best for web apps", confidence: "high" },
-          database: { value: "PostgreSQL", reason: "Reliable and scalable", confidence: "medium" },
-          styling: { value: "Tailwind CSS", reason: "Utility-first CSS", confidence: "low" },
-          warnings: [],
-        });
-
-        render(<ProjectKickstart />);
-
-        await goToReviewStep(user);
-
-        // Should show AI suggested badges
-        const aiSuggestedBadges = screen.getAllByText("AI suggested");
-        expect(aiSuggestedBadges.length).toBeGreaterThanOrEqual(1);
-
-        // Should show confidence levels
-        expect(screen.getByText("high confidence")).toBeInTheDocument();
-        expect(screen.getByText("medium confidence")).toBeInTheDocument();
-        expect(screen.getByText("low confidence")).toBeInTheDocument();
-      });
-
-      it("should show reasoning for each suggestion", async () => {
+      it("should show reasoning for suggestions when value matches", async () => {
         const user = userEvent.setup();
         mockInferTechStack.mockResolvedValue({
           language: null,
@@ -800,7 +782,7 @@ describe("ProjectKickstart", () => {
         expect(screen.getByText("Best for interactive UIs")).toBeInTheDocument();
       });
 
-      it("should display warnings if present", async () => {
+      it("should display AI recommendations if present", async () => {
         const user = userEvent.setup();
         mockInferTechStack.mockResolvedValue({
           language: null,
@@ -814,73 +796,92 @@ describe("ProjectKickstart", () => {
 
         await goToReviewStep(user);
 
-        expect(screen.getByText("Recommendations")).toBeInTheDocument();
-        expect(screen.getByText("Consider using a database for data persistence")).toBeInTheDocument();
-        expect(screen.getByText("Authentication may be needed")).toBeInTheDocument();
+        expect(screen.getByText("AI Recommendations:")).toBeInTheDocument();
+        expect(screen.getByText(/Consider using a database for data persistence/)).toBeInTheDocument();
+        expect(screen.getByText(/Authentication may be needed/)).toBeInTheDocument();
       });
 
-      it("should render Framework, Database, and Styling rows", async () => {
+      it("should show Language, Framework, Database, and Styling labels", async () => {
         const user = userEvent.setup();
         render(<ProjectKickstart />);
 
         await goToReviewStep(user);
 
+        expect(screen.getByText("Language")).toBeInTheDocument();
         expect(screen.getByText("Framework")).toBeInTheDocument();
         expect(screen.getByText("Database")).toBeInTheDocument();
         expect(screen.getByText("Styling")).toBeInTheDocument();
       });
 
-      it("should always show Language as user's choice (not suggested)", async () => {
+      it("should show Regenerate button", async () => {
         const user = userEvent.setup();
-        // Even if AI returns a language suggestion, it should show user's choice
+        render(<ProjectKickstart />);
+
+        await goToReviewStep(user);
+
+        expect(screen.getByRole("button", { name: /regenerate/i })).toBeInTheDocument();
+      });
+
+      it("should show Additional Technologies input", async () => {
+        const user = userEvent.setup();
+        render(<ProjectKickstart />);
+
+        await goToReviewStep(user);
+
+        expect(screen.getByText("Additional Technologies")).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/Redis, Docker, AWS S3/)).toBeInTheDocument();
+      });
+
+      it("should pre-fill dropdowns with user selections or AI suggestions", async () => {
+        const user = userEvent.setup();
         mockInferTechStack.mockResolvedValue({
-          language: { value: "Go", reason: "Fast", confidence: "high" },
-          framework: null,
-          database: null,
+          language: null,
+          framework: { value: "React", reason: "Test", confidence: "high" },
+          database: { value: "PostgreSQL", reason: "Test", confidence: "medium" },
+          styling: { value: "Tailwind CSS", reason: "Test", confidence: "high" },
+          warnings: [],
+        });
+
+        render(<ProjectKickstart />);
+
+        await goToReviewStep(user);
+
+        // User selected TypeScript, so it should be pre-filled
+        expect(screen.getByDisplayValue("TypeScript")).toBeInTheDocument();
+        // AI suggested values should be pre-filled
+        expect(screen.getByDisplayValue("React")).toBeInTheDocument();
+        expect(screen.getByDisplayValue("PostgreSQL")).toBeInTheDocument();
+        expect(screen.getByDisplayValue("Tailwind CSS")).toBeInTheDocument();
+      });
+    });
+
+    describe("Regenerate", () => {
+      it("should call inferTechStack again when Regenerate clicked", async () => {
+        const user = userEvent.setup();
+        render(<ProjectKickstart />);
+
+        await goToReviewStep(user);
+
+        // Clear mock to track new call
+        mockInferTechStack.mockClear();
+        mockInferTechStack.mockResolvedValue({
+          language: { value: "Python", reason: "Alternative", confidence: "high" },
+          framework: { value: "FastAPI", reason: "Fast and modern", confidence: "high" },
+          database: { value: "MongoDB", reason: "NoSQL option", confidence: "medium" },
           styling: null,
           warnings: [],
         });
 
-        render(<ProjectKickstart />);
+        await user.click(screen.getByRole("button", { name: /regenerate/i }));
 
-        await goToReviewStep(user);
-
-        // Language row should show user's TypeScript, not AI's Go suggestion
-        const languageRow = screen.getByText("Language").closest("div")?.parentElement;
-        expect(languageRow).toHaveTextContent("TypeScript");
-        expect(languageRow).toHaveTextContent("Your choice");
+        await waitFor(() => {
+          expect(mockInferTechStack).toHaveBeenCalled();
+        });
       });
     });
 
-    describe("Accept Suggestions", () => {
-      it("should apply all AI suggestions when 'Accept Suggestions' clicked", async () => {
-        const user = userEvent.setup();
-        mockInferTechStack.mockResolvedValue({
-          language: null,
-          framework: { value: "React", reason: "Best for web apps", confidence: "high" },
-          database: { value: "PostgreSQL", reason: "Reliable", confidence: "medium" },
-          styling: { value: "Tailwind CSS", reason: "Utility-first", confidence: "high" },
-          warnings: [],
-        });
-
-        render(<ProjectKickstart />);
-
-        await goToReviewStep(user);
-
-        // Click Accept Suggestions
-        await user.click(screen.getByRole("button", { name: /accept suggestions/i }));
-
-        // The dropdowns should now have the suggested values selected
-        const frameworkSelect = screen.getByDisplayValue("React");
-        const databaseSelect = screen.getByDisplayValue("PostgreSQL");
-        const stylingSelect = screen.getByDisplayValue("Tailwind CSS");
-
-        expect(frameworkSelect).toBeInTheDocument();
-        expect(databaseSelect).toBeInTheDocument();
-        expect(stylingSelect).toBeInTheDocument();
-      });
-
-      it("should proceed to generation with suggested values", async () => {
+    describe("Accept & Generate", () => {
+      it("should proceed to generation with reviewed values", async () => {
         const user = userEvent.setup();
         mockInferTechStack.mockResolvedValue({
           language: null,
@@ -894,9 +895,8 @@ describe("ProjectKickstart", () => {
 
         await goToReviewStep(user);
 
-        // Accept suggestions then generate
-        await user.click(screen.getByRole("button", { name: /accept suggestions/i }));
-        await user.click(screen.getByRole("button", { name: /^generate$/i }));
+        // Click Accept & Generate
+        await user.click(screen.getByRole("button", { name: /accept & generate/i }));
 
         await waitFor(() => {
           expect(mockGenerateKickstartPrompt).toHaveBeenCalledWith(
@@ -906,64 +906,6 @@ describe("ProjectKickstart", () => {
                 framework: "React",
                 database: "SQLite",
                 styling: "CSS Modules",
-              },
-            })
-          );
-        });
-      });
-    });
-
-    describe("Keep Mine", () => {
-      it("should preserve original user selections", async () => {
-        const user = userEvent.setup();
-        mockInferTechStack.mockResolvedValue({
-          language: null,
-          framework: { value: "React", reason: "Test", confidence: "high" },
-          database: { value: "PostgreSQL", reason: "Test", confidence: "high" },
-          styling: { value: "Tailwind CSS", reason: "Test", confidence: "high" },
-          warnings: [],
-        });
-
-        render(<ProjectKickstart />);
-
-        await goToReviewStep(user);
-
-        // Click Keep Mine
-        await user.click(screen.getByRole("button", { name: /keep mine/i }));
-
-        // The dropdowns should reset to empty (user didn't select anything)
-        // Since user didn't select framework/database/styling, they should be empty
-        const selects = screen.getAllByRole("combobox");
-        const emptySelects = selects.filter((s) => (s as HTMLSelectElement).value === "");
-        expect(emptySelects.length).toBeGreaterThanOrEqual(3);
-      });
-
-      it("should proceed to generation with original values", async () => {
-        const user = userEvent.setup();
-        mockInferTechStack.mockResolvedValue({
-          language: null,
-          framework: { value: "React", reason: "Test", confidence: "high" },
-          database: { value: "PostgreSQL", reason: "Test", confidence: "high" },
-          styling: { value: "Tailwind CSS", reason: "Test", confidence: "high" },
-          warnings: [],
-        });
-
-        render(<ProjectKickstart />);
-
-        await goToReviewStep(user);
-
-        // Keep mine then generate
-        await user.click(screen.getByRole("button", { name: /keep mine/i }));
-        await user.click(screen.getByRole("button", { name: /^generate$/i }));
-
-        await waitFor(() => {
-          expect(mockGenerateKickstartPrompt).toHaveBeenCalledWith(
-            expect.objectContaining({
-              techPreferences: {
-                language: "TypeScript",
-                framework: null, // User didn't select
-                database: null, // User didn't select
-                styling: null, // User didn't select
               },
             })
           );
@@ -1017,9 +959,8 @@ describe("ProjectKickstart", () => {
 
         await goToReviewStep(user);
 
-        // Accept suggestions so reviewed values match suggestions
-        await user.click(screen.getByRole("button", { name: /accept suggestions/i }));
-        await user.click(screen.getByRole("button", { name: /^generate$/i }));
+        // Click Accept & Generate (reviewed values are pre-filled from suggestions)
+        await user.click(screen.getByRole("button", { name: /accept & generate/i }));
 
         await waitFor(() => {
           expect(mockGenerateKickstartPrompt).toHaveBeenCalledWith({
@@ -1043,7 +984,7 @@ describe("ProjectKickstart", () => {
 
         await goToReviewStep(user);
 
-        await user.click(screen.getByRole("button", { name: /^generate$/i }));
+        await user.click(screen.getByRole("button", { name: /accept & generate/i }));
 
         await waitFor(() => {
           expect(screen.getByText("Generated Prompt")).toBeInTheDocument();
@@ -1061,7 +1002,7 @@ describe("ProjectKickstart", () => {
 
         await goToReviewStep(user);
 
-        await user.click(screen.getByRole("button", { name: /^generate$/i }));
+        await user.click(screen.getByRole("button", { name: /accept & generate/i }));
 
         expect(screen.getByText(/generating/i)).toBeInTheDocument();
 

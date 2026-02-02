@@ -12,7 +12,7 @@
  *
  * DEPENDENCIES:
  * - @/lib/tauri - generateKickstartPrompt, generateKickstartClaudeMd, inferTechStack for AI generation
- * - @/types/kickstart - KickstartInput, InferredStack, StackSuggestion types
+ * - @/types/kickstart - KickstartInput, InferredStack types
  * - @/types/project - LANGUAGES, FRAMEWORKS, DATABASES, STYLING_OPTIONS for dropdowns
  * - @/stores/projectStore - Active project for context
  *
@@ -36,7 +36,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { generateKickstartPrompt, generateKickstartClaudeMd, inferTechStack } from "@/lib/tauri";
-import type { KickstartInput, InferredStack, StackSuggestion } from "@/types/kickstart";
+import type { KickstartInput, InferredStack } from "@/types/kickstart";
 import {
   LANGUAGES,
   FRAMEWORKS,
@@ -44,6 +44,9 @@ import {
   STYLING_OPTIONS,
 } from "@/types/project";
 import { useProjectStore } from "@/stores/projectStore";
+
+// All frameworks flattened for matching (used when no language selected in review)
+const ALL_FRAMEWORKS = Object.values(FRAMEWORKS).flat();
 
 interface ProjectKickstartProps {
   onClaudeMdCreated?: () => void;
@@ -74,6 +77,7 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
   const [reviewedFramework, setReviewedFramework] = useState<string>("");
   const [reviewedDatabase, setReviewedDatabase] = useState<string>("");
   const [reviewedStyling, setReviewedStyling] = useState<string>("");
+  const [additionalTech, setAdditionalTech] = useState<string>("");
 
   // Generation state
   const [generating, setGenerating] = useState(false);
@@ -171,31 +175,46 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
     }
   }, [isValid, isStackIncomplete, appPurpose, targetUsers, keyFeatures, constraints, language, framework, database, styling]);
 
-  // Accept all suggestions
-  const handleAcceptAll = () => {
-    if (inferredStack) {
-      if (inferredStack.language && !language) {
-        setReviewedLanguage(inferredStack.language.value);
-      }
-      if (inferredStack.framework && !framework) {
-        setReviewedFramework(inferredStack.framework.value);
-      }
-      if (inferredStack.database && !database) {
-        setReviewedDatabase(inferredStack.database.value);
-      }
-      if (inferredStack.styling && !styling) {
-        setReviewedStyling(inferredStack.styling.value);
-      }
-    }
-  };
+  // Regenerate stack suggestions with different approach
+  const handleRegenerate = useCallback(async () => {
+    setInferring(true);
+    setError(null);
 
-  // Keep original selections
-  const handleKeepMine = () => {
-    setReviewedLanguage(language);
-    setReviewedFramework(framework);
-    setReviewedDatabase(database);
-    setReviewedStyling(styling);
-  };
+    try {
+      // Build hint to get different suggestions, filtering out empty values
+      const currentStack = [reviewedLanguage, reviewedFramework, reviewedDatabase, reviewedStyling]
+        .filter(Boolean)
+        .join(", ");
+      const alternativeHint = currentStack
+        ? `Please suggest alternative technologies than: ${currentStack}`
+        : undefined;
+      const fullConstraints = [constraints.trim(), alternativeHint]
+        .filter(Boolean)
+        .join(". ");
+
+      const result = await inferTechStack({
+        appPurpose: appPurpose.trim(),
+        targetUsers: targetUsers.trim(),
+        keyFeatures: keyFeatures.filter((f) => f.trim().length > 0),
+        constraints: fullConstraints || undefined,
+        // Don't pass current selections to get fresh suggestions
+        currentLanguage: undefined,
+        currentFramework: undefined,
+        currentDatabase: undefined,
+        currentStyling: undefined,
+      });
+
+      setInferredStack(result);
+      setReviewedLanguage(result.language?.value || "");
+      setReviewedFramework(result.framework?.value || "");
+      setReviewedDatabase(result.database?.value || "");
+      setReviewedStyling(result.styling?.value || "");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to regenerate stack");
+    } finally {
+      setInferring(false);
+    }
+  }, [appPurpose, targetUsers, keyFeatures, constraints, reviewedLanguage, reviewedFramework, reviewedDatabase, reviewedStyling]);
 
   // Generate kickstart prompt
   const handleGenerate = useCallback(async () => {
@@ -211,6 +230,13 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
     const finalDatabase = step === "review" ? reviewedDatabase : database;
     const finalStyling = step === "review" ? reviewedStyling : styling;
 
+    // Build constraints including additional tech and AI recommendations
+    const fullConstraints = [
+      constraints.trim(),
+      additionalTech.trim() ? `Additional technologies to include: ${additionalTech.trim()}` : "",
+      inferredStack?.warnings?.length ? `Recommendations: ${inferredStack.warnings.join(". ")}` : "",
+    ].filter(Boolean).join("\n\n") || undefined;
+
     const input: KickstartInput = {
       appPurpose: appPurpose.trim(),
       targetUsers: targetUsers.trim(),
@@ -221,7 +247,7 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
         database: finalDatabase || null,
         styling: finalStyling || null,
       },
-      constraints: constraints.trim() || undefined,
+      constraints: fullConstraints,
     };
 
     try {
@@ -260,6 +286,13 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
     const finalDatabase = step === "review" ? reviewedDatabase : database;
     const finalStyling = step === "review" ? reviewedStyling : styling;
 
+    // Build constraints including additional tech and AI recommendations
+    const fullConstraints = [
+      constraints.trim(),
+      additionalTech.trim() ? `Additional technologies to include: ${additionalTech.trim()}` : "",
+      inferredStack?.warnings?.length ? `Recommendations: ${inferredStack.warnings.join(". ")}` : "",
+    ].filter(Boolean).join("\n\n") || undefined;
+
     const input: KickstartInput = {
       appPurpose: appPurpose.trim(),
       targetUsers: targetUsers.trim(),
@@ -270,7 +303,7 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
         database: finalDatabase || null,
         styling: finalStyling || null,
       },
-      constraints: constraints.trim() || undefined,
+      constraints: fullConstraints,
     };
 
     try {
@@ -283,75 +316,6 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
       setCreatingClaudeMd(false);
     }
   }, [activeProject, isValid, step, appPurpose, targetUsers, keyFeatures, language, framework, database, styling, reviewedFramework, reviewedDatabase, reviewedStyling, constraints, onClaudeMdCreated]);
-
-  // Render suggestion row for review step - always editable
-  const renderSuggestionRow = (
-    label: string,
-    userValue: string,
-    suggestion: StackSuggestion | null,
-    reviewedValue: string,
-    setReviewedValue: (v: string) => void,
-    options: readonly string[]
-  ) => {
-    const isUserChoice = !!userValue;
-    const hasSuggestion = suggestion && !userValue;
-
-    // Determine styling based on source
-    const selectClass = isUserChoice
-      ? "rounded-lg border border-green-500/50 bg-green-950/30 px-3 py-1.5 text-sm text-neutral-100 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-      : hasSuggestion
-      ? "rounded-lg border border-purple-500/50 bg-purple-950/30 px-3 py-1.5 text-sm text-neutral-100 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-      : "rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
-
-    return (
-      <div className="flex items-start gap-4 py-3 border-b border-neutral-800 last:border-0">
-        <div className="w-24 flex-shrink-0">
-          <span className="text-sm font-medium text-neutral-300">{label}</span>
-        </div>
-        <div className="flex-1 space-y-2">
-          <div className="flex items-center gap-2">
-            <select
-              value={reviewedValue}
-              onChange={(e) => setReviewedValue(e.target.value)}
-              className={selectClass}
-            >
-              <option value="">None</option>
-              {options.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
-            {isUserChoice ? (
-              <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
-                Your choice
-              </span>
-            ) : hasSuggestion ? (
-              <>
-                <span className="rounded-full bg-purple-500/20 px-2 py-0.5 text-xs text-purple-400">
-                  AI suggested
-                </span>
-                <span className={`rounded-full px-2 py-0.5 text-xs ${
-                  suggestion.confidence === "high"
-                    ? "bg-green-500/20 text-green-400"
-                    : suggestion.confidence === "medium"
-                    ? "bg-yellow-500/20 text-yellow-400"
-                    : "bg-neutral-500/20 text-neutral-400"
-                }`}>
-                  {suggestion.confidence} confidence
-                </span>
-              </>
-            ) : (
-              <span className="text-xs text-neutral-500">Optional</span>
-            )}
-          </div>
-          {hasSuggestion && suggestion.reason && (
-            <p className="text-xs text-neutral-500">{suggestion.reason}</p>
-          )}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-6">
@@ -510,129 +474,201 @@ export function ProjectKickstart({ onClaudeMdCreated }: ProjectKickstartProps) {
           )}
         </div>
       ) : step === "review" && inferredStack ? (
-        /* Step: Review */
+        /* Step: Review - Layered Tech Stack */
         <div className="space-y-6">
-          <div className="rounded-xl border border-purple-500/30 bg-gradient-to-br from-purple-950/20 to-blue-950/20 p-6">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/20">
-                <svg className="h-5 w-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-neutral-100">Suggested Tech Stack</h3>
+              <p className="text-sm text-neutral-400">Review and customize your stack, then generate your CLAUDE.md</p>
+            </div>
+            <button
+              onClick={handleRegenerate}
+              disabled={inferring}
+              className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-300 transition-colors hover:border-neutral-600 hover:bg-neutral-700 disabled:opacity-50"
+            >
+              {inferring ? (
+                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              ) : (
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              )}
+              Regenerate
+            </button>
+          </div>
+
+          {/* Core Layer */}
+          <div className="rounded-xl border border-purple-500/30 bg-gradient-to-br from-purple-950/20 to-transparent p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="flex h-6 w-6 items-center justify-center rounded bg-purple-500/20">
+                <svg className="h-3.5 w-3.5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                 </svg>
               </div>
+              <span className="text-sm font-medium text-purple-300">Core</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <h4 className="font-medium text-neutral-200">Review Tech Stack</h4>
-                <p className="text-sm text-neutral-400">
-                  Based on your project, we have some suggestions. Review and customize below.
-                </p>
+                <label className="mb-1 block text-xs text-neutral-500">Language</label>
+                <select
+                  value={reviewedLanguage}
+                  onChange={(e) => setReviewedLanguage(e.target.value)}
+                  className="w-full rounded-lg border border-purple-500/30 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:border-purple-500 focus:outline-none"
+                >
+                  <option value="">Select...</option>
+                  {LANGUAGES.map((lang) => (
+                    <option key={lang} value={lang}>{lang}</option>
+                  ))}
+                </select>
+                {inferredStack.language?.reason && reviewedLanguage === inferredStack.language.value && (
+                  <p className="mt-1 text-xs text-neutral-500">{inferredStack.language.reason}</p>
+                )}
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-neutral-500">Framework</label>
+                <select
+                  value={reviewedFramework}
+                  onChange={(e) => setReviewedFramework(e.target.value)}
+                  className="w-full rounded-lg border border-purple-500/30 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:border-purple-500 focus:outline-none"
+                >
+                  <option value="">None</option>
+                  {(reviewedLanguage ? FRAMEWORKS[reviewedLanguage] || [] : ALL_FRAMEWORKS).map((fw) => (
+                    <option key={fw} value={fw}>{fw}</option>
+                  ))}
+                </select>
+                {inferredStack.framework?.reason && reviewedFramework === inferredStack.framework.value && (
+                  <p className="mt-1 text-xs text-neutral-500">{inferredStack.framework.reason}</p>
+                )}
               </div>
             </div>
+          </div>
 
-            {/* Warnings */}
+          {/* Data Layer */}
+          <div className="rounded-xl border border-blue-500/30 bg-gradient-to-br from-blue-950/20 to-transparent p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="flex h-6 w-6 items-center justify-center rounded bg-blue-500/20">
+                <svg className="h-3.5 w-3.5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                </svg>
+              </div>
+              <span className="text-sm font-medium text-blue-300">Data</span>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-neutral-500">Database</label>
+              <select
+                value={reviewedDatabase}
+                onChange={(e) => setReviewedDatabase(e.target.value)}
+                className="w-full rounded-lg border border-blue-500/30 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="">None</option>
+                {DATABASES.map((db) => (
+                  <option key={db} value={db}>{db}</option>
+                ))}
+              </select>
+              {inferredStack.database?.reason && reviewedDatabase === inferredStack.database.value && (
+                <p className="mt-1 text-xs text-neutral-500">{inferredStack.database.reason}</p>
+              )}
+            </div>
+          </div>
+
+          {/* UI Layer */}
+          <div className="rounded-xl border border-green-500/30 bg-gradient-to-br from-green-950/20 to-transparent p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="flex h-6 w-6 items-center justify-center rounded bg-green-500/20">
+                <svg className="h-3.5 w-3.5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                </svg>
+              </div>
+              <span className="text-sm font-medium text-green-300">UI</span>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-neutral-500">Styling</label>
+              <select
+                value={reviewedStyling}
+                onChange={(e) => setReviewedStyling(e.target.value)}
+                className="w-full rounded-lg border border-green-500/30 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:border-green-500 focus:outline-none"
+              >
+                <option value="">None</option>
+                {STYLING_OPTIONS.map((style) => (
+                  <option key={style} value={style}>{style}</option>
+                ))}
+              </select>
+              {inferredStack.styling?.reason && reviewedStyling === inferredStack.styling.value && (
+                <p className="mt-1 text-xs text-neutral-500">{inferredStack.styling.reason}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Additional Technologies */}
+          <div className="rounded-xl border border-neutral-700 bg-neutral-900/50 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="flex h-6 w-6 items-center justify-center rounded bg-neutral-700">
+                <svg className="h-3.5 w-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+              </div>
+              <span className="text-sm font-medium text-neutral-300">Additional Technologies</span>
+            </div>
+
+            {/* AI Recommendations */}
             {inferredStack.warnings.length > 0 && (
-              <div className="mb-4 rounded-lg bg-yellow-950/30 border border-yellow-500/30 px-4 py-3">
-                <div className="flex items-start gap-2">
-                  <svg className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <div>
-                    <p className="text-sm font-medium text-yellow-300">Recommendations</p>
-                    <ul className="mt-1 text-xs text-yellow-400/80 list-disc list-inside">
-                      {inferredStack.warnings.map((warning, i) => (
-                        <li key={i}>{warning}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
+              <div className="mb-3 rounded-lg bg-neutral-800/50 px-3 py-2">
+                <p className="mb-1.5 text-xs font-medium text-neutral-400">AI Recommendations:</p>
+                <ul className="space-y-1">
+                  {inferredStack.warnings.map((warning, i) => (
+                    <li key={i} className="text-xs text-neutral-500">• {warning}</li>
+                  ))}
+                </ul>
               </div>
             )}
 
-            {/* Stack Review */}
-            <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 divide-y divide-neutral-800">
-              <div className="px-4">
-                {renderSuggestionRow(
-                  "Language",
-                  language,
-                  inferredStack.language,
-                  reviewedLanguage,
-                  setReviewedLanguage,
-                  LANGUAGES
-                )}
-              </div>
-
-              <div className="px-4">
-                {renderSuggestionRow(
-                  "Framework",
-                  framework,
-                  inferredStack.framework,
-                  reviewedFramework,
-                  setReviewedFramework,
-                  availableFrameworks
-                )}
-              </div>
-
-              <div className="px-4">
-                {renderSuggestionRow(
-                  "Database",
-                  database,
-                  inferredStack.database,
-                  reviewedDatabase,
-                  setReviewedDatabase,
-                  DATABASES
-                )}
-              </div>
-
-              <div className="px-4">
-                {renderSuggestionRow(
-                  "Styling",
-                  styling,
-                  inferredStack.styling,
-                  reviewedStyling,
-                  setReviewedStyling,
-                  STYLING_OPTIONS
-                )}
-              </div>
+            <div>
+              <label className="mb-1 block text-xs text-neutral-500">Add more (e.g., Redis, Docker, Auth0, WebSockets...)</label>
+              <input
+                type="text"
+                value={additionalTech}
+                onChange={(e) => setAdditionalTech(e.target.value)}
+                placeholder="Redis, Docker, AWS S3..."
+                className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:border-neutral-600 focus:outline-none"
+              />
+              <p className="mt-1 text-xs text-neutral-600">These will be included in your generated CLAUDE.md</p>
             </div>
+          </div>
 
-            {/* Action buttons */}
-            <div className="mt-4 flex items-center justify-between">
-              <button
-                onClick={() => setStep("form")}
-                className="text-sm text-neutral-400 hover:text-neutral-300"
-              >
-                ← Back to form
-              </button>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleKeepMine}
-                  className="rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:bg-neutral-700"
-                >
-                  Keep Mine
-                </button>
-                <button
-                  onClick={handleAcceptAll}
-                  className="rounded-lg border border-purple-500/50 bg-purple-600/20 px-4 py-2 text-sm font-medium text-purple-300 transition-colors hover:bg-purple-600/30"
-                >
-                  Accept Suggestions
-                </button>
-                <button
-                  onClick={handleGenerate}
-                  disabled={generating}
-                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {generating ? (
-                    <>
-                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Generating...
-                    </>
-                  ) : (
-                    "Generate"
-                  )}
-                </button>
-              </div>
-            </div>
+          {/* Action buttons */}
+          <div className="flex items-center justify-between pt-2">
+            <button
+              onClick={() => setStep("form")}
+              className="text-sm text-neutral-400 hover:text-neutral-300"
+            >
+              ← Back to form
+            </button>
+            <button
+              onClick={handleGenerate}
+              disabled={generating}
+              className="flex items-center gap-2 rounded-lg bg-purple-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {generating ? (
+                <>
+                  <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  Accept & Generate
+                </>
+              )}
+            </button>
           </div>
         </div>
       ) : (
