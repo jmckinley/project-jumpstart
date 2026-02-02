@@ -3,7 +3,7 @@
  * @description Navigation sidebar with project selector, section links, and completion checkmarks
  *
  * PURPOSE:
- * - Display app logo and branding at top
+ * - Display clickable app logo and branding at top (navigates to dashboard)
  * - Display project selector dropdown for switching between projects
  * - Render navigation links for all main sections
  * - Show active section highlighting
@@ -28,6 +28,7 @@
  * - Kickstart shown when isEmptyProject=true AND CLAUDE.md not yet created
  *
  * CLAUDE NOTES:
+ * - Clicking the app logo/title at top navigates to dashboard
  * - Sections: Dashboard, CLAUDE.md, Modules, Skills, Agents, RALPH, Context Health, Enforcement, Settings
  * - Kickstart section is temporary - disappears after CLAUDE.md is created
  * - Sections with completion tracking: claude-md, modules, skills, agents, ralph, enforcement
@@ -163,11 +164,14 @@ export function Sidebar({
 
   return (
     <aside className="flex w-56 flex-col border-r border-neutral-800 bg-neutral-900">
-      {/* App Logo */}
-      <div className="flex items-center gap-2 border-b border-neutral-800 px-3 py-2">
+      {/* App Logo - clickable to navigate to dashboard */}
+      <button
+        onClick={() => onNavigate("dashboard")}
+        className="flex w-full items-center gap-2 border-b border-neutral-800 px-3 py-2 text-left transition-colors hover:bg-neutral-800"
+      >
         <img src="/icon-64.png" alt="Project Jumpstart" className="h-6 w-6" />
         <span className="text-sm font-semibold text-neutral-200">Project Jumpstart</span>
-      </div>
+      </button>
 
       {/* Project Selector */}
       <div className="border-b border-neutral-800 p-3">
