@@ -37,7 +37,7 @@ When working with Claude Code, context gets lost after ~30 minutes of conversati
 
 Download the latest release for macOS:
 
-**[Project Jumpstart v0.1.0-beta.19](https://github.com/jmckinley/project-jumpstart/releases/latest)** (11 MB, Apple Silicon)
+**[Project Jumpstart v0.1.0-beta.20](https://github.com/jmckinley/project-jumpstart/releases/latest)** (11 MB, Apple Silicon)
 
 ### Installation
 
