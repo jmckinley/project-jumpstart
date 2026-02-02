@@ -100,7 +100,7 @@ const initialState = {
   testing: null as string | null,
   styling: null as string | null,
   stackExtras: null as StackExtras | null,
-  goals: ["features", "documentation"] as string[],
+  goals: ["features", "tests", "reviews", "debugging", "documentation"] as string[],
   generateModuleDocs: true,
   setupEnforcement: true,
 };

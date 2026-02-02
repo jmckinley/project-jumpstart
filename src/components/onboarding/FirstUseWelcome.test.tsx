@@ -66,12 +66,11 @@ describe("FirstUseWelcome", () => {
       render(<FirstUseWelcome onComplete={mockOnComplete} />);
 
       expect(screen.getByText("Welcome to Project Jumpstart")).toBeInTheDocument();
-      expect(screen.getByText("Auto-generate CLAUDE.md files")).toBeInTheDocument();
-      expect(screen.getByText("Track module documentation freshness")).toBeInTheDocument();
-      expect(screen.getByText("Skills & agents library")).toBeInTheDocument();
-      expect(screen.getByText("RALPH loop prompt optimization")).toBeInTheDocument();
-      expect(screen.getByText("One-click fixes")).toBeInTheDocument();
-      expect(screen.getByText("Avoid context rot!")).toBeInTheDocument();
+      expect(screen.getByText("One-click updates all your project documentation")).toBeInTheDocument();
+      expect(screen.getByText("Latest best practices from the Claude Code team built-in")).toBeInTheDocument();
+      expect(screen.getByText("Claude remembers your project—even in new conversations")).toBeInTheDocument();
+      expect(screen.getByText("Pre-built skills & agents for commits, PRs, reviews & more")).toBeInTheDocument();
+      expect(screen.getByText("Use RALPH to work behind the scenes")).toBeInTheDocument();
     });
 
     it("should render API key input with '(required)' label", () => {

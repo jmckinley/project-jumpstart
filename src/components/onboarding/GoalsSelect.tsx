@@ -23,7 +23,7 @@
  *
  * CLAUDE NOTES:
  * - GOALS constant has { id, label, skill } shape
- * - Default goals are ["features", "documentation"] (set in store initial state)
+ * - Default goals are ["features", "tests", "reviews", "debugging", "documentation"] (set in store initial state)
  * - generateModuleDocs and setupEnforcement default to true
  * - These selections influence what gets generated in step 4
  */
