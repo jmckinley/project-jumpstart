@@ -749,25 +749,6 @@ export APPLE_TEAM_ID="KACZ4GS4RL"
 pnpm tauri build
 ```
 
-**DMG Bundling Workaround**: The Tauri DMG bundler (`bundle_dmg.sh`) sometimes fails with "Not enough arguments". The .app is still signed and notarized successfully. Create the DMG manually:
-
-```bash
-# Create DMG from signed .app
-hdiutil create -volname "Project Jumpstart" \
-  -srcfolder "src-tauri/target/release/bundle/macos/Project Jumpstart.app" \
-  -ov -format UDZO \
-  "src-tauri/target/release/bundle/macos/Project Jumpstart_0.1.0_aarch64.dmg"
-
-# Sign, notarize, and staple the DMG
-codesign --force --sign "Developer ID Application: John McKinley (KACZ4GS4RL)" \
-  "src-tauri/target/release/bundle/macos/Project Jumpstart_0.1.0_aarch64.dmg"
-
-xcrun notarytool submit "src-tauri/target/release/bundle/macos/Project Jumpstart_0.1.0_aarch64.dmg" \
-  --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
-
-xcrun stapler staple "src-tauri/target/release/bundle/macos/Project Jumpstart_0.1.0_aarch64.dmg"
-```
-
 ---
 
 ## Spec Reference
