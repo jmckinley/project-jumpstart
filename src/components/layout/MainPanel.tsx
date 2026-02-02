@@ -108,6 +108,7 @@ import { SkillLibrary } from "@/components/skills/SkillLibrary";
 import { AgentLibrary } from "@/components/agents/AgentLibrary";
 import { AgentsList } from "@/components/agents/AgentsList";
 import { AgentEditor } from "@/components/agents/AgentEditor";
+import { SuggestedAgents } from "@/components/agents/SuggestedAgents";
 import { useAgents } from "@/hooks/useAgents";
 import type { ModuleDoc } from "@/types/module";
 import type { LibrarySkill } from "@/types/skill";
@@ -741,32 +742,41 @@ function AgentsView({ onAgentsChange }: { onAgentsChange?: () => void }) {
       </div>
 
       {activeTab === "my-agents" ? (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-1">
-            <AgentsList
-              agents={agents}
-              selectedId={selectedAgent?.id ?? null}
-              onSelect={handleSelect}
-              onCreateNew={handleCreateNew}
-              onDelete={handleDelete}
-            />
-          </div>
-          <div className="lg:col-span-2">
-            {editing ? (
-              <AgentEditor
-                agent={selectedAgent}
-                onSave={handleSave}
-                onCancel={handleCancel}
+        <>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-1">
+              <AgentsList
+                agents={agents}
+                selectedId={selectedAgent?.id ?? null}
+                onSelect={handleSelect}
+                onCreateNew={handleCreateNew}
+                onDelete={handleDelete}
               />
-            ) : (
-              <div className="flex h-full min-h-[300px] items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-500">
-                <p className="text-sm">
-                  Select an agent to edit or click "New Agent" to create one.
-                </p>
-              </div>
-            )}
+            </div>
+            <div className="lg:col-span-2">
+              {editing ? (
+                <AgentEditor
+                  agent={selectedAgent}
+                  onSave={handleSave}
+                  onCancel={handleCancel}
+                />
+              ) : (
+                <div className="flex h-full min-h-[300px] items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-500">
+                  <p className="text-sm">
+                    Select an agent to edit or click "New Agent" to create one.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+
+          {/* One-click suggested agents */}
+          <SuggestedAgents
+            existingAgentNames={agents.map((a) => a.name)}
+            onAddAgent={handleAddFromLibrary}
+            loading={loading}
+          />
+        </>
       ) : (
         <AgentLibrary
           existingAgentNames={agents.map((a) => a.name)}
