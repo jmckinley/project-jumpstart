@@ -5,7 +5,7 @@
  * PURPOSE:
  * - Explain what context rot is and why it matters
  * - Emphasize the importance of adding an API key for AI features
- * - Document all features: Kickstart, Dashboard, CLAUDE.md, Modules, Skills, Agents, RALPH, Context, Enforcement
+ * - Document all features: Kickstart, Dashboard, CLAUDE.md, Modules, Skills, Agents, RALPH, Context Health, Enforcement
  * - Explain enforcement modes (off, warn, block, auto-update)
  * - Document Claude Code best practices: grill-me-on-changes, prove-it-works, fresh-start-pattern, two-claude-review
  * - Document Skeptical Reviewer agent and RALPH mistake learning
@@ -96,7 +96,7 @@ const FAQS: FAQItem[] = [
   {
     question: "What is the health score?",
     answer:
-      "The health score (0-100) measures your project's documentation quality across six components: CLAUDE.md (25 points), Module docs (25 points), Freshness (15 points), Skills (15 points), Context (10 points), and Enforcement (10 points). Higher scores mean better context preservation. The dashboard shows a breakdown so you can see exactly where to improve.",
+      "The health score (0-100) measures your project's documentation quality across six components: CLAUDE.md (25 points), Module docs (25 points), Freshness (15 points), Skills (15 points), Context Health (10 points), and Enforcement (10 points). Higher scores mean better context preservation. The dashboard shows a breakdown so you can see exactly where to improve.",
   },
   {
     question: "What are Quick Wins?",
@@ -134,6 +134,11 @@ const FAQS: FAQItem[] = [
       "RALPH now records mistakes during coding sessions. Before starting a new loop, you'll see a 'Learned from Previous Loops' banner showing recent mistakes and their resolutions. You can also 'learn patterns' which appends them to your CLAUDE.md file, making them persist across all future sessions. This prevents repeating the same errors.",
   },
   {
+    question: "What are the one-click solutions?",
+    answer:
+      "Project Jumpstart is designed for minimal friction. For Skills: 'Detect Patterns' scans your codebase, then click 'Create Skill' to instantly generate a comprehensive skill with templates, examples, and DO/DON'T lists. For Agents: The 'Suggested for Your Project' section in the My Agents tab shows recommended agents - click 'Add' to create them instantly without filling out any forms. Both features match recommendations to your tech stack.",
+  },
+  {
     question: "How do the sidebar checkmarks work?",
     answer:
       "Checkmarks indicate completed setup steps for each project: CLAUDE.md exists with content, at least one module has documentation, skills/agents are added, a RALPH loop has been started, and git hooks are installed. They're tracked per-project and update automatically.",
@@ -163,7 +168,7 @@ const FEATURE_GUIDES: FeatureGuide[] = [
     description:
       "Your project health at a glance. The health score (0-100) measures documentation quality across six components. Quick Wins show prioritized improvements. The Context Rot alert warns when documentation is falling behind.",
     tips: [
-      "Health score components: CLAUDE.md (25), Modules (25), Freshness (15), Skills (15), Context (10), Enforcement (10)",
+      "Health score components: CLAUDE.md (25), Modules (25), Freshness (15), Skills (15), Context Health (10), Enforcement (10)",
       "Click Quick Wins 'Fix' buttons to jump directly to issues",
       "Green score (70+) means Claude has good context preservation",
       "Check Recent Activity to see what's been happening in your project",
@@ -216,6 +221,8 @@ const FEATURE_GUIDES: FeatureGuide[] = [
       "Try 'Grill Me On Changes' and 'Prove It Works' for better code quality",
       "'Fresh Start Pattern' is your escape hatch when context gets polluted",
       "Add skills to your project to customize them for your codebase",
+      "Pattern Detection scans your codebase and suggests skills - one-click to create!",
+      "Pattern-generated skills include comprehensive content: templates, examples, DO/DON'T lists",
     ],
   },
   {
@@ -225,10 +232,11 @@ const FEATURE_GUIDES: FeatureGuide[] = [
     tips: [
       "The Skeptical Reviewer has a 6-step workflow for finding bugs systematically",
       "Agents are tiered: Essential, Advanced, and Specialized",
-      "Check 'Recommended' tab - agents are matched to your tech stack",
+      "'Suggested for Your Project' shows recommended agents right in the My Agents tab",
+      "One-click 'Add' creates agents instantly - no form to fill out!",
+      "'Great Match' badge indicates agents highly relevant to your tech stack",
       "Trigger patterns let you invoke agents with keywords like 'review' or 'debug'",
       "Customize agent instructions with AI enhancement",
-      "Agents can include workflow steps and tool configurations",
     ],
   },
   {
