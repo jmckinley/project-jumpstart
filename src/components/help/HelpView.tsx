@@ -116,7 +116,7 @@ const FAQS: FAQItem[] = [
   {
     question: "What is RALPH?",
     answer:
-      "RALPH is an automated agentic coding technique that repeatedly feeds your prompt to Claude Code until the task is complete. Each iteration starts with a fresh context, solving the 'context accumulation' problem where AI loses focus as conversations grow. The prompt analyzer scores your prompts on clarity, specificity, context, and scope. RALPH also learns from past mistakes - it shows 'Learned from Previous Loops' before you start, so you don't repeat the same errors.",
+      "RALPH is an automated agentic coding technique that repeatedly feeds your prompt to Claude Code until the task is complete. Each iteration starts with a fresh context, solving the 'context accumulation' problem where AI loses focus as conversations grow. Just type your prompt and click 'Start RALPH Loop' - or optionally use 'Check Prompt' first to see analysis and quality score. RALPH also learns from past mistakes - it shows 'Learned from Previous Loops' before you start, so you don't repeat the same errors.",
   },
   {
     question: "What are the Claude Code Best Practices skills?",
@@ -136,7 +136,7 @@ const FAQS: FAQItem[] = [
   {
     question: "What are the one-click solutions?",
     answer:
-      "Project Jumpstart is designed for minimal friction. For Skills: 'Detect Patterns' scans your codebase, then click 'Create Skill' to instantly generate a comprehensive skill with templates, examples, and DO/DON'T lists. For Agents: The 'Suggested for Your Project' section in the My Agents tab shows recommended agents - click 'Add' to create them instantly without filling out any forms. Both features match recommendations to your tech stack.",
+      "Project Jumpstart is designed for minimal friction. For Skills: 'Detect Patterns' scans your codebase, then click 'Create Skill' to instantly generate a comprehensive skill with templates, examples, and DO/DON'T lists. For Agents: The 'Suggested for Your Project' section in the My Agents tab shows recommended agents - click 'Add' to create them instantly without filling out any forms. For Git: Click 'Initialize Git Repository' in the Enforcement tab to set up git AND auto-update hooks in one step. All features match recommendations to your tech stack.",
   },
   {
     question: "How do the sidebar checkmarks work?",
@@ -244,7 +244,8 @@ const FEATURE_GUIDES: FeatureGuide[] = [
     description:
       "An automated agentic coding technique that repeatedly feeds your prompt to Claude Code until the task is complete. Each iteration starts fresh, solving the 'context accumulation' problem. Now with mistake learning!",
     tips: [
-      "Aim for a quality score of 70+ before starting a loop",
+      "Just type your prompt and click 'Start RALPH Loop' - no need to check first",
+      "Use 'Check Prompt' optionally to see analysis and quality score",
       "Include specific file paths and function names in your prompt",
       "Define clear boundaries - what should NOT change",
       "Use the auto-enhance feature for low-scoring prompts",
@@ -271,6 +272,7 @@ const FEATURE_GUIDES: FeatureGuide[] = [
       "Git hooks that check for documentation before commits. Four modes: Off (no checks), Warn (show warnings), Block (prevent commits), and Auto-Update (generate missing docs with AI).",
     tips: [
       "Auto-Update mode (recommended) generates missing docs automatically at commit time",
+      "No git? Click 'Initialize Git Repository' - it auto-installs auto-update hooks in one step",
       "Start with 'Warn' mode to see what would be flagged without blocking",
       "Settings and Enforcement tabs stay in sync - change in either place",
       "Auto-Update requires an API key configured in Settings",

@@ -14,32 +14,42 @@ When working with Claude Code, context gets lost after ~30 minutes of conversati
 
 ## Features
 
+### Documentation
 - **Auto-generate CLAUDE.md** - Project-level documentation that survives context loss
 - **Module Documentation** - File headers with PURPOSE, EXPORTS, PATTERNS, and CLAUDE NOTES
 - **Freshness Tracking** - Know when documentation is stale and needs updating
-- **Skills Library** - 46+ pre-built prompts for common tasks, scored by relevance to your tech stack
+
+### One-Click Solutions
+- **Skills from Patterns** - Detect code patterns and create comprehensive skills with one click
+- **Suggested Agents** - Context-aware agent recommendations based on your tech stack
+- **Git Enforcement** - One-click git init + auto-update hooks for doc enforcement
+
+### AI-Powered Tools
+- **Skills Library** - 50+ pre-built prompts for common tasks, scored by relevance
 - **Agents Library** - Reusable agent configurations for specialized tasks
-- **RALPH Loops** - Prompt optimization for complex multi-step tasks
-- **Context Health Monitor** - Track token usage and identify context bloat
-- **Enforcement** - Git hooks and CI snippets to maintain documentation standards
+- **RALPH Loops** - Prompt optimization with Auto-Enhance for complex tasks
+
+### Monitoring
+- **Context Health** - Track token usage and identify context bloat
+- **Enforcement** - Git hooks (warn/block/auto-update) and CI snippets
 
 ## Download
 
 Download the latest release for macOS:
 
-**[Project Jumpstart v0.1.0-beta](https://github.com/jmckinley/project-jumpstart/releases/tag/v0.1.0-beta)** (11 MB, Universal Binary)
+**[Project Jumpstart v0.1.0-beta.18](https://github.com/jmckinley/project-jumpstart/releases/latest)** (11 MB, Apple Silicon)
 
 ### Installation
 
 1. Download the DMG file
 2. Open the DMG and drag "Project Jumpstart" to Applications
-3. **First launch**: Right-click the app → "Open" → "Open" (required for unsigned apps)
+3. Launch the app (signed and notarized, no Gatekeeper issues)
 
 ### Requirements
 
 - macOS 11+ (Big Sur or later)
-- Works on both Intel and Apple Silicon Macs
-- Anthropic API key (strongly recommended for AI features)
+- Apple Silicon Mac (M1/M2/M3)
+- Anthropic API key (required for AI-powered features)
 
 ## Getting Started
 
@@ -64,16 +74,17 @@ Project Jumpstart automatically detects:
 
 ## Skills Library
 
-46+ pre-built skills organized by category:
+50+ pre-built skills organized by category:
 
+- **Code Review** - Grill Me on Changes, Two-Claude Review, Skeptical Review
+- **Prompting Patterns** - Fresh Start Pattern, Prove It Works
 - **Language Patterns** - TypeScript, Python, Rust, Go, Java, Kotlin, Swift idioms
-- **UI/UX** - Accessibility, responsive design, loading states, form UX, animations
+- **UI/UX** - Accessibility, responsive design, loading states, form UX
 - **Testing** - Unit tests, integration tests, E2E with Playwright
 - **Documentation** - Module headers, API docs, README generation
 - **Database** - Supabase, Firebase, Prisma, Drizzle, MongoDB patterns
-- **And more...**
 
-Skills are scored by relevance to your project's detected tech stack.
+Skills are scored by relevance to your project's detected tech stack. Create custom skills from detected patterns with comprehensive templates.
 
 ## Development
 
