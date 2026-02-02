@@ -277,8 +277,49 @@ fn detect_tech_patterns(path: &std::path::Path, patterns: &mut Vec<Pattern>) {
                 description: "React component creation pattern".to_string(),
                 frequency: 5,
                 suggested_skill: Some(
-                    "Create new React components following the project's conventions: \
-                     functional components, TypeScript props interface, Tailwind CSS styling."
+                    r#"## React Component Pattern
+
+### Structure
+- One component per file, named after the component
+- Props interface defined ABOVE the component function
+- Use named exports (not default exports)
+- Functional components only (no class components)
+
+### TypeScript Requirements
+```typescript
+interface MyComponentProps {
+  title: string;
+  count?: number;  // Optional props use ?
+  onAction: () => void;
+  children?: React.ReactNode;
+}
+
+export function MyComponent({ title, count = 0, onAction, children }: MyComponentProps) {
+  // Component logic here
+  return (
+    <div>
+      {/* JSX here */}
+    </div>
+  );
+}
+```
+
+### Styling
+- Use Tailwind CSS utility classes exclusively
+- No inline styles or CSS files
+- Follow dark theme: bg-neutral-950, border-neutral-800, text-neutral-300
+
+### DO
+- Destructure props in function signature
+- Use semantic HTML elements
+- Handle loading and error states
+- Memoize callbacks with useCallback when passed to children
+
+### DON'T
+- Don't use `any` type - always define proper interfaces
+- Don't mutate props or state directly
+- Don't use index as key in lists (use unique IDs)
+- Don't forget to handle edge cases (empty arrays, null values)"#
                         .to_string(),
                 ),
             });
@@ -290,8 +331,62 @@ fn detect_tech_patterns(path: &std::path::Path, patterns: &mut Vec<Pattern>) {
                 description: "Test file creation pattern".to_string(),
                 frequency: 4,
                 suggested_skill: Some(
-                    "Create test files following the project's testing conventions. \
-                     Use describe/it blocks, mock dependencies, and test both happy and error paths."
+                    r#"## Test File Pattern
+
+### File Naming
+- Test files: `ComponentName.test.tsx` or `hookName.test.ts`
+- Colocate with source: `src/components/Button.tsx` → `src/components/Button.test.tsx`
+
+### Structure
+```typescript
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MyComponent } from "./MyComponent";
+
+// Mock dependencies at top of file
+vi.mock("@/lib/tauri", () => ({
+  invoke: vi.fn(),
+}));
+
+describe("MyComponent", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should render correctly", () => {
+    render(<MyComponent title="Test" />);
+    expect(screen.getByText("Test")).toBeInTheDocument();
+  });
+
+  it("should handle user interaction", async () => {
+    const user = userEvent.setup();
+    const onAction = vi.fn();
+    render(<MyComponent onAction={onAction} />);
+
+    await user.click(screen.getByRole("button"));
+    expect(onAction).toHaveBeenCalledOnce();
+  });
+});
+```
+
+### Test Coverage Requirements
+- Happy path (normal usage)
+- Error states and edge cases
+- Loading states
+- Empty/null/undefined inputs
+- User interactions (clicks, typing)
+
+### DO
+- Use descriptive test names: "should [do X] when [condition Y]"
+- Test behavior, not implementation details
+- Use `getByRole` over `getByTestId` when possible
+- Clean up mocks in beforeEach
+
+### DON'T
+- Don't test internal state directly
+- Don't forget async/await for user events
+- Don't leave console.error calls in tests (mock them)"#
                         .to_string(),
                 ),
             });
@@ -303,8 +398,67 @@ fn detect_tech_patterns(path: &std::path::Path, patterns: &mut Vec<Pattern>) {
                 description: "Zustand store creation pattern".to_string(),
                 frequency: 3,
                 suggested_skill: Some(
-                    "Create Zustand stores following the project pattern: \
-                     interface for state + actions, create() with set function, typed selectors."
+                    r#"## Zustand Store Pattern
+
+### File Location
+- Stores go in `src/stores/` directory
+- One store per file: `src/stores/userStore.ts`
+
+### Structure
+```typescript
+import { create } from "zustand";
+
+// 1. Define interface with state AND actions together
+interface UserState {
+  // State
+  user: User | null;
+  loading: boolean;
+  error: string | null;
+
+  // Actions
+  setUser: (user: User | null) => void;
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
+  reset: () => void;
+}
+
+// 2. Initial state (for reset)
+const initialState = {
+  user: null,
+  loading: false,
+  error: null,
+};
+
+// 3. Create store with typed state
+export const useUserStore = create<UserState>((set) => ({
+  ...initialState,
+
+  setUser: (user) => set({ user }),
+  setLoading: (loading) => set({ loading }),
+  setError: (error) => set({ error }),
+  reset: () => set(initialState),
+}));
+```
+
+### Usage in Components
+```typescript
+// Use selectors to pick specific state (prevents unnecessary re-renders)
+const user = useUserStore((s) => s.user);
+const setUser = useUserStore((s) => s.setUser);
+
+// DON'T: const { user, setUser } = useUserStore(); // Re-renders on ANY state change
+```
+
+### DO
+- Always type the state interface
+- Use selectors to access specific state slices
+- Include a reset() action for cleanup
+- Keep actions simple (complex logic goes in hooks)
+
+### DON'T
+- Don't destructure the whole store in components
+- Don't put async logic directly in store (use hooks)
+- Don't forget to reset on logout/cleanup"#
                         .to_string(),
                 ),
             });
@@ -316,9 +470,50 @@ fn detect_tech_patterns(path: &std::path::Path, patterns: &mut Vec<Pattern>) {
                 description: "Tailwind CSS utility class patterns".to_string(),
                 frequency: 3,
                 suggested_skill: Some(
-                    "Use Tailwind CSS utility classes for all styling. \
-                     Follow the project's dark theme: neutral-950 background, neutral-800 borders, \
-                     neutral-400 text."
+                    r#"## Tailwind CSS Pattern
+
+### Color Palette (Dark Theme)
+| Element | Class |
+|---------|-------|
+| Background | `bg-neutral-950` (page), `bg-neutral-900` (cards) |
+| Borders | `border-neutral-800` |
+| Text primary | `text-neutral-100` or `text-neutral-200` |
+| Text secondary | `text-neutral-400` |
+| Text muted | `text-neutral-500` or `text-neutral-600` |
+| Accent | `text-blue-400`, `bg-blue-600` (buttons) |
+| Success | `text-green-400`, `bg-green-500/20` |
+| Warning | `text-yellow-400`, `bg-yellow-500/20` |
+| Error | `text-red-400`, `bg-red-500/20` |
+
+### Common Patterns
+```tsx
+// Card container
+<div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+
+// Button primary
+<button className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500">
+
+// Button secondary
+<button className="rounded-md border border-neutral-700 bg-neutral-800 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-700">
+
+// Input field
+<input className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-blue-500 focus:outline-none">
+
+// Badge
+<span className="inline-flex rounded-full bg-blue-500/20 px-2 py-0.5 text-xs font-medium text-blue-400">
+```
+
+### DO
+- Use utility classes exclusively (no custom CSS)
+- Use consistent spacing: `gap-2`, `gap-3`, `gap-4`, `p-3`, `p-4`
+- Use `transition-colors` for hover effects
+- Use `truncate` for text that might overflow
+
+### DON'T
+- Don't use inline styles
+- Don't create CSS files
+- Don't use arbitrary values like `w-[123px]` (use design tokens)
+- Don't forget dark mode considerations (we're dark-only)"#
                         .to_string(),
                 ),
             });
@@ -332,9 +527,66 @@ fn detect_tech_patterns(path: &std::path::Path, patterns: &mut Vec<Pattern>) {
             description: "Tauri command creation pattern".to_string(),
             frequency: 4,
             suggested_skill: Some(
-                "Create Tauri commands: async fn with #[tauri::command], \
-                 return Result<T, String>, use State<AppState> for DB access, \
-                 register in lib.rs invoke_handler."
+                r#"## Tauri Command Pattern
+
+### Command Structure
+```rust
+use tauri::State;
+use crate::db::AppState;
+
+#[tauri::command]
+pub async fn my_command(
+    arg1: String,
+    arg2: Option<i32>,  // Optional args
+    state: State<'_, AppState>,
+) -> Result<ReturnType, String> {
+    // 1. Get database connection
+    let db = state.db.lock().map_err(|e| format!("DB lock error: {}", e))?;
+
+    // 2. Do work
+    let result = do_something(&db, &arg1)?;
+
+    // 3. Return success
+    Ok(result)
+}
+```
+
+### Registration (lib.rs)
+```rust
+// Add to invoke_handler in lib.rs
+.invoke_handler(tauri::generate_handler![
+    // ... existing commands
+    commands::mymodule::my_command,  // Add new command
+])
+```
+
+### Frontend Wrapper (lib/tauri.ts)
+```typescript
+export async function myCommand(arg1: string, arg2?: number): Promise<ReturnType> {
+  return invoke<ReturnType>("my_command", { arg1, arg2 });
+}
+```
+
+### Error Handling
+```rust
+// Convert errors to String at boundary
+.map_err(|e| e.to_string())?
+
+// Or with context
+.map_err(|e| format!("Failed to load data: {}", e))?
+```
+
+### DO
+- Always make commands `async`
+- Always return `Result<T, String>`
+- Use `State<'_, AppState>` for shared state
+- Add command to invoke_handler in lib.rs
+- Create typed wrapper in lib/tauri.ts
+
+### DON'T
+- Don't use `unwrap()` or `expect()` - always handle errors
+- Don't forget to register the command in lib.rs
+- Don't block the async runtime with heavy sync operations"#
                     .to_string(),
             ),
         });
@@ -347,7 +599,74 @@ fn detect_tech_patterns(path: &std::path::Path, patterns: &mut Vec<Pattern>) {
             description: "Python module creation pattern".to_string(),
             frequency: 3,
             suggested_skill: Some(
-                "Create Python modules with docstrings, type hints, and proper __init__.py exports."
+                r#"## Python Module Pattern
+
+### File Structure
+```python
+"""
+Module docstring explaining purpose.
+
+This module handles [description].
+"""
+
+from typing import Optional, List, Dict
+from dataclasses import dataclass
+
+# Constants at top
+DEFAULT_TIMEOUT = 30
+
+@dataclass
+class MyModel:
+    """Data class for structured data."""
+    name: str
+    value: int
+    optional_field: Optional[str] = None
+
+def public_function(arg: str, count: int = 0) -> List[str]:
+    """
+    Brief description of what function does.
+
+    Args:
+        arg: Description of arg
+        count: Description of count (default: 0)
+
+    Returns:
+        List of strings representing...
+
+    Raises:
+        ValueError: If arg is empty
+    """
+    if not arg:
+        raise ValueError("arg cannot be empty")
+
+    return _helper_function(arg, count)
+
+def _helper_function(arg: str, count: int) -> List[str]:
+    """Private helper (prefixed with _)."""
+    return [arg] * count
+```
+
+### __init__.py Exports
+```python
+"""Package docstring."""
+
+from .module_name import public_function, MyModel
+
+__all__ = ["public_function", "MyModel"]
+```
+
+### DO
+- Use type hints for all function signatures
+- Write docstrings for all public functions/classes
+- Use `@dataclass` for data containers
+- Prefix private functions with `_`
+- Export public API in `__init__.py`
+
+### DON'T
+- Don't use `from module import *`
+- Don't skip type hints
+- Don't forget to handle exceptions
+- Don't use mutable default arguments"#
                     .to_string(),
             ),
         });
@@ -370,9 +689,64 @@ fn detect_structural_patterns(path: &std::path::Path, patterns: &mut Vec<Pattern
                 description: format!("Large component library ({} files)", component_count),
                 frequency: component_count.min(10) as u32,
                 suggested_skill: Some(
-                    "When creating new components, follow the existing patterns: \
-                     one component per file, exported as named export, \
-                     props interface defined above the component."
+                    r#"## Component Library Pattern
+
+### Directory Structure
+```
+src/components/
+├── ui/              # Reusable primitives (Button, Card, Badge)
+├── layout/          # Layout components (Sidebar, MainPanel)
+├── dashboard/       # Feature-specific components
+├── forms/           # Form components
+└── [feature]/       # Feature modules
+```
+
+### Component File Template
+```typescript
+/**
+ * @module components/[category]/ComponentName
+ * @description Brief description of component purpose
+ */
+
+interface ComponentNameProps {
+  // Required props first
+  title: string;
+  onAction: () => void;
+  // Optional props with defaults
+  variant?: "primary" | "secondary";
+  disabled?: boolean;
+}
+
+export function ComponentName({
+  title,
+  onAction,
+  variant = "primary",
+  disabled = false,
+}: ComponentNameProps) {
+  return (
+    <div className="...">
+      {/* Implementation */}
+    </div>
+  );
+}
+```
+
+### Naming Conventions
+- Component files: `PascalCase.tsx`
+- One component per file
+- File name matches component name
+- Test file: `ComponentName.test.tsx`
+
+### DO
+- Keep components focused (single responsibility)
+- Extract reusable logic to hooks
+- Use composition over prop drilling
+- Document with JSDoc header
+
+### DON'T
+- Don't put multiple components in one file
+- Don't use default exports
+- Don't duplicate component logic (extract to shared components)"#
                         .to_string(),
                 ),
             });
@@ -388,8 +762,82 @@ fn detect_structural_patterns(path: &std::path::Path, patterns: &mut Vec<Pattern
                 description: format!("Custom hooks pattern ({} hooks)", hook_count),
                 frequency: hook_count.min(8) as u32,
                 suggested_skill: Some(
-                    "Create custom React hooks following the use* naming convention. \
-                     Return typed objects with state and actions. Use useCallback for memoized actions."
+                    r#"## Custom Hook Pattern
+
+### File Location & Naming
+- Location: `src/hooks/useFeatureName.ts`
+- Naming: Always prefix with `use`
+
+### Hook Template
+```typescript
+/**
+ * @module hooks/useFeatureName
+ * @description Manages [feature] state and actions
+ */
+
+import { useState, useCallback } from "react";
+import { featureApi } from "@/lib/tauri";
+
+interface FeatureState {
+  data: DataType | null;
+  loading: boolean;
+  error: string | null;
+}
+
+export function useFeatureName() {
+  const [state, setState] = useState<FeatureState>({
+    data: null,
+    loading: false,
+    error: null,
+  });
+
+  const loadData = useCallback(async () => {
+    setState((s) => ({ ...s, loading: true, error: null }));
+    try {
+      const data = await featureApi();
+      setState((s) => ({ ...s, data, loading: false }));
+    } catch (err) {
+      setState((s) => ({
+        ...s,
+        loading: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+      }));
+    }
+  }, []);
+
+  const updateData = useCallback(async (newData: DataType) => {
+    // Update logic
+  }, []);
+
+  return {
+    ...state,
+    loadData,
+    updateData,
+  };
+}
+```
+
+### Return Type Pattern
+```typescript
+// Return object with spread state + actions
+return {
+  ...state,           // data, loading, error
+  loadData,           // Actions
+  updateData,
+  clearError,
+};
+```
+
+### DO
+- Use `useCallback` for all action functions
+- Type the state interface explicitly
+- Handle loading and error states
+- Use functional setState: `setState(s => ({ ...s, ... }))`
+
+### DON'T
+- Don't forget cleanup in useEffect (return cleanup function)
+- Don't call hooks conditionally
+- Don't put business logic in components (put it in hooks)"#
                         .to_string(),
                 ),
             });
@@ -403,9 +851,76 @@ fn detect_structural_patterns(path: &std::path::Path, patterns: &mut Vec<Pattern
             description: "Module documentation header pattern".to_string(),
             frequency: 5,
             suggested_skill: Some(
-                "Every source file must have a documentation header with: \
-                 @module, @description, PURPOSE, DEPENDENCIES, EXPORTS, PATTERNS, CLAUDE NOTES. \
-                 Update the header whenever exports or dependencies change."
+                r#"## Module Documentation Pattern
+
+Every source file MUST have a documentation header at the top. This is critical because:
+- Headers survive context compaction (Claude loses memory after ~30 min)
+- They're always visible when a file is opened
+- They document intent, not just implementation
+
+### TypeScript/React Template
+```typescript
+/**
+ * @module path/from/src
+ * @description One-line description of what this module does
+ *
+ * PURPOSE:
+ * - Main responsibility #1
+ * - Main responsibility #2
+ *
+ * DEPENDENCIES:
+ * - @/lib/tauri - Backend IPC calls
+ * - @/stores/featureStore - State management
+ *
+ * EXPORTS:
+ * - functionName - What it does
+ * - ComponentName - What it renders
+ * - TypeName - What it represents
+ *
+ * PATTERNS:
+ * - How this module should be used
+ * - Important conventions to follow
+ *
+ * CLAUDE NOTES:
+ * - Things to always remember about this module
+ * - Common mistakes to avoid
+ * - Related files to check
+ */
+```
+
+### Rust Template
+```rust
+//! @module path/from/src
+//! @description One-line description
+//!
+//! PURPOSE:
+//! - Main responsibility
+//!
+//! EXPORTS:
+//! - function_name - What it does
+//!
+//! CLAUDE NOTES:
+//! - Important context
+```
+
+### When to Update
+| Change | Action |
+|--------|--------|
+| Add export | Add to EXPORTS |
+| Remove export | Remove from EXPORTS |
+| Add significant import | Add to DEPENDENCIES |
+| Change purpose | Update @description |
+| Fix bug revealing behavior | Add to CLAUDE NOTES |
+
+### DO
+- Update docs when changing exports
+- Keep descriptions concise but complete
+- Include "gotchas" in CLAUDE NOTES
+
+### DON'T
+- Don't skip the header on new files
+- Don't leave stale exports listed
+- Don't forget to document non-obvious behavior"#
                     .to_string(),
             ),
         });
