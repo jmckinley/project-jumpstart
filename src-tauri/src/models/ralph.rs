@@ -160,20 +160,3 @@ fn default_branch() -> String {
 fn default_max_iterations() -> u32 {
     3
 }
-
-/// Progress update during PRD execution
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
-pub struct PrdProgress {
-    /// Current story being worked on (0-indexed)
-    pub current_story_index: u32,
-    /// Total number of stories
-    pub total_stories: u32,
-    /// Number of completed stories
-    pub completed_stories: u32,
-    /// Current iteration within the story
-    pub current_iteration: u32,
-    /// Status message
-    pub status_message: String,
-}

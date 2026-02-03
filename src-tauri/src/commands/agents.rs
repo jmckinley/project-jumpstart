@@ -5,7 +5,6 @@
 //! - List, create, update, and delete agents via IPC
 //! - Track agent usage analytics
 //! - AI-powered agent instructions enhancement
-//! - Count agents for health score calculation
 //!
 //! DEPENDENCIES:
 //! - tauri - Command macro and State
@@ -22,7 +21,6 @@
 //! - delete_agent - Delete an agent by ID
 //! - increment_agent_usage - Bump usage count for an agent
 //! - enhance_agent_instructions - AI-enhance an agent's instructions
-//! - count_agents - Count agents for a project (used in health scoring)
 //!
 //! PATTERNS:
 //! - All commands use AppState for DB access
@@ -34,7 +32,6 @@
 //! - Agents support advanced workflows with steps, tools, and triggers
 //! - Timestamps use chrono::Utc::now() in RFC 3339 format
 //! - enhance_agent_instructions requires API key in settings
-//! - count_agents is called from health calculation
 
 use chrono::Utc;
 use tauri::State;
@@ -269,40 +266,6 @@ pub async fn increment_agent_usage(id: String, state: State<'_, AppState>) -> Re
             |row| row.get(0),
         )
         .map_err(|e| format!("Failed to fetch usage count: {}", e))?;
-
-    Ok(count)
-}
-
-/// Count the number of agents for a project (used in health score calculation).
-#[tauri::command]
-#[allow(dead_code)]
-pub async fn count_agents(project_id: Option<String>, state: State<'_, AppState>) -> Result<u32, String> {
-    let db = state.db.lock().map_err(|e| format!("DB lock error: {}", e))?;
-
-    let count: u32 = if let Some(pid) = project_id {
-        db.query_row(
-            "SELECT COUNT(*) FROM agents WHERE project_id = ?1 OR project_id IS NULL",
-            [&pid],
-            |row| row.get(0),
-        )
-    } else {
-        db.query_row("SELECT COUNT(*) FROM agents", [], |row| row.get(0))
-    }
-    .map_err(|e| format!("Failed to count agents: {}", e))?;
-
-    Ok(count)
-}
-
-/// Count agents for health scoring (sync helper function).
-#[allow(dead_code)]
-pub fn count_agents_sync(db: &rusqlite::Connection, project_id: &str) -> Result<u32, String> {
-    let count: u32 = db
-        .query_row(
-            "SELECT COUNT(*) FROM agents WHERE project_id = ?1 OR project_id IS NULL",
-            [project_id],
-            |row| row.get(0),
-        )
-        .map_err(|e| format!("Failed to count agents: {}", e))?;
 
     Ok(count)
 }
