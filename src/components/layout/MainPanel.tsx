@@ -1011,6 +1011,7 @@ function TestPlansView() {
     suggestions,
     running,
     generating,
+    error: testPlansError,
     loadTestPlans,
     selectPlan,
     addPlan,
@@ -1023,6 +1024,7 @@ function TestPlansView() {
     generateSuggestions,
     acceptSuggestion,
     dismissSuggestion,
+    clearError: clearTestPlansError,
   } = useTestPlans();
 
   const {
@@ -1213,6 +1215,19 @@ function TestPlansView() {
 
       {activeTab === "plans" && (
         <>
+          {/* Error display */}
+          {testPlansError && (
+            <div className="flex items-center justify-between rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3">
+              <p className="text-sm text-red-400">{testPlansError}</p>
+              <button
+                onClick={clearTestPlansError}
+                className="text-xs text-red-400 hover:text-red-300"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
           {/* Framework detection */}
           {framework && (
             <div className="rounded-md border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm">
