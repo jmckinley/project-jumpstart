@@ -196,13 +196,20 @@ project-jumpstart/
 │   ├── App.tsx                     # Root component
 │   └── main.tsx                    # Entry point
 │
+├── .claude/                        # Claude Code configuration
+│   ├── hooks/                      # Session lifecycle hooks
+│   │   └── extract-learnings.sh    # Auto-extract learnings at session end
+│   ├── settings.json               # Hook registrations
+│   └── settings.local.json         # Local permissions (gitignored)
+│
 ├── package.json
 ├── tsconfig.json
 ├── tailwind.config.js
 ├── vite.config.ts
 ├── vitest.config.ts                # Test configuration
 ├── project-jumpstart-spec.md       # Full product specification
-└── CLAUDE.md                       # This file
+├── CLAUDE.md                       # This file (project memory)
+└── CLAUDE.local.md                 # Personal learnings (gitignored, auto-populated)
 ```
 
 ---
@@ -585,6 +592,12 @@ Record key architectural decisions here so they survive context loss:
 
 7. **Enforcement settings sync**: Settings and Enforcement tabs share the same enforcement level. Changing one updates the other. When installing auto-update hook, the API key is decrypted from SQLite and exported to settings.json for the shell script to read.
 
+8. **TDD Workflow with Claude Code integration**: Test Plans section includes TDD red-green-refactor workflow, framework auto-detection (Vitest, Jest, Pytest, Cargo, etc.), AI-powered test suggestions, and generators for Claude Code subagent configs and PostToolUse hooks.
+
+9. **Session learning extraction**: A `SessionEnd` hook (`.claude/hooks/extract-learnings.sh`) auto-extracts user preferences, solutions, patterns, and gotchas from conversation transcripts. Learnings are appended to `CLAUDE.local.md` (personal, gitignored) with deduplication against existing entries. Uses Claude API for intelligent extraction.
+
+10. **Dynamic vs static documentation**: CLAUDE.md contains static project documentation. For auto-discovered content (hooks, scripts, etc.), use backtick shell commands that execute at load time. CLAUDE.local.md contains auto-extracted session learnings that accumulate over time.
+
 ---
 
 ## Key Types Reference
@@ -703,6 +716,49 @@ interface DetectionResult {
   buildTool: { value: string; confidence: number; source: string } | null;
   testFramework: { value: string; confidence: number; source: string } | null;
 }
+
+// Test Plans
+interface TestPlan {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string;
+  status: 'draft' | 'active' | 'archived';
+  targetCoverage: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface TestCase {
+  id: string;
+  planId: string;
+  name: string;
+  description: string;
+  filePath: string | null;
+  testType: 'unit' | 'integration' | 'e2e';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  status: 'pending' | 'passing' | 'failing' | 'skipped';
+}
+
+interface TDDSession {
+  id: string;
+  projectId: string;
+  featureName: string;
+  testFilePath: string | null;
+  currentPhase: 'red' | 'green' | 'refactor';
+  phaseStatus: 'pending' | 'active' | 'complete' | 'failed';
+  redPrompt: string | null;
+  greenPrompt: string | null;
+  refactorPrompt: string | null;
+  completedAt: string | null;
+}
+
+interface TestFrameworkInfo {
+  name: string;
+  command: string;
+  configFile: string | null;
+  coverageCommand: string | null;
+}
 ```
 
 ---
@@ -754,6 +810,22 @@ interface DetectionResult {
 - Frontend tests: `pnpm test`
 - Backend tests: `cargo test`
 - Test files colocated with source (`.test.ts`, `.test.tsx`)
+
+### TDD Workflow Feature
+- **Test Plans**: Organize tests into plans with target coverage goals
+- **Test Cases**: Track individual test cases with type (unit/integration/e2e) and priority
+- **Framework Detection**: Auto-detects Vitest, Jest, Pytest, Cargo test, Playwright, Mocha, Cypress
+- **TDD Phases**: Red (write failing test) → Green (make it pass) → Refactor (clean up)
+- **AI Suggestions**: Generate test suggestions from code analysis via Claude API
+- **Subagent Configs**: Generate Claude Code subagent markdown for automated TDD
+- **PostToolUse Hooks**: Generate hooks JSON to auto-run tests after code changes
+
+### Claude Code Hooks
+- **Location**: `.claude/hooks/` directory with shell scripts
+- **Registration**: `.claude/settings.json` defines which hooks run on which events
+- **extract-learnings.sh**: SessionEnd hook that auto-extracts learnings from transcripts
+- **Hook Input**: JSON on stdin with `session_id`, `transcript_path`, `cwd`, `hook_event_name`
+- **Learnings Output**: Appended to `CLAUDE.local.md` with categories: [Preference], [Solution], [Pattern], [Gotcha]
 
 ### macOS Build & Notarization
 - **Apple ID**: john@greatfallsventures.com

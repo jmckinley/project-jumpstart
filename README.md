@@ -29,6 +29,19 @@ When working with Claude Code, context gets lost after ~30 minutes of conversati
 - **Agents Library** - Reusable agent configurations for specialized tasks
 - **RALPH Loops** - Prompt optimization with Auto-Enhance for complex tasks
 
+### TDD Workflow & Test Plans
+- **Test Plans** - Organize test cases with target coverage goals
+- **Framework Detection** - Auto-detects Vitest, Jest, Pytest, Cargo, Playwright, Mocha, Cypress
+- **TDD Workflow** - Guided Red → Green → Refactor cycle with auto-generated prompts
+- **AI Test Suggestions** - Generate test recommendations from code analysis
+- **Claude Code Integration** - Generate subagent configs and PostToolUse hooks for automated testing
+
+### Claude Code Hooks
+- **Session Learning Extraction** - Auto-extract preferences, solutions, patterns from conversations
+- **CLAUDE.local.md** - Personal learnings accumulate over time (gitignored)
+- **Deduplication** - Intelligent filtering to avoid duplicate learnings
+- **Categorized Insights** - [Preference], [Solution], [Pattern], [Gotcha] tags
+
 ### Monitoring
 - **Context Health** - Track token usage and identify context bloat
 - **Enforcement** - Git hooks (warn/block/auto-update) and CI snippets
@@ -80,7 +93,7 @@ Project Jumpstart automatically detects:
 - **Prompting Patterns** - Fresh Start Pattern, Prove It Works
 - **Language Patterns** - TypeScript, Python, Rust, Go, Java, Kotlin, Swift idioms
 - **UI/UX** - Accessibility, responsive design, loading states, form UX
-- **Testing** - Unit tests, integration tests, E2E with Playwright
+- **Testing** - TDD workflow, unit/integration/E2E tests, framework detection, AI suggestions
 - **Documentation** - Module headers, API docs, README generation
 - **Database** - Supabase, Firebase, Prisma, Drizzle, MongoDB patterns
 
@@ -116,19 +129,24 @@ pnpm tauri build
 ```
 project-jumpstart/
 ├── src/                    # React frontend
-│   ├── components/         # UI components
+│   ├── components/         # UI components (including test-plans/)
 │   ├── stores/             # Zustand state
-│   ├── hooks/              # Custom hooks
+│   ├── hooks/              # Custom hooks (including useTestPlans, useTDDWorkflow)
 │   ├── lib/                # Utilities
 │   └── data/               # Skills/agents library
 ├── src-tauri/              # Rust backend
 │   ├── src/
-│   │   ├── commands/       # IPC handlers
-│   │   ├── core/           # Business logic
+│   │   ├── commands/       # IPC handlers (including test_plans.rs)
+│   │   ├── core/           # Business logic (including test_runner.rs)
 │   │   ├── models/         # Data structures
 │   │   └── db/             # SQLite database
 │   └── Cargo.toml
-└── CLAUDE.md               # Project documentation
+├── .claude/                # Claude Code configuration
+│   ├── hooks/              # Session lifecycle hooks
+│   │   └── extract-learnings.sh  # Auto-extract session learnings
+│   └── settings.json       # Hook registrations
+├── CLAUDE.md               # Project documentation (team-shared)
+└── CLAUDE.local.md         # Personal learnings (gitignored)
 ```
 
 ## Tech Stack
