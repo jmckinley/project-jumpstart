@@ -199,6 +199,8 @@ project-jumpstart/
 ├── .claude/                        # Claude Code configuration
 │   ├── hooks/                      # Session lifecycle hooks
 │   │   └── extract-learnings.sh    # Auto-extract learnings at session end
+│   ├── rules/                      # Modular rule files (always loaded)
+│   │   └── testing.md              # Testing frameworks, patterns, TDD workflow
 │   ├── settings.json               # Hook registrations
 │   └── settings.local.json         # Local permissions (gitignored)
 │
@@ -807,9 +809,10 @@ interface TestFrameworkInfo {
 - Resolve to absolute only when needed
 
 ### Testing
-- Frontend tests: `pnpm test`
-- Backend tests: `cargo test`
+- Frontend tests: `pnpm test` (Vitest)
+- Backend tests: `cargo test` (Cargo, run from src-tauri/)
 - Test files colocated with source (`.test.ts`, `.test.tsx`)
+- **Detailed testing rules**: See `.claude/rules/testing.md`
 
 ### TDD Workflow Feature
 - **Test Plans**: Organize tests into plans with target coverage goals
