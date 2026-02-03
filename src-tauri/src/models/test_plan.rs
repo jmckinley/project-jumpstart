@@ -291,6 +291,7 @@ pub struct TestRun {
 /// Result for a single test case in a run
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct TestCaseResult {
     pub id: String,
     pub run_id: String,

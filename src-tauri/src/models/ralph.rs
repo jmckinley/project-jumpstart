@@ -164,6 +164,7 @@ fn default_max_iterations() -> u32 {
 /// Progress update during PRD execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct PrdProgress {
     /// Current story being worked on (0-indexed)
     pub current_story_index: u32,

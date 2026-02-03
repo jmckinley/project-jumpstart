@@ -215,6 +215,7 @@ pub struct TestExecutionResult {
 
 /// Result for a single test
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct IndividualTestResult {
     pub name: String,
     pub file_path: Option<String>,
@@ -682,7 +683,6 @@ fn parse_playwright_suite(
 
 /// Parse pytest output
 pub fn parse_pytest_output(stdout: &str, stderr: &str, output: &Output) -> TestExecutionResult {
-    let mut total = 0u32;
     let mut passed = 0u32;
     let mut failed = 0u32;
     let mut skipped = 0u32;
@@ -710,7 +710,7 @@ pub fn parse_pytest_output(stdout: &str, stderr: &str, output: &Output) -> TestE
         }
     }
 
-    total = passed + failed + skipped;
+    let total = passed + failed + skipped;
 
     // Parse individual test results from verbose output
     for line in stdout.lines() {
@@ -797,7 +797,7 @@ fn extract_number_before(text: &str, keyword: &str) -> Option<u32> {
 }
 
 /// Extract coverage percentage from coverage files
-fn extract_coverage(project_path: &str, framework_name: &str) -> Option<f64> {
+fn extract_coverage(project_path: &str, _framework_name: &str) -> Option<f64> {
     let path = Path::new(project_path);
 
     // Common coverage file locations

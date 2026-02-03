@@ -275,6 +275,7 @@ pub async fn increment_agent_usage(id: String, state: State<'_, AppState>) -> Re
 
 /// Count the number of agents for a project (used in health score calculation).
 #[tauri::command]
+#[allow(dead_code)]
 pub async fn count_agents(project_id: Option<String>, state: State<'_, AppState>) -> Result<u32, String> {
     let db = state.db.lock().map_err(|e| format!("DB lock error: {}", e))?;
 
@@ -293,6 +294,7 @@ pub async fn count_agents(project_id: Option<String>, state: State<'_, AppState>
 }
 
 /// Count agents for health scoring (sync helper function).
+#[allow(dead_code)]
 pub fn count_agents_sync(db: &rusqlite::Connection, project_id: &str) -> Result<u32, String> {
     let count: u32 = db
         .query_row(

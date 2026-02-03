@@ -48,7 +48,8 @@ project-jumpstart/
 │   │   │   ├── settings.rs         # User preferences
 │   │   │   ├── activity.rs         # Activity logging
 │   │   │   ├── watcher.rs          # File watcher control
-│   │   │   └── kickstart.rs        # Project kickstart prompts
+│   │   │   ├── kickstart.rs        # Project kickstart prompts
+│   │   │   └── test_plans.rs       # TDD workflow & test plans
 │   │   ├── core/                   # Business logic
 │   │   │   ├── mod.rs
 │   │   │   ├── scanner.rs          # Project detection
@@ -58,7 +59,8 @@ project-jumpstart/
 │   │   │   ├── freshness.rs        # Staleness calculation
 │   │   │   ├── health.rs           # Health scoring
 │   │   │   ├── ai.rs               # Anthropic API client
-│   │   │   └── crypto.rs           # Encrypted settings storage
+│   │   │   ├── crypto.rs           # Encrypted settings storage
+│   │   │   └── test_runner.rs      # Test framework detection/execution
 │   │   ├── models/                 # Data structures
 │   │   │   ├── mod.rs
 │   │   │   ├── project.rs
@@ -67,7 +69,8 @@ project-jumpstart/
 │   │   │   ├── agent.rs
 │   │   │   ├── ralph.rs
 │   │   │   ├── context.rs
-│   │   │   └── enforcement.rs
+│   │   │   ├── enforcement.rs
+│   │   │   └── test_plan.rs        # Test plan, case, run, TDD session models
 │   │   └── db/                     # Database layer
 │   │       ├── mod.rs              # Connection, AppState
 │   │       └── schema.rs           # SQLite migrations
@@ -119,6 +122,19 @@ project-jumpstart/
 │   │   │   ├── AgentLibraryCard.tsx
 │   │   │   ├── AgentLibraryDetail.tsx
 │   │   │   └── AgentCategoryFilter.tsx
+│   │   ├── test-plans/             # TDD workflow & test plans
+│   │   │   ├── TestPlansList.tsx   # Test plans list with status
+│   │   │   ├── TestPlanEditor.tsx  # Plan create/edit form
+│   │   │   ├── TestCasesList.tsx   # Test cases list with filters
+│   │   │   ├── TestCaseEditor.tsx  # Case create/edit form
+│   │   │   ├── TestRunProgress.tsx # Live execution progress
+│   │   │   ├── TestRunHistory.tsx  # Historical test runs
+│   │   │   ├── TestCoverageChart.tsx # Coverage trend chart
+│   │   │   ├── TestSuggestions.tsx # AI-generated suggestions
+│   │   │   ├── TDDWorkflow.tsx     # Red-green-refactor guide
+│   │   │   ├── TDDPhaseCard.tsx    # Individual phase card
+│   │   │   ├── SubagentGenerator.tsx # Claude subagent config
+│   │   │   └── HooksGenerator.tsx  # PostToolUse hooks config
 │   │   ├── ralph/                  # RALPH command center
 │   │   │   ├── CommandCenter.tsx   # Prompt input + controls
 │   │   │   ├── PromptAnalyzer.tsx  # Analysis display
@@ -146,7 +162,9 @@ project-jumpstart/
 │   │   ├── useContextHealth.ts
 │   │   ├── useEnforcement.ts
 │   │   ├── useRefreshDocs.ts
-│   │   └── useSectionCompletion.ts
+│   │   ├── useSectionCompletion.ts
+│   │   ├── useTestPlans.ts         # Test plan CRUD & execution
+│   │   └── useTDDWorkflow.ts       # TDD session state management
 │   ├── stores/                     # Zustand stores
 │   │   ├── projectStore.ts
 │   │   ├── onboardingStore.ts
@@ -166,7 +184,8 @@ project-jumpstart/
 │   │   ├── health.ts
 │   │   ├── ralph.ts
 │   │   ├── enforcement.ts
-│   │   └── kickstart.ts
+│   │   ├── kickstart.ts
+│   │   └── test-plan.ts            # Test plan, case, run, TDD types
 │   ├── lib/                        # Utilities
 │   │   ├── tauri.ts                # Tauri IPC wrapper (50+ commands)
 │   │   ├── utils.ts                # General utilities
@@ -519,7 +538,7 @@ export async function scanProject(path: string): Promise<DetectionResult> {
 ## Current Status
 
 **Status**: Feature-Complete (Beta Ready)
-**Last Updated**: January 2026
+**Last Updated**: February 2026
 
 ### Implementation Status
 
@@ -532,6 +551,7 @@ export async function scanProject(path: string): Promise<DetectionResult> {
 | Project Kickstart | ✅ Complete | Empty project bootstrapping with AI prompts |
 | Skills Workshop | ✅ Complete | CRUD, pattern detection, skill library |
 | Agents Management | ✅ Complete | CRUD, library, AI-enhanced instructions |
+| Test Plans & TDD | ✅ Complete | Test plans CRUD, TDD workflow, framework detection, AI suggestions |
 | RALPH Command Center | ✅ Complete | Prompt analysis (heuristic + AI), loop monitoring |
 | Context Health | ✅ Complete | Token breakdown, MCP status, checkpoints |
 | Enforcement | ✅ Complete | Git hooks, CI integration snippets |
@@ -543,7 +563,7 @@ export async function scanProject(path: string): Promise<DetectionResult> {
 
 - **macOS Notarization**: Configured and working with Apple credentials
 - **Windows/Linux Builds**: Not yet configured (platform config, not code)
-- **E2E Tests**: Would be nice but 440 unit tests (379 frontend + 61 Rust) provide good coverage
+- **E2E Tests**: Would be nice but 581 unit tests (502 frontend + 79 Rust) provide good coverage
 
 ---
 
@@ -695,7 +715,7 @@ interface DetectionResult {
 - Use pnpm, not npm or yarn
 - Target macOS first, then Windows/Linux
 - Every file needs a documentation header (see above)
-- 440 unit tests (379 frontend + 61 Rust) provide good coverage
+- 581 unit tests (502 frontend + 79 Rust) provide good coverage
 
 ### AI Integration
 - Anthropic API key stored encrypted in settings
@@ -723,7 +743,7 @@ interface DetectionResult {
 - Settings JSON for hooks: `~/.project-jumpstart/settings.json` (auto-generated, 0600 permissions)
 - Use migrations for schema changes
 - All timestamps in UTC
-- Full schema includes: projects, skills, agents, activities, checkpoints, ralph_loops, settings
+- Full schema includes: projects, skills, agents, activities, checkpoints, ralph_loops, settings, test_plans, test_cases, test_runs, test_case_results, tdd_sessions
 
 ### File Paths
 - Use forward slashes even on Windows (Tauri normalizes)
@@ -769,6 +789,7 @@ The full product specification is in `project-jumpstart-spec.md`. Key sections:
 
 | Date | Change |
 |------|--------|
+| Feb 3, 2026 | Added TDD Workflow & Test Plans feature: test framework detection, plan/case management, TDD red-green-refactor workflow, AI-powered test suggestions, subagent/hooks generation. |
 | Jan 31, 2026 | Added enforcement settings sync between Settings and Enforcement tabs. Four modes: off, warn, block, auto-update. API key exported to settings.json for auto-update hook. |
 | Jan 31, 2026 | Added auto-update enforcement mode with AI-powered doc generation at commit time. |
 | Jan 2026 | Updated to reflect feature-complete status. All sections implemented. |

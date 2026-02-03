@@ -52,6 +52,7 @@ const WEIGHT_TESTS: u32 = 10;
 /// `test_coverage` is the latest test coverage percentage (0-100, from test runs).
 /// `test_pass_rate` is the latest test pass rate (0-100, from test runs).
 /// Checks for CLAUDE.md existence, module documentation coverage, freshness, skills, tests.
+#[allow(dead_code)]
 pub fn calculate_health(project_path: &str, skill_count: u32) -> HealthScore {
     calculate_health_with_tests(project_path, skill_count, None, None)
 }
@@ -345,6 +346,7 @@ fn count_mcp_servers(content: &str) -> u32 {
 }
 
 /// Module documentation stats for scoring and display.
+#[allow(dead_code)]
 struct ModuleDocStats {
     score: u32,
     total_files: u32,

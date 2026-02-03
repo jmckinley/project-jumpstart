@@ -54,9 +54,9 @@ use tauri::State;
 use uuid::Uuid;
 
 use crate::db::{self, AppState};
-use crate::core::test_runner::{self, TestExecutionResult};
+use crate::core::test_runner::{self};
 use crate::models::test_plan::{
-    GeneratedTestSuggestion, TDDPhase, TDDPhaseStatus, TDDSession, TestCase, TestCaseResult,
+    GeneratedTestSuggestion, TDDPhase, TDDPhaseStatus, TDDSession, TestCase,
     TestCaseStatus, TestFrameworkInfo, TestPlan, TestPlanStatus, TestPlanSummary, TestPriority,
     TestRun, TestRunStatus, TestType,
 };
@@ -873,7 +873,7 @@ pub async fn update_tdd_session(
     }
 
     // Check if completed
-    let completed_at = if new_phase == TDDPhase::Refactor && new_status == TDDPhaseStatus::Complete {
+    let _completed_at = if new_phase == TDDPhase::Refactor && new_status == TDDPhaseStatus::Complete {
         db.execute(
             "UPDATE tdd_sessions SET completed_at = ?1 WHERE id = ?2",
             rusqlite::params![now_str, id],

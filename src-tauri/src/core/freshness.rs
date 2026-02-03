@@ -38,6 +38,7 @@ use std::path::Path;
 
 /// Result of checking freshness for a single file.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct FreshnessResult {
     pub score: u32,
     pub status: String,
@@ -47,6 +48,7 @@ pub struct FreshnessResult {
 
 /// A single staleness signal contributing to the freshness score.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct StalenessSignal {
     pub signal_type: SignalType,
     pub weight: u32,
