@@ -6,6 +6,7 @@
  * - Create new test plans with name, description, and target coverage
  * - Edit existing test plans
  * - Change plan status (draft, active, archived)
+ * - Option to auto-generate test cases with AI on creation
  *
  * DEPENDENCIES:
  * - react (useState, useEffect) - Form state management
@@ -16,12 +17,15 @@
  *
  * PATTERNS:
  * - Controlled form inputs with local state
- * - onSave callback with form data
+ * - onSave callback with form data including autoGenerateTests flag
  * - isEditing prop determines create vs edit mode
+ * - hasApiKey prop enables/disables auto-generation checkbox
  *
  * CLAUDE NOTES:
  * - Target coverage defaults to 80%
  * - Status can only be changed in edit mode
+ * - Auto-generate checkbox only shows for new plans
+ * - Auto-generate requires API key to be configured
  */
 
 import { useState, useEffect } from "react";
@@ -34,17 +38,20 @@ interface TestPlanEditorProps {
     description: string;
     status?: TestPlanStatus;
     targetCoverage: number;
+    autoGenerateTests?: boolean;
   }) => void;
   onCancel: () => void;
+  hasApiKey?: boolean;
 }
 
-export function TestPlanEditor({ plan, onSave, onCancel }: TestPlanEditorProps) {
+export function TestPlanEditor({ plan, onSave, onCancel, hasApiKey = false }: TestPlanEditorProps) {
   const isEditing = !!plan;
 
   const [name, setName] = useState(plan?.name || "");
   const [description, setDescription] = useState(plan?.description || "");
   const [status, setStatus] = useState<TestPlanStatus>(plan?.status || "draft");
   const [targetCoverage, setTargetCoverage] = useState(plan?.targetCoverage || 80);
+  const [autoGenerateTests, setAutoGenerateTests] = useState(false);
 
   useEffect(() => {
     if (plan) {
@@ -64,6 +71,7 @@ export function TestPlanEditor({ plan, onSave, onCancel }: TestPlanEditorProps) 
       description: description.trim(),
       status: isEditing ? status : undefined,
       targetCoverage,
+      autoGenerateTests: !isEditing && autoGenerateTests ? true : undefined,
     });
   };
 
@@ -121,6 +129,33 @@ export function TestPlanEditor({ plan, onSave, onCancel }: TestPlanEditorProps) 
             <span>100%</span>
           </div>
         </div>
+
+        {/* Auto-generate test cases (new plan only) */}
+        {!isEditing && (
+          <div className="flex items-start gap-3 rounded-md border border-neutral-800 bg-neutral-950 p-3">
+            <input
+              type="checkbox"
+              id="autoGenerate"
+              checked={autoGenerateTests}
+              onChange={(e) => setAutoGenerateTests(e.target.checked)}
+              disabled={!hasApiKey}
+              className="mt-0.5 h-4 w-4 rounded border-neutral-600 bg-neutral-800 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+            />
+            <div className="flex-1">
+              <label
+                htmlFor="autoGenerate"
+                className={`block text-sm font-medium ${hasApiKey ? "text-neutral-200" : "text-neutral-500"}`}
+              >
+                Auto-generate test cases with AI
+              </label>
+              <p className="mt-0.5 text-xs text-neutral-500">
+                {hasApiKey
+                  ? "Analyze your code and create suggested test cases automatically"
+                  : "Requires API key in Settings"}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Status (edit mode only) */}
         {isEditing && (

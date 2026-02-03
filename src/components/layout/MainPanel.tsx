@@ -147,6 +147,7 @@ import {
   HooksGenerator,
 } from "@/components/test-plans";
 import type { TestPlan, TestCase, TestPlanStatus, GeneratedTestSuggestion } from "@/types/test-plan";
+import { getSetting } from "@/lib/tauri";
 
 interface MainPanelProps {
   activeSection: string;
@@ -1043,10 +1044,14 @@ function TestPlansView() {
   const [isCreatingPlan, setIsCreatingPlan] = useState(false);
   const [isCreatingCase, setIsCreatingCase] = useState(false);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [isAutoGenerating, setIsAutoGenerating] = useState(false);
 
   useEffect(() => {
     loadTestPlans();
     loadSessions();
+    // Check if API key is configured
+    getSetting("api_key").then((key) => setHasApiKey(!!key));
   }, [loadTestPlans, loadSessions]);
 
   const handleCreatePlan = useCallback(() => {
@@ -1064,18 +1069,48 @@ function TestPlansView() {
   );
 
 
+  // Track plan ID for auto-generation
+  const [autoGenPlanId, setAutoGenPlanId] = useState<string | null>(null);
+
   const handleSavePlan = useCallback(
-    async (data: { name: string; description: string; status?: TestPlanStatus; targetCoverage: number }) => {
+    async (data: { name: string; description: string; status?: TestPlanStatus; targetCoverage: number; autoGenerateTests?: boolean }) => {
       if (editingPlan) {
         await editPlan(editingPlan.id, data.name, data.description, data.status, data.targetCoverage);
       } else {
-        await addPlan(data.name, data.description, data.targetCoverage);
+        const newPlan = await addPlan(data.name, data.description, data.targetCoverage);
+
+        // Auto-generate test cases if requested
+        if (data.autoGenerateTests && newPlan) {
+          setAutoGenPlanId(newPlan.id);
+          setIsAutoGenerating(true);
+          selectPlan(newPlan.id);
+          await generateSuggestions();
+          // Suggestions will be auto-accepted via the effect below
+        }
       }
       setEditingPlan(null);
       setIsCreatingPlan(false);
     },
-    [editingPlan, editPlan, addPlan],
+    [editingPlan, editPlan, addPlan, generateSuggestions, selectPlan],
   );
+
+  // Auto-accept generated suggestions when auto-generating for a new plan
+  useEffect(() => {
+    if (autoGenPlanId && suggestions.length > 0 && !generating) {
+      const acceptAll = async () => {
+        for (const suggestion of suggestions) {
+          await acceptSuggestion(autoGenPlanId, suggestion);
+        }
+        setAutoGenPlanId(null);
+        setIsAutoGenerating(false);
+      };
+      acceptAll();
+    } else if (autoGenPlanId && !generating && suggestions.length === 0) {
+      // Generation finished but no suggestions
+      setAutoGenPlanId(null);
+      setIsAutoGenerating(false);
+    }
+  }, [autoGenPlanId, suggestions, generating, acceptSuggestion]);
 
   const handleCancelPlan = useCallback(() => {
     setEditingPlan(null);
@@ -1208,7 +1243,17 @@ function TestPlansView() {
                   plan={editingPlan}
                   onSave={handleSavePlan}
                   onCancel={handleCancelPlan}
+                  hasApiKey={hasApiKey}
                 />
+              ) : isAutoGenerating ? (
+                <div className="flex h-64 flex-col items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900">
+                  <svg className="h-8 w-8 animate-spin text-purple-500" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <p className="mt-3 text-sm font-medium text-neutral-200">Generating test cases...</p>
+                  <p className="mt-1 text-xs text-neutral-500">Analyzing your code with AI</p>
+                </div>
               ) : selectedPlan ? (
                 <div className="space-y-4">
                   {isCreatingCase ? (
