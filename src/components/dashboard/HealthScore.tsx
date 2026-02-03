@@ -5,7 +5,7 @@
  * PURPOSE:
  * - Render a large circular progress ring showing the total health score
  * - Color-code the ring: green >= 70, yellow 40-69, red < 40
- * - Show a breakdown of all 6 health components as horizontal bars
+ * - Show a breakdown of all 7 health components as horizontal bars
  *
  * DEPENDENCIES:
  * - @/types/health - HealthComponents type for component breakdown
@@ -21,7 +21,7 @@
  * CLAUDE NOTES:
  * - The SVG circle has radius 54 and circumference ~339.29
  * - stroke-dashoffset is calculated as circumference * (1 - score / 100)
- * - Component max weights: claudeMd 25, moduleDocs 25, freshness 15, skills 15, context 10, enforcement 10
+ * - Component max weights: claudeMd 23, moduleDocs 23, freshness 14, skills 14, context 8, enforcement 8, tests 10
  * - When components is null, bars render at 0 width
  */
 
@@ -33,12 +33,13 @@ interface HealthScoreProps {
 }
 
 const COMPONENT_CONFIG = [
-  { key: "claudeMd" as const, label: "CLAUDE.md", max: 25 },
-  { key: "moduleDocs" as const, label: "Modules", max: 25 },
-  { key: "freshness" as const, label: "Freshness", max: 15 },
-  { key: "skills" as const, label: "Skills", max: 15 },
-  { key: "context" as const, label: "Context", max: 10 },
-  { key: "enforcement" as const, label: "Enforcement", max: 10 },
+  { key: "claudeMd" as const, label: "CLAUDE.md", max: 23 },
+  { key: "moduleDocs" as const, label: "Modules", max: 23 },
+  { key: "freshness" as const, label: "Freshness", max: 14 },
+  { key: "skills" as const, label: "Skills", max: 14 },
+  { key: "context" as const, label: "Context", max: 8 },
+  { key: "enforcement" as const, label: "Enforcement", max: 8 },
+  { key: "tests" as const, label: "Tests", max: 10 },
 ];
 
 function getScoreColor(score: number): string {

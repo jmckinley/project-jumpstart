@@ -14,6 +14,7 @@ const mockComponents = {
   skills: 10,
   context: 8,
   enforcement: 10,
+  tests: 8,
 };
 
 describe("HealthScore", () => {
@@ -46,17 +47,19 @@ describe("HealthScore", () => {
       expect(screen.getByText("Skills")).toBeInTheDocument();
       expect(screen.getByText("Context")).toBeInTheDocument();
       expect(screen.getByText("Enforcement")).toBeInTheDocument();
+      expect(screen.getByText("Tests")).toBeInTheDocument();
     });
 
     it("should display component values with max", () => {
       render(<HealthScore score={75} components={mockComponents} />);
 
-      expect(screen.getByText("20 / 25")).toBeInTheDocument(); // claudeMd
-      expect(screen.getByText("15 / 25")).toBeInTheDocument(); // moduleDocs
-      expect(screen.getByText("12 / 15")).toBeInTheDocument(); // freshness
-      expect(screen.getByText("10 / 15")).toBeInTheDocument(); // skills
-      expect(screen.getByText("8 / 10")).toBeInTheDocument();  // context
-      expect(screen.getByText("10 / 10")).toBeInTheDocument(); // enforcement
+      expect(screen.getByText("20 / 23")).toBeInTheDocument(); // claudeMd
+      expect(screen.getByText("15 / 23")).toBeInTheDocument(); // moduleDocs
+      expect(screen.getByText("12 / 14")).toBeInTheDocument(); // freshness
+      expect(screen.getByText("10 / 14")).toBeInTheDocument(); // skills
+      expect(screen.getByText("8 / 8")).toBeInTheDocument();   // context
+      expect(screen.getByText("10 / 8")).toBeInTheDocument();  // enforcement
+      expect(screen.getByText("8 / 10")).toBeInTheDocument();  // tests
     });
   });
 
@@ -112,18 +115,19 @@ describe("HealthScore", () => {
 
     it("should handle max component values", () => {
       const maxComponents = {
-        claudeMd: 25,
-        moduleDocs: 25,
-        freshness: 15,
-        skills: 15,
-        context: 10,
-        enforcement: 10,
+        claudeMd: 23,
+        moduleDocs: 23,
+        freshness: 14,
+        skills: 14,
+        context: 8,
+        enforcement: 8,
+        tests: 10,
       };
 
       render(<HealthScore score={100} components={maxComponents} />);
 
-      // There are two components with max 25: claudeMd and moduleDocs
-      const maxValueElements = screen.getAllByText("25 / 25");
+      // There are two components with max 23: claudeMd and moduleDocs
+      const maxValueElements = screen.getAllByText("23 / 23");
       expect(maxValueElements.length).toBe(2);
     });
   });

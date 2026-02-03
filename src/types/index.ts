@@ -12,6 +12,7 @@
  * - All types from health.ts
  * - All types from skill.ts
  * - All types from ralph.ts
+ * - All types from test-plan.ts
  *
  * PATTERNS:
  * - Import from '@/types' for commonly used types
@@ -41,3 +42,22 @@ export type {
 } from "./health";
 export type { Skill, Pattern } from "./skill";
 export type { RalphLoop, PromptAnalysis, PromptCriterion } from "./ralph";
+export type {
+  TestPlan,
+  TestPlanStatus,
+  TestCase,
+  TestType,
+  TestPriority,
+  TestCaseStatus,
+  TestRun,
+  TestRunStatus,
+  TestCaseResult,
+  TestPlanSummary,
+  TDDPhase,
+  TDDPhaseStatus,
+  TDDSession,
+  GeneratedTestSuggestion,
+  TestFrameworkInfo,
+  TDDPhaseConfig,
+  TDDResult,
+} from "./test-plan";

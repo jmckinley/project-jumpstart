@@ -11,8 +11,8 @@
 //! - tauri::Manager - Trait for app.manage() state injection
 //! - tauri_plugin_opener - System URL/file opener
 //! - tauri_plugin_dialog - Native file/folder dialogs
-//! - commands - IPC command handlers (onboarding, project, claude_md, modules, freshness, skills, ralph, context, enforcement, settings)
-//! - core - Business logic modules (scanner, generator, health, analyzer, freshness)
+//! - commands - IPC command handlers (onboarding, project, claude_md, modules, freshness, skills, ralph, context, enforcement, settings, test_plans)
+//! - core - Business logic modules (scanner, generator, health, analyzer, freshness, test_runner)
 //! - models - Data structures
 //! - db - Database layer and AppState
 //!
@@ -63,6 +63,13 @@ use commands::agents::{
     create_agent, delete_agent, enhance_agent_instructions, increment_agent_usage, list_agents, update_agent,
 };
 use commands::kickstart::{generate_kickstart_prompt, generate_kickstart_claude_md, infer_tech_stack};
+use commands::test_plans::{
+    list_test_plans, get_test_plan, create_test_plan, update_test_plan, delete_test_plan,
+    list_test_cases, create_test_case, update_test_case, delete_test_case,
+    detect_project_test_framework, run_test_plan, get_test_runs, generate_test_suggestions,
+    create_tdd_session, update_tdd_session, get_tdd_session, list_tdd_sessions,
+    generate_subagent_config, generate_hooks_config,
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -141,6 +148,26 @@ pub fn run() {
             generate_kickstart_prompt,
             generate_kickstart_claude_md,
             infer_tech_stack,
+            // Test Plan Manager commands
+            list_test_plans,
+            get_test_plan,
+            create_test_plan,
+            update_test_plan,
+            delete_test_plan,
+            list_test_cases,
+            create_test_case,
+            update_test_case,
+            delete_test_case,
+            detect_project_test_framework,
+            run_test_plan,
+            get_test_runs,
+            generate_test_suggestions,
+            create_tdd_session,
+            update_tdd_session,
+            get_tdd_session,
+            list_tdd_sessions,
+            generate_subagent_config,
+            generate_hooks_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

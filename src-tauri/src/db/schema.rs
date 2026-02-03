@@ -22,11 +22,17 @@
 //! CLAUDE NOTES:
 //! - Tables: projects, module_docs, freshness_history (Phase 5), skills, patterns, agents,
 //!   ralph_loops (Phase 7), checkpoints (Phase 8), enforcement_events (Phase 9), settings,
-//!   activities (Phase 10), ralph_mistakes (for learning from loop errors)
+//!   activities (Phase 10), ralph_mistakes (for learning from loop errors),
+//!   test_plans, test_cases, test_runs, test_case_results, tdd_sessions (Test Plan Manager)
 //! - freshness_history stores per-file freshness snapshots for trend analysis
 //! - ralph_loops tracks RALPH loop execution with status (idle/running/paused/completed/failed)
 //! - ralph_loops.mode: "iterative" (default, accumulated context) or "prd" (fresh context per story)
 //! - ralph_mistakes stores mistakes and learned patterns for RALPH context enhancement
+//! - test_plans: Organize test cases by feature with target coverage
+//! - test_cases: Individual test cases linked to files with type/priority/status
+//! - test_runs: Test execution history with pass/fail counts and coverage
+//! - test_case_results: Per-case results for each run
+//! - tdd_sessions: Track TDD workflow phases (red/green/refactor)
 //! - See spec Part 6.2 for full table definitions
 //! - Add new tables here and call in create_tables()
 //! - stack_extras column stores JSON for additional services (auth, hosting, payments, etc.)
@@ -221,6 +227,88 @@ pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
         );
 
         CREATE INDEX IF NOT EXISTS idx_ralph_mistakes_project ON ralph_mistakes(project_id);
+
+        -- Test Plan Manager tables
+        CREATE TABLE IF NOT EXISTS test_plans (
+            id              TEXT PRIMARY KEY,
+            project_id      TEXT NOT NULL,
+            name            TEXT NOT NULL,
+            description     TEXT NOT NULL DEFAULT '',
+            status          TEXT NOT NULL DEFAULT 'draft',
+            target_coverage INTEGER NOT NULL DEFAULT 80,
+            created_at      TEXT NOT NULL,
+            updated_at      TEXT NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS test_cases (
+            id              TEXT PRIMARY KEY,
+            plan_id         TEXT NOT NULL,
+            name            TEXT NOT NULL,
+            description     TEXT NOT NULL DEFAULT '',
+            file_path       TEXT,
+            test_type       TEXT NOT NULL DEFAULT 'unit',
+            priority        TEXT NOT NULL DEFAULT 'medium',
+            status          TEXT NOT NULL DEFAULT 'pending',
+            last_run_at     TEXT,
+            created_at      TEXT NOT NULL,
+            updated_at      TEXT NOT NULL,
+            FOREIGN KEY (plan_id) REFERENCES test_plans(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS test_runs (
+            id              TEXT PRIMARY KEY,
+            plan_id         TEXT NOT NULL,
+            status          TEXT NOT NULL DEFAULT 'running',
+            total_tests     INTEGER NOT NULL DEFAULT 0,
+            passed_tests    INTEGER NOT NULL DEFAULT 0,
+            failed_tests    INTEGER NOT NULL DEFAULT 0,
+            skipped_tests   INTEGER NOT NULL DEFAULT 0,
+            duration_ms     INTEGER,
+            coverage_percent REAL,
+            stdout          TEXT,
+            stderr          TEXT,
+            started_at      TEXT NOT NULL,
+            completed_at    TEXT,
+            FOREIGN KEY (plan_id) REFERENCES test_plans(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS test_case_results (
+            id              TEXT PRIMARY KEY,
+            run_id          TEXT NOT NULL,
+            case_id         TEXT NOT NULL,
+            status          TEXT NOT NULL DEFAULT 'pending',
+            duration_ms     INTEGER,
+            error_message   TEXT,
+            stack_trace     TEXT,
+            FOREIGN KEY (run_id) REFERENCES test_runs(id),
+            FOREIGN KEY (case_id) REFERENCES test_cases(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS tdd_sessions (
+            id              TEXT PRIMARY KEY,
+            project_id      TEXT NOT NULL,
+            feature_name    TEXT NOT NULL,
+            test_file_path  TEXT,
+            current_phase   TEXT NOT NULL DEFAULT 'red',
+            phase_status    TEXT NOT NULL DEFAULT 'pending',
+            red_prompt      TEXT,
+            red_output      TEXT,
+            green_prompt    TEXT,
+            green_output    TEXT,
+            refactor_prompt TEXT,
+            refactor_output TEXT,
+            created_at      TEXT NOT NULL,
+            updated_at      TEXT NOT NULL,
+            completed_at    TEXT,
+            FOREIGN KEY (project_id) REFERENCES projects(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_test_plans_project ON test_plans(project_id);
+        CREATE INDEX IF NOT EXISTS idx_test_cases_plan ON test_cases(plan_id);
+        CREATE INDEX IF NOT EXISTS idx_test_runs_plan ON test_runs(plan_id);
+        CREATE INDEX IF NOT EXISTS idx_test_case_results_run ON test_case_results(run_id);
+        CREATE INDEX IF NOT EXISTS idx_tdd_sessions_project ON tdd_sessions(project_id);
         ",
     )?;
 

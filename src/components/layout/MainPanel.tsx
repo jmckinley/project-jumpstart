@@ -33,6 +33,9 @@
  * - @/components/enforcement/GitHookSetup - Git hook installation and status
  * - @/components/enforcement/CISetup - CI integration templates
  * - @/components/settings/SettingsView - User settings and app info panel
+ * - @/components/test-plans/* - Test plan management components
+ * - @/hooks/useTestPlans - Test plan CRUD and execution actions
+ * - @/hooks/useTDDWorkflow - TDD workflow session management
  * - @/hooks/useHealth - Health score data and refresh action
  * - @/hooks/useModules - Module scanning and generation actions
  * - @/hooks/useSkills - Skills CRUD and pattern detection actions
@@ -51,6 +54,7 @@
  * - "kickstart" section renders ProjectKickstart for new project setup
  * - "claude-md" section renders the Editor component
  * - "modules" section renders file tree, doc preview, and batch generator (or ProjectKickstart for empty projects)
+ * - "test-plans" section renders test plans list, TDD workflow, and tools (subagent/hooks generators)
  * - "skills" section renders skills list, skill editor, and pattern detector
  * - "ralph" section renders command center, prompt analyzer, and loop monitor
  * - "context" section renders health monitor, token breakdown, and MCP optimizer
@@ -127,6 +131,22 @@ import { useEnforcement } from "@/hooks/useEnforcement";
 import { SettingsView } from "@/components/settings/SettingsView";
 import { HelpView } from "@/components/help/HelpView";
 import type { Skill } from "@/types/skill";
+import { useTestPlans } from "@/hooks/useTestPlans";
+import { useTDDWorkflow, TDD_PHASES } from "@/hooks/useTDDWorkflow";
+import {
+  TestPlansList,
+  TestPlanEditor,
+  TestCasesList,
+  TestCaseEditor,
+  TestRunProgress,
+  TestRunHistory,
+  TestCoverageChart,
+  TestSuggestions,
+  TDDWorkflow,
+  SubagentGenerator,
+  HooksGenerator,
+} from "@/components/test-plans";
+import type { TestPlan, TestCase, TestPlanStatus, GeneratedTestSuggestion } from "@/types/test-plan";
 
 interface MainPanelProps {
   activeSection: string;
@@ -979,6 +999,310 @@ function KickstartView({ onClaudeMdCreated, onNavigate }: { onClaudeMdCreated?: 
   return <ProjectKickstart onClaudeMdCreated={onClaudeMdCreated} onNavigate={onNavigate} />;
 }
 
+function TestPlansView() {
+  const {
+    plans,
+    selectedPlan,
+    cases,
+    runs,
+    framework,
+    suggestions,
+    running,
+    generating,
+    loadTestPlans,
+    selectPlan,
+    addPlan,
+    editPlan,
+    removePlan,
+    addCase,
+    editCase,
+    removeCase,
+    runTests,
+    generateSuggestions,
+    acceptSuggestion,
+    dismissSuggestion,
+  } = useTestPlans();
+
+  const {
+    session,
+    loadSessions,
+    startSession,
+    advancePhase,
+    failPhase,
+    retryPhase,
+    recordOutput,
+    closeSession,
+    getSubagentConfig,
+    getHooksConfig,
+  } = useTDDWorkflow();
+
+  const [activeTab, setActiveTab] = useState<"plans" | "tdd" | "tools">("plans");
+  const [editingPlan, setEditingPlan] = useState<TestPlan | null>(null);
+  const [editingCase, setEditingCase] = useState<TestCase | null>(null);
+  const [isCreatingPlan, setIsCreatingPlan] = useState(false);
+  const [isCreatingCase, setIsCreatingCase] = useState(false);
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadTestPlans();
+    loadSessions();
+  }, [loadTestPlans, loadSessions]);
+
+  const handleCreatePlan = useCallback(() => {
+    setEditingPlan(null);
+    setIsCreatingPlan(true);
+  }, []);
+
+  const handleSelectPlan = useCallback(
+    (plan: TestPlan) => {
+      selectPlan(plan.id);
+      setIsCreatingCase(false);
+      setEditingCase(null);
+    },
+    [selectPlan],
+  );
+
+
+  const handleSavePlan = useCallback(
+    async (data: { name: string; description: string; status?: TestPlanStatus; targetCoverage: number }) => {
+      if (editingPlan) {
+        await editPlan(editingPlan.id, data.name, data.description, data.status, data.targetCoverage);
+      } else {
+        await addPlan(data.name, data.description, data.targetCoverage);
+      }
+      setEditingPlan(null);
+      setIsCreatingPlan(false);
+    },
+    [editingPlan, editPlan, addPlan],
+  );
+
+  const handleCancelPlan = useCallback(() => {
+    setEditingPlan(null);
+    setIsCreatingPlan(false);
+  }, []);
+
+  const handleDeletePlan = useCallback(
+    async (id: string) => {
+      await removePlan(id);
+    },
+    [removePlan],
+  );
+
+  const handleCreateCase = useCallback(() => {
+    setEditingCase(null);
+    setIsCreatingCase(true);
+    setSelectedCaseId(null);
+  }, []);
+
+  const handleSelectCase = useCallback((testCase: TestCase) => {
+    setEditingCase(testCase);
+    setSelectedCaseId(testCase.id);
+    setIsCreatingCase(true);
+  }, []);
+
+  const handleSaveCase = useCallback(
+    async (data: { name: string; description: string; filePath?: string; testType: "unit" | "integration" | "e2e"; priority: "low" | "medium" | "high" | "critical" }) => {
+      if (!selectedPlan) return;
+      if (editingCase) {
+        await editCase(editingCase.id, data.name, data.description, data.filePath, data.testType, data.priority);
+      } else {
+        await addCase(selectedPlan.plan.id, data.name, data.description, data.filePath, data.testType, data.priority);
+      }
+      setEditingCase(null);
+      setIsCreatingCase(false);
+      setSelectedCaseId(null);
+    },
+    [selectedPlan, editingCase, editCase, addCase],
+  );
+
+  const handleCancelCase = useCallback(() => {
+    setEditingCase(null);
+    setIsCreatingCase(false);
+    setSelectedCaseId(null);
+  }, []);
+
+  const handleRunTests = useCallback(
+    async (_withCoverage: boolean) => {
+      if (!selectedPlan) return;
+      await runTests(selectedPlan.plan.id);
+    },
+    [selectedPlan, runTests],
+  );
+
+  const handleAcceptSuggestion = useCallback(
+    async (suggestion: GeneratedTestSuggestion) => {
+      if (!selectedPlan) return;
+      await acceptSuggestion(selectedPlan.plan.id, suggestion);
+    },
+    [selectedPlan, acceptSuggestion],
+  );
+
+  const latestRun = runs.length > 0 ? runs[0] : null;
+
+  return (
+    <div className="space-y-6">
+      {/* Tab Navigation */}
+      <div className="flex gap-1 border-b border-neutral-800">
+        <button
+          onClick={() => setActiveTab("plans")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "plans"
+              ? "border-b-2 border-blue-500 text-blue-400"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          Test Plans
+        </button>
+        <button
+          onClick={() => setActiveTab("tdd")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "tdd"
+              ? "border-b-2 border-blue-500 text-blue-400"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          TDD Workflow
+        </button>
+        <button
+          onClick={() => setActiveTab("tools")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "tools"
+              ? "border-b-2 border-blue-500 text-blue-400"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          Tools
+        </button>
+      </div>
+
+      {activeTab === "plans" && (
+        <>
+          {/* Framework detection */}
+          {framework && (
+            <div className="rounded-md border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm">
+              <span className="text-neutral-400">Detected test framework: </span>
+              <span className="font-medium text-neutral-200">{framework.name}</span>
+              {framework.configFile && (
+                <span className="ml-2 text-xs text-neutral-500">({framework.configFile})</span>
+              )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            {/* Left column: Plans list */}
+            <div className="space-y-4">
+              <TestPlansList
+                plans={plans}
+                selectedId={selectedPlan?.plan.id ?? null}
+                onSelect={handleSelectPlan}
+                onCreateNew={handleCreatePlan}
+                onDelete={handleDeletePlan}
+              />
+            </div>
+
+            {/* Middle column: Plan editor or cases list */}
+            <div className="lg:col-span-2">
+              {isCreatingPlan ? (
+                <TestPlanEditor
+                  plan={editingPlan}
+                  onSave={handleSavePlan}
+                  onCancel={handleCancelPlan}
+                />
+              ) : selectedPlan ? (
+                <div className="space-y-4">
+                  {isCreatingCase ? (
+                    <TestCaseEditor
+                      testCase={editingCase}
+                      planId={selectedPlan.plan.id}
+                      onSave={handleSaveCase}
+                      onCancel={handleCancelCase}
+                    />
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-medium text-neutral-200">{selectedPlan.plan.name}</h3>
+                        <button
+                          onClick={handleCreateCase}
+                          className="rounded-md bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 hover:bg-neutral-700"
+                        >
+                          Add Test Case
+                        </button>
+                      </div>
+
+                      <TestCasesList
+                        cases={cases}
+                        selectedId={selectedCaseId}
+                        onSelect={handleSelectCase}
+                        onCreateNew={handleCreateCase}
+                        onDelete={removeCase}
+                      />
+
+                      <TestRunProgress
+                        run={latestRun}
+                        framework={framework}
+                        isRunning={running}
+                        onRunTests={handleRunTests}
+                      />
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="flex h-64 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-500">
+                  <p className="text-sm">Select a test plan or create a new one</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom section: History and coverage */}
+          {selectedPlan && runs.length > 0 && (
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <TestRunHistory runs={runs} />
+              <TestCoverageChart
+                coverageTrend={selectedPlan.coverageTrend}
+                targetCoverage={selectedPlan.plan.targetCoverage}
+                currentCoverage={selectedPlan.currentCoverage}
+              />
+            </div>
+          )}
+
+          {/* AI Suggestions */}
+          <TestSuggestions
+            suggestions={suggestions}
+            isGenerating={generating}
+            onGenerate={generateSuggestions}
+            onAccept={handleAcceptSuggestion}
+            onDismiss={dismissSuggestion}
+          />
+        </>
+      )}
+
+      {activeTab === "tdd" && (
+        <TDDWorkflow
+          session={session}
+          phases={TDD_PHASES}
+          onStartSession={startSession}
+          onAdvancePhase={advancePhase}
+          onFailPhase={failPhase}
+          onRetryPhase={retryPhase}
+          onRecordOutput={recordOutput}
+          onCloseSession={closeSession}
+        />
+      )}
+
+      {activeTab === "tools" && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <SubagentGenerator onGenerate={getSubagentConfig} />
+          <HooksGenerator
+            defaultCommand={framework?.command}
+            onGenerate={getHooksConfig}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function renderSection(
   section: string,
   onNavigate?: (section: string) => void,
@@ -993,6 +1317,8 @@ function renderSection(
       return <Editor onSave={onCompletionChange} />;
     case "modules":
       return <ModulesView onDocApplied={onCompletionChange} onNavigate={onNavigate} />;
+    case "test-plans":
+      return <TestPlansView />;
     case "skills":
       return <SkillsView onSkillsChange={onCompletionChange} />;
     case "agents":

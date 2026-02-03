@@ -14,6 +14,7 @@
 //! - ralph - RalphLoop, PromptAnalysis, PromptCriterion types
 //! - context - ContextHealth, TokenBreakdown, McpServerStatus, Checkpoint types
 //! - enforcement - EnforcementEvent, HookStatus, CiSnippet types
+//! - test_plan - TestPlan, TestCase, TestRun, TestCaseResult, TDDSession types
 //!
 //! PATTERNS:
 //! - All models derive Serialize, Deserialize for Tauri IPC
@@ -31,3 +32,4 @@ pub mod agent;
 pub mod ralph;
 pub mod context;
 pub mod enforcement;
+pub mod test_plan;

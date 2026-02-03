@@ -40,6 +40,7 @@ export interface HealthComponents {
   skills: number;
   context: number;
   enforcement: number;
+  tests: number;
 }
 
 export interface QuickWin {

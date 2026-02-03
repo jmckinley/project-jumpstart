@@ -19,6 +19,7 @@
 //! - settings - User settings persistence
 //! - activity - Activity feed logging and retrieval
 //! - kickstart - Project kickstart prompt generation
+//! - test_plans - Test plan management and TDD workflow commands
 //!
 //! PATTERNS:
 //! - Each submodule contains #[tauri::command] functions
@@ -42,3 +43,4 @@ pub mod settings;
 pub mod activity;
 pub mod watcher;
 pub mod kickstart;
+pub mod test_plans;

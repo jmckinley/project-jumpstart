@@ -13,7 +13,8 @@
 //! - std::path::Path - File system checks
 //!
 //! EXPORTS:
-//! - calculate_health - Calculate full health score for a project path
+//! - calculate_health - Calculate full health score for a project path (without test metrics)
+//! - calculate_health_with_tests - Calculate health score with optional test coverage and pass rate
 //! - estimate_tokens - Estimate token count for a string (chars / 4 approximation)
 //!
 //! PATTERNS:
@@ -22,11 +23,12 @@
 //! - Health score drives dashboard display
 //!
 //! CLAUDE NOTES:
-//! - Weights: CLAUDE.md=25, Modules=25, Freshness=15, Skills=15, Context=10, Enforcement=10
+//! - Weights: CLAUDE.md=23, Modules=23, Freshness=14, Skills=14, Context=8, Enforcement=8, Tests=10
 //! - Phase 5 added freshness scoring via core::freshness engine
-//! - Phase 6 added skills scoring: min(skill_count * 3, 15)
-//! - Phase 9 added enforcement scoring: 5 for hooks + 5 for CI config
+//! - Phase 6 added skills scoring: min(skill_count * 3, 14)
+//! - Phase 9 added enforcement scoring: 4 for hooks + 4 for CI config
 //! - Phase 10 added context scoring: based on persistent token usage vs 200k budget
+//! - Phase 11 added tests scoring: based on test coverage and pass rate
 //! - Freshness score is the average freshness of all documented files, scaled to weight
 //! - Context rot risk is based on doc scores only (CLAUDE.md + modules + freshness)
 //! - Risk thresholds: low (>=70% of doc max), medium (40-69%), high (<40%)
@@ -36,17 +38,31 @@ use crate::core::freshness;
 use crate::models::project::{HealthComponents, HealthScore, QuickWin};
 use std::path::Path;
 
-const WEIGHT_CLAUDE_MD: u32 = 25;
-const WEIGHT_MODULE_DOCS: u32 = 25;
-const WEIGHT_FRESHNESS: u32 = 15;
-const WEIGHT_SKILLS: u32 = 15;
-const WEIGHT_CONTEXT: u32 = 10;
-const WEIGHT_ENFORCEMENT: u32 = 10;
+// Weights adjusted to accommodate tests component (total must = 100)
+const WEIGHT_CLAUDE_MD: u32 = 23;
+const WEIGHT_MODULE_DOCS: u32 = 23;
+const WEIGHT_FRESHNESS: u32 = 14;
+const WEIGHT_SKILLS: u32 = 14;
+const WEIGHT_CONTEXT: u32 = 8;
+const WEIGHT_ENFORCEMENT: u32 = 8;
+const WEIGHT_TESTS: u32 = 10;
 
 /// Calculate the full health score for a project at the given path.
 /// `skill_count` is the number of skills created for the project (from DB).
-/// Checks for CLAUDE.md existence, module documentation coverage, freshness, skills.
+/// `test_coverage` is the latest test coverage percentage (0-100, from test runs).
+/// `test_pass_rate` is the latest test pass rate (0-100, from test runs).
+/// Checks for CLAUDE.md existence, module documentation coverage, freshness, skills, tests.
 pub fn calculate_health(project_path: &str, skill_count: u32) -> HealthScore {
+    calculate_health_with_tests(project_path, skill_count, None, None)
+}
+
+/// Calculate health score with optional test metrics.
+pub fn calculate_health_with_tests(
+    project_path: &str,
+    skill_count: u32,
+    test_coverage: Option<f64>,
+    test_pass_rate: Option<f64>,
+) -> HealthScore {
     let path = Path::new(project_path);
 
     let claude_md_score = calculate_claude_md_score(path);
@@ -55,9 +71,10 @@ pub fn calculate_health(project_path: &str, skill_count: u32) -> HealthScore {
     let skills_score = calculate_skills_score(skill_count);
     let context_score = calculate_context_score(path);
     let enforcement_score = enforcement::calculate_enforcement_score(project_path);
+    let tests_score = calculate_tests_score(test_coverage, test_pass_rate);
 
     let total = claude_md_score + module_docs_stats.score + freshness_score + skills_score
-        + context_score + enforcement_score;
+        + context_score + enforcement_score + tests_score;
 
     // Context rot risk is based on documentation-specific scores (CLAUDE.md + modules + freshness),
     // not the full composite. A project with perfect docs but no skills/enforcement shouldn't
@@ -90,6 +107,9 @@ pub fn calculate_health(project_path: &str, skill_count: u32) -> HealthScore {
         skills_score,
         context_score,
         enforcement_score,
+        tests_score,
+        test_coverage,
+        test_pass_rate,
     );
 
     HealthScore {
@@ -101,6 +121,7 @@ pub fn calculate_health(project_path: &str, skill_count: u32) -> HealthScore {
             skills: skills_score,
             context: context_score,
             enforcement: enforcement_score,
+            tests: tests_score,
         },
         quick_wins,
         context_rot_risk,
@@ -151,11 +172,35 @@ fn calculate_claude_md_score(project_path: &Path) -> u32 {
     score.min(WEIGHT_CLAUDE_MD)
 }
 
-/// Score the skills component (0-15 points).
-/// Based on the number of skills created: min(skill_count * 3, 15).
+/// Score the skills component (0-14 points).
+/// Based on the number of skills created: min(skill_count * 3, 14).
 /// 5+ skills = full score.
 fn calculate_skills_score(skill_count: u32) -> u32 {
     (skill_count * 3).min(WEIGHT_SKILLS)
+}
+
+/// Score the tests component (0-10 points).
+/// Based on test coverage (60%) and pass rate (40%).
+/// - Coverage: 0-6 points based on coverage percentage
+/// - Pass rate: 0-4 points based on pass rate percentage
+fn calculate_tests_score(test_coverage: Option<f64>, test_pass_rate: Option<f64>) -> u32 {
+    // If no test data available, score is 0
+    let coverage = test_coverage.unwrap_or(0.0);
+    let pass_rate = test_pass_rate.unwrap_or(0.0);
+
+    // Coverage contributes 60% of test score (6 points max)
+    // Full score at 80% coverage, scales linearly
+    let coverage_score = if coverage >= 80.0 {
+        6
+    } else {
+        ((coverage / 80.0) * 6.0).round() as u32
+    };
+
+    // Pass rate contributes 40% of test score (4 points max)
+    // Full score at 100% pass rate, scales linearly
+    let pass_rate_score = ((pass_rate / 100.0) * 4.0).round() as u32;
+
+    (coverage_score + pass_rate_score).min(WEIGHT_TESTS)
 }
 
 /// Score the freshness component (0-15 points).
@@ -406,6 +451,9 @@ fn generate_quick_wins(
     skills: u32,
     _context: u32, // Context score not used for quick wins (screen is read-only)
     enforcement: u32,
+    tests: u32,
+    test_coverage: Option<f64>,
+    test_pass_rate: Option<f64>,
 ) -> Vec<QuickWin> {
     let mut wins = Vec::new();
 
@@ -509,7 +557,7 @@ fn generate_quick_wins(
             impact: WEIGHT_ENFORCEMENT,
             effort: "low".to_string(),
         });
-    } else if enforcement <= 5 {
+    } else if enforcement <= 4 {
         // Has hooks but no CI (or vice versa)
         wins.push(QuickWin {
             title: "Add CI documentation checks".to_string(),
@@ -517,6 +565,42 @@ fn generate_quick_wins(
             impact: WEIGHT_ENFORCEMENT - enforcement,
             effort: "low".to_string(),
         });
+    }
+
+    // Tests: suggest based on coverage and pass rate
+    if tests == 0 {
+        wins.push(QuickWin {
+            title: "Add test coverage".to_string(),
+            description: "Create test plans and run tests to track code coverage and quality.".to_string(),
+            impact: WEIGHT_TESTS,
+            effort: "medium".to_string(),
+        });
+    } else if tests < 6 {
+        // Has some tests but low coverage or pass rate
+        let coverage = test_coverage.unwrap_or(0.0);
+        let pass_rate = test_pass_rate.unwrap_or(0.0);
+
+        if coverage < 80.0 && pass_rate >= 90.0 {
+            wins.push(QuickWin {
+                title: "Increase test coverage".to_string(),
+                description: format!(
+                    "Current coverage is {:.0}%. Target 80% for full score.",
+                    coverage
+                ),
+                impact: WEIGHT_TESTS - tests,
+                effort: "medium".to_string(),
+            });
+        } else if pass_rate < 90.0 {
+            wins.push(QuickWin {
+                title: "Fix failing tests".to_string(),
+                description: format!(
+                    "Current pass rate is {:.0}%. Fix failing tests to improve health score.",
+                    pass_rate
+                ),
+                impact: WEIGHT_TESTS - tests,
+                effort: "medium".to_string(),
+            });
+        }
     }
 
     // Sort by impact descending
@@ -575,7 +659,28 @@ mod tests {
         assert_eq!(calculate_skills_score(0), 0);
         assert_eq!(calculate_skills_score(1), 3);
         assert_eq!(calculate_skills_score(3), 9);
-        assert_eq!(calculate_skills_score(5), 15);
-        assert_eq!(calculate_skills_score(10), 15); // capped at weight
+        assert_eq!(calculate_skills_score(5), 14); // capped at weight (14)
+        assert_eq!(calculate_skills_score(10), 14); // capped at weight
+    }
+
+    #[test]
+    fn test_tests_score() {
+        // No test data
+        assert_eq!(calculate_tests_score(None, None), 0);
+
+        // Full coverage (80%+) and full pass rate (100%)
+        assert_eq!(calculate_tests_score(Some(80.0), Some(100.0)), 10);
+        assert_eq!(calculate_tests_score(Some(100.0), Some(100.0)), 10);
+
+        // Partial coverage
+        assert_eq!(calculate_tests_score(Some(40.0), Some(100.0)), 7); // 3 coverage + 4 pass
+        assert_eq!(calculate_tests_score(Some(0.0), Some(100.0)), 4); // 0 coverage + 4 pass
+
+        // Partial pass rate
+        assert_eq!(calculate_tests_score(Some(80.0), Some(50.0)), 8); // 6 coverage + 2 pass
+        assert_eq!(calculate_tests_score(Some(80.0), Some(0.0)), 6); // 6 coverage + 0 pass
+
+        // Both partial
+        assert_eq!(calculate_tests_score(Some(40.0), Some(50.0)), 5); // 3 coverage + 2 pass
     }
 }

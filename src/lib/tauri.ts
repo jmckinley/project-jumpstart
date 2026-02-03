@@ -101,6 +101,27 @@
  * - generateKickstartClaudeMd - Generate and save initial CLAUDE.md from kickstart input
  * - inferTechStack - Use AI to suggest optimal tech stack based on project description
  *
+ * Test Plans:
+ * - listTestPlans - List test plans for a project
+ * - getTestPlan - Get a test plan with summary stats
+ * - createTestPlan - Create a new test plan
+ * - updateTestPlan - Update an existing test plan
+ * - deleteTestPlan - Delete a test plan
+ * - listTestCases - List test cases for a plan
+ * - createTestCase - Create a new test case
+ * - updateTestCase - Update an existing test case
+ * - deleteTestCase - Delete a test case
+ * - detectProjectTestFramework - Detect test framework for a project
+ * - runTestPlan - Execute tests for a plan
+ * - getTestRuns - Get test run history
+ * - generateTestSuggestions - AI-powered test suggestions
+ * - createTddSession - Start a new TDD workflow session
+ * - updateTddSession - Update TDD session phase/status
+ * - getTddSession - Get a TDD session
+ * - listTddSessions - List TDD sessions for a project
+ * - generateSubagentConfig - Generate Claude Code subagent markdown
+ * - generateHooksConfig - Generate PostToolUse hooks JSON
+ *
  * PATTERNS:
  * - Each function wraps a single Tauri command
  * - Functions are async and return typed promises
@@ -123,6 +144,15 @@ import type { RalphLoop, PromptAnalysis, RalphMistake, RalphLoopContext } from "
 import type { EnforcementEvent, HookStatus, CiSnippet } from "@/types/enforcement";
 import type { Agent, AgentWorkflowStep, AgentTool } from "@/types/agent";
 import type { KickstartInput, KickstartPrompt, InferStackInput, InferredStack } from "@/types/kickstart";
+import type {
+  TestPlan,
+  TestPlanSummary,
+  TestCase,
+  TestRun,
+  TDDSession,
+  GeneratedTestSuggestion,
+  TestFrameworkInfo,
+} from "@/types/test-plan";
 
 export async function scanProject(path: string): Promise<DetectionResult> {
   return invoke<DetectionResult>("scan_project", { path });
@@ -510,5 +540,185 @@ export async function enhanceAgentInstructions(
     category: category ?? null,
     projectLanguage: projectLanguage ?? null,
     projectFramework: projectFramework ?? null,
+  });
+}
+
+// =============================================================================
+// Test Plan Commands
+// =============================================================================
+
+export async function listTestPlans(projectId: string): Promise<TestPlan[]> {
+  return invoke<TestPlan[]>("list_test_plans", { projectId });
+}
+
+export async function getTestPlan(planId: string): Promise<TestPlanSummary> {
+  return invoke<TestPlanSummary>("get_test_plan", { planId });
+}
+
+export async function createTestPlan(
+  projectId: string,
+  name: string,
+  description: string,
+  targetCoverage?: number,
+): Promise<TestPlan> {
+  return invoke<TestPlan>("create_test_plan", {
+    projectId,
+    name,
+    description,
+    targetCoverage: targetCoverage ?? null,
+  });
+}
+
+export async function updateTestPlan(
+  id: string,
+  name?: string,
+  description?: string,
+  status?: string,
+  targetCoverage?: number,
+): Promise<TestPlan> {
+  return invoke<TestPlan>("update_test_plan", {
+    id,
+    name: name ?? null,
+    description: description ?? null,
+    status: status ?? null,
+    targetCoverage: targetCoverage ?? null,
+  });
+}
+
+export async function deleteTestPlan(id: string): Promise<void> {
+  return invoke<void>("delete_test_plan", { id });
+}
+
+export async function listTestCases(planId: string): Promise<TestCase[]> {
+  return invoke<TestCase[]>("list_test_cases", { planId });
+}
+
+export async function createTestCase(
+  planId: string,
+  name: string,
+  description: string,
+  filePath?: string,
+  testType?: string,
+  priority?: string,
+): Promise<TestCase> {
+  return invoke<TestCase>("create_test_case", {
+    planId,
+    name,
+    description,
+    filePath: filePath ?? null,
+    testType: testType ?? null,
+    priority: priority ?? null,
+  });
+}
+
+export async function updateTestCase(
+  id: string,
+  name?: string,
+  description?: string,
+  filePath?: string,
+  testType?: string,
+  priority?: string,
+  status?: string,
+): Promise<TestCase> {
+  return invoke<TestCase>("update_test_case", {
+    id,
+    name: name ?? null,
+    description: description ?? null,
+    filePath: filePath ?? null,
+    testType: testType ?? null,
+    priority: priority ?? null,
+    status: status ?? null,
+  });
+}
+
+export async function deleteTestCase(id: string): Promise<void> {
+  return invoke<void>("delete_test_case", { id });
+}
+
+export async function detectProjectTestFramework(projectPath: string): Promise<TestFrameworkInfo | null> {
+  return invoke<TestFrameworkInfo | null>("detect_project_test_framework", { projectPath });
+}
+
+export async function runTestPlan(
+  planId: string,
+  projectPath: string,
+  withCoverage?: boolean,
+): Promise<TestRun> {
+  return invoke<TestRun>("run_test_plan", {
+    planId,
+    projectPath,
+    withCoverage: withCoverage ?? false,
+  });
+}
+
+export async function getTestRuns(planId: string, limit?: number): Promise<TestRun[]> {
+  return invoke<TestRun[]>("get_test_runs", { planId, limit: limit ?? null });
+}
+
+export async function generateTestSuggestions(
+  projectPath: string,
+  filePaths?: string[],
+): Promise<GeneratedTestSuggestion[]> {
+  return invoke<GeneratedTestSuggestion[]>("generate_test_suggestions", {
+    projectPath,
+    filePaths: filePaths ?? null,
+  });
+}
+
+// =============================================================================
+// TDD Workflow Commands
+// =============================================================================
+
+export async function createTddSession(
+  projectId: string,
+  featureName: string,
+  testFilePath?: string,
+): Promise<TDDSession> {
+  return invoke<TDDSession>("create_tdd_session", {
+    projectId,
+    featureName,
+    testFilePath: testFilePath ?? null,
+  });
+}
+
+export async function updateTddSession(
+  id: string,
+  phase?: string,
+  phaseStatus?: string,
+  output?: string,
+): Promise<TDDSession> {
+  return invoke<TDDSession>("update_tdd_session", {
+    id,
+    phase: phase ?? null,
+    phaseStatus: phaseStatus ?? null,
+    output: output ?? null,
+  });
+}
+
+export async function getTddSession(id: string): Promise<TDDSession> {
+  return invoke<TDDSession>("get_tdd_session", { id });
+}
+
+export async function listTddSessions(
+  projectId: string,
+  includeCompleted?: boolean,
+): Promise<TDDSession[]> {
+  return invoke<TDDSession[]>("list_tdd_sessions", {
+    projectId,
+    includeCompleted: includeCompleted ?? null,
+  });
+}
+
+export async function generateSubagentConfig(agentType: string): Promise<string> {
+  return invoke<string>("generate_subagent_config", { agentType });
+}
+
+export async function generateHooksConfig(
+  testCommand: string,
+  filePatterns?: string[],
+): Promise<string> {
+  return invoke<string>("generate_hooks_config", {
+    testCommand,
+    filePatterns: filePatterns ?? null,
   });
 }

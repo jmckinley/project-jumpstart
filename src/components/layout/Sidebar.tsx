@@ -29,7 +29,7 @@
  *
  * CLAUDE NOTES:
  * - Clicking the app logo/title at top navigates to dashboard
- * - Sections: Dashboard, CLAUDE.md, Modules, Skills, Agents, RALPH, Context Health, Enforcement, Settings
+ * - Sections: Dashboard, CLAUDE.md, Modules, Test Plans, Skills, Agents, RALPH, Context Health, Enforcement, Settings
  * - Kickstart section is temporary - disappears after CLAUDE.md is created
  * - Sections with completion tracking: claude-md, modules, skills, agents, ralph, enforcement
  * - Project selector is at the top of the sidebar
@@ -55,6 +55,7 @@ const sections = [
   { id: "dashboard", label: "Dashboard" },
   { id: "claude-md", label: "CLAUDE.md" },
   { id: "modules", label: "Modules" },
+  { id: "test-plans", label: "Test Plans" },
   { id: "skills", label: "Skills" },
   { id: "agents", label: "Agents" },
   { id: "ralph", label: "RALPH" },

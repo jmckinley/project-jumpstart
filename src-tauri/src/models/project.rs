@@ -89,6 +89,7 @@ pub struct HealthComponents {
     pub skills: u32,
     pub context: u32,
     pub enforcement: u32,
+    pub tests: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -187,13 +187,13 @@ pub async fn generate_claude_md(
 }
 
 /// Calculate and return the health score for a project path.
-/// Queries the database for skill count to include in the calculation.
+/// Queries the database for skill count and latest test metrics to include in the calculation.
 #[tauri::command]
 pub async fn get_health_score(
     project_path: String,
     state: State<'_, AppState>,
 ) -> Result<HealthScore, String> {
-    let skill_count = {
+    let (skill_count, test_coverage, test_pass_rate) = {
         let db = state
             .db
             .lock()
@@ -208,17 +208,43 @@ pub async fn get_health_score(
             )
             .ok();
 
-        if let Some(pid) = project_id {
-            db.query_row(
-                "SELECT COUNT(*) FROM skills WHERE project_id = ?1 OR project_id IS NULL",
-                [&pid],
-                |row| row.get::<_, u32>(0),
-            )
-            .unwrap_or(0)
+        if let Some(pid) = &project_id {
+            let skills = db
+                .query_row(
+                    "SELECT COUNT(*) FROM skills WHERE project_id = ?1 OR project_id IS NULL",
+                    [pid],
+                    |row| row.get::<_, u32>(0),
+                )
+                .unwrap_or(0);
+
+            // Get latest test run metrics for this project
+            let test_metrics: Option<(f64, f64)> = db
+                .query_row(
+                    "SELECT tr.coverage_percent,
+                            CASE WHEN tr.total_tests > 0
+                                 THEN (tr.passed_tests * 100.0 / tr.total_tests)
+                                 ELSE 0.0 END as pass_rate
+                     FROM test_runs tr
+                     JOIN test_plans tp ON tr.plan_id = tp.id
+                     WHERE tp.project_id = ?1 AND tr.status = 'completed'
+                     ORDER BY tr.completed_at DESC
+                     LIMIT 1",
+                    [pid],
+                    |row| Ok((row.get::<_, f64>(0).unwrap_or(0.0), row.get::<_, f64>(1).unwrap_or(0.0))),
+                )
+                .ok();
+
+            let (coverage, pass_rate) = test_metrics.unwrap_or((0.0, 0.0));
+            (skills, Some(coverage), Some(pass_rate))
         } else {
-            0
+            (0, None, None)
         }
     };
 
-    Ok(health::calculate_health(&project_path, skill_count))
+    Ok(health::calculate_health_with_tests(
+        &project_path,
+        skill_count,
+        test_coverage,
+        test_pass_rate,
+    ))
 }

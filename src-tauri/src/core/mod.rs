@@ -13,6 +13,7 @@
 //! - freshness - Documentation staleness detection
 //! - health - Health score calculation
 //! - crypto - API key encryption/decryption
+//! - test_runner - Test framework detection and execution
 //!
 //! PATTERNS:
 //! - Core modules contain business logic, not IPC handling
@@ -31,3 +32,4 @@ pub mod generator;
 pub mod freshness;
 pub mod health;
 pub mod crypto;
+pub mod test_runner;

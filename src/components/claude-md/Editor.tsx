@@ -22,7 +22,7 @@
  * - Calls loadContent() on mount via useEffect to fetch current CLAUDE.md
  * - Maintains local draft state so the textarea is a controlled component
  * - Syncs local draft from hook content when content loads or changes externally
- * - "Generate from Template" button is always visible and prominent
+ * - "Regen fresh CLAUDE.md" button is always visible and prominent
  * - Shows confirmation dialog when generating would replace existing content
  * - Suggestions onApply appends the template snippet to the draft
  *
@@ -248,7 +248,7 @@ export function Editor({ onSave }: EditorProps) {
                 <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                {generating ? "Generating..." : "Generate from Template"}
+                {generating ? "Generating..." : "Regen fresh CLAUDE.md"}
               </button>
             </div>
             <textarea
