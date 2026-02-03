@@ -263,6 +263,7 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
           onAction={(win) => {
             const title = win.title.toLowerCase();
             if (title.includes("claude.md")) onNavigate?.("claude-md");
+            else if (title.includes("test") || title.includes("tdd") || title.includes("coverage")) onNavigate?.("test-plans");
             else if (title.includes("module") || title.includes("doc")) onNavigate?.("modules");
             else if (title.includes("skill")) onNavigate?.("skills");
             else if (title.includes("enforce") || title.includes("hook")) onNavigate?.("enforcement");
