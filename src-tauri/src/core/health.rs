@@ -32,6 +32,7 @@
 //! - Freshness score is the average freshness of all documented files, scaled to weight
 //! - Context rot risk is based on doc scores only (CLAUDE.md + modules + freshness)
 //! - Risk thresholds: low (>=70% of doc max), medium (40-69%), high (<40%)
+//! - Quick wins include TDD subagent setup when test framework detected but no subagent exists
 
 use crate::commands::enforcement;
 use crate::core::freshness;
@@ -444,6 +445,72 @@ fn has_doc_header(path: &Path) -> bool {
     header_area.contains("@module") || header_area.contains("@description")
 }
 
+/// Check if a test framework is detected in the project.
+/// Looks for common test framework config files.
+fn has_test_framework(project_path: &Path) -> bool {
+    // Rust
+    if project_path.join("Cargo.toml").exists() {
+        return true;
+    }
+    // Python
+    if project_path.join("pytest.ini").exists()
+        || project_path.join("conftest.py").exists()
+    {
+        return true;
+    }
+    // Go
+    if project_path.join("go.mod").exists() {
+        return true;
+    }
+    // JavaScript/TypeScript - check package.json for test frameworks
+    let pkg_json = project_path.join("package.json");
+    if pkg_json.exists() {
+        if let Ok(content) = std::fs::read_to_string(&pkg_json) {
+            // Quick check for common test framework names
+            if content.contains("vitest")
+                || content.contains("jest")
+                || content.contains("mocha")
+                || content.contains("playwright")
+                || content.contains("cypress")
+            {
+                return true;
+            }
+        }
+    }
+    // Vitest config
+    if project_path.join("vitest.config.ts").exists()
+        || project_path.join("vitest.config.js").exists()
+    {
+        return true;
+    }
+    // Jest config
+    if project_path.join("jest.config.ts").exists()
+        || project_path.join("jest.config.js").exists()
+    {
+        return true;
+    }
+    false
+}
+
+/// Check if a TDD subagent is already configured.
+/// Looks for .claude/agents/ directory with TDD-related files.
+fn has_tdd_subagent(project_path: &Path) -> bool {
+    let agents_dir = project_path.join(".claude").join("agents");
+    if !agents_dir.exists() {
+        return false;
+    }
+    // Check for any TDD-related agent files
+    if let Ok(entries) = std::fs::read_dir(&agents_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_lowercase();
+            if name.contains("tdd") || name.contains("test-writer") || name.contains("test_writer") {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 /// Generate quick win suggestions based on current scores.
 fn generate_quick_wins(
     project_path: &Path,
@@ -577,7 +644,19 @@ fn generate_quick_wins(
             impact: WEIGHT_TESTS,
             effort: "medium".to_string(),
         });
-    } else if tests < 6 {
+    }
+
+    // TDD Subagent: suggest if test framework detected but no TDD subagent configured
+    if has_test_framework(project_path) && !has_tdd_subagent(project_path) {
+        wins.push(QuickWin {
+            title: "Set up TDD subagent".to_string(),
+            description: "Generate a Claude Code subagent for TDD workflow. Automates test writing with your detected test framework.".to_string(),
+            impact: 5, // Moderate impact - improves workflow but doesn't affect health score directly
+            effort: "low".to_string(),
+        });
+    }
+
+    if tests > 0 && tests < 6 {
         // Has some tests but low coverage or pass rate
         let coverage = test_coverage.unwrap_or(0.0);
         let pass_rate = test_pass_rate.unwrap_or(0.0);
