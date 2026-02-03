@@ -24,7 +24,7 @@ const mockPhases: TDDPhaseConfig[] = [
     emoji: "🔴",
     title: "Red",
     description: "Write a failing test",
-    expectedOutcome: "Test should fail initially",
+    expectedOutcome: "fail",
     color: "red",
   },
   {
@@ -32,7 +32,7 @@ const mockPhases: TDDPhaseConfig[] = [
     emoji: "🟢",
     title: "Green",
     description: "Make the test pass",
-    expectedOutcome: "Test should pass with minimal code",
+    expectedOutcome: "pass",
     color: "green",
   },
   {
@@ -40,7 +40,7 @@ const mockPhases: TDDPhaseConfig[] = [
     emoji: "🔵",
     title: "Refactor",
     description: "Clean up the code",
-    expectedOutcome: "Code is clean, tests still pass",
+    expectedOutcome: "pass",
     color: "blue",
   },
 ];
@@ -53,13 +53,14 @@ const mockSession: TDDSession = {
   currentPhase: "red",
   phaseStatus: "active",
   redPrompt: "Write a test for the logout button",
-  redOutput: null,
-  greenPrompt: null,
-  greenOutput: null,
-  refactorPrompt: null,
-  refactorOutput: null,
+  redOutput: undefined,
+  greenPrompt: undefined,
+  greenOutput: undefined,
+  refactorPrompt: undefined,
+  refactorOutput: undefined,
   createdAt: "2024-01-01T00:00:00Z",
-  completedAt: null,
+  updatedAt: "2024-01-01T00:00:00Z",
+  completedAt: undefined,
 };
 
 describe("TDDWorkflow", () => {

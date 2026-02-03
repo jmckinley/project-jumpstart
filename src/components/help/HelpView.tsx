@@ -6,7 +6,7 @@
  * - Organize help content into Getting Started, Daily Use, and Advanced tabs
  * - Explain what context rot is and why it matters
  * - Emphasize the importance of adding an API key for AI features
- * - Document all features: Kickstart, Dashboard, CLAUDE.md, Modules, Skills, Agents, RALPH, Context Health, Enforcement
+ * - Document all features: Kickstart, Dashboard, CLAUDE.md, Modules, Skills, Agents, TDD Workflow, RALPH, Context Health, Enforcement, Hooks
  * - Help new and experienced users get the most out of the app
  *
  * DEPENDENCIES:
@@ -22,9 +22,11 @@
  * - Highlighted info boxes for key concepts
  *
  * CLAUDE NOTES:
- * - Three tabs: Getting Started (new users), Daily Use (existing projects), Advanced (RALPH, enforcement)
+ * - Three tabs: Getting Started (new users), Daily Use (existing projects), Advanced (RALPH, enforcement, hooks)
  * - Context rot and API key sections appear in Getting Started
  * - FAQ appears at bottom of each tab with relevant questions
+ * - TDD Workflow and Test Plans documented in Daily Use tab
+ * - Session Learning Extraction and Claude Code Hooks documented in Advanced tab
  * - Keep explanations concise and actionable
  */
 
@@ -124,6 +126,18 @@ const FAQS: FAQItem[] = [
     tabs: ["daily-use"],
   },
   {
+    question: "What is the TDD Workflow?",
+    answer:
+      "The TDD (Test-Driven Development) Workflow guides you through the red-green-refactor cycle. It auto-detects your test framework (Vitest, Jest, Pytest, Cargo, Playwright, etc.), generates phase-specific prompts, and can create Claude Code subagent configs and PostToolUse hooks for automated testing. Access it from the Test Plans section.",
+    tabs: ["daily-use"],
+  },
+  {
+    question: "How do test plans work?",
+    answer:
+      "Test Plans help you organize test cases with target coverage goals. They include AI-powered test suggestions based on code analysis, test framework auto-detection, and a guided TDD workflow. You can generate Claude Code subagents and hooks to automate your testing workflow.",
+    tabs: ["daily-use"],
+  },
+  {
     question: "Can I use this with multiple projects?",
     answer:
       "Yes! Use the project dropdown at the top of the sidebar to switch between projects. Each project has its own isolated data - health scores, checkmarks, skills, agents, and enforcement settings are all per-project.",
@@ -163,6 +177,24 @@ const FAQS: FAQItem[] = [
     question: "What are the important default settings, and how do I change them?",
     answer:
       "The key defaults are: (1) API Key - required for all AI features; add yours in Settings first. (2) Enforcement Mode - defaults to 'Auto-Update' which automatically generates missing documentation at commit time. Change this in Settings or the Enforcement tab. (3) Module Documentation - new projects auto-expand the file tree and show all files. (4) Git Hooks - installed automatically when you enable enforcement during onboarding. To change settings, click 'Settings' in the sidebar - enforcement level, API key, and preferences are all there.",
+    tabs: ["advanced"],
+  },
+  {
+    question: "What is session learning extraction?",
+    answer:
+      "Session learning extraction is a Claude Code hook that automatically analyzes your conversation transcripts and extracts useful information: preferences, solutions to recurring problems, patterns, and gotchas. These learnings are saved to CLAUDE.local.md (gitignored) and loaded automatically in future sessions. It complements Claude Code's 5-tier memory hierarchy by auto-populating the local tier.",
+    tabs: ["advanced"],
+  },
+  {
+    question: "How do I enable session learning extraction?",
+    answer:
+      "Project Jumpstart can generate a SessionEnd hook that extracts learnings from your conversations. In the Claude Code Hooks section, enable 'Session Learning Extraction'. This creates a .claude/settings.json with the hook registration and a .claude/hooks/extract-learnings.sh script. The hook runs automatically when you end a Claude Code session.",
+    tabs: ["advanced"],
+  },
+  {
+    question: "What is CLAUDE.local.md?",
+    answer:
+      "CLAUDE.local.md is the local tier of Claude Code's memory hierarchy. It's gitignored (personal to you) and automatically loaded at session start. While CLAUDE.md contains team-shared documentation, CLAUDE.local.md holds your personal preferences and learnings. Session learning extraction auto-populates this file from your conversations.",
     tabs: ["advanced"],
   },
 ];
@@ -210,9 +242,9 @@ const DAILY_USE_GUIDES: FeatureGuide[] = [
   {
     title: "Dashboard & Health Score",
     description:
-      "Your project health at a glance. The health score (0-100) measures documentation quality across six components. Quick Wins show prioritized improvements. The Context Rot alert warns when documentation is falling behind.",
+      "Your project health at a glance. The health score (0-100) measures documentation quality across seven components. Quick Wins show prioritized improvements. The Context Rot alert warns when documentation is falling behind.",
     tips: [
-      "Health score components: CLAUDE.md (25), Modules (25), Freshness (15), Skills (15), Context Health (10), Enforcement (10)",
+      "Health score components: CLAUDE.md (23), Modules (23), Freshness (14), Skills (14), Tests (10), Context (8), Enforcement (8)",
       "Click Quick Wins 'Fix' buttons to jump directly to issues",
       "Green score (70+) means Claude has good context preservation",
       "Check Recent Activity to see what's been happening in your project",
@@ -255,6 +287,20 @@ const DAILY_USE_GUIDES: FeatureGuide[] = [
       "One-click 'Add' creates agents instantly - no form to fill out!",
       "'Great Match' badge indicates agents highly relevant to your tech stack",
       "Trigger patterns let you invoke agents with keywords like 'review' or 'debug'",
+    ],
+  },
+  {
+    title: "TDD Workflow & Test Plans",
+    description:
+      "A complete test management system with guided Red-Green-Refactor workflow. Auto-detects your test framework (Vitest, Jest, Pytest, Cargo, Playwright, Mocha, Cypress) and generates AI-powered test suggestions. Create Claude Code subagents and hooks for automated testing.",
+    tips: [
+      "Start by creating a Test Plan with target coverage goals",
+      "Use AI Test Suggestions to generate test recommendations from code analysis",
+      "The TDD Workflow guides you through Red (failing test) → Green (make it pass) → Refactor",
+      "Each phase has auto-generated prompts specific to your test framework",
+      "Generate Claude Code subagent configs for specialized test-writing agents",
+      "Generate PostToolUse hooks to auto-run tests after file changes",
+      "Test coverage and pass rate contribute to your health score (10 points)",
     ],
   },
 ];
@@ -309,6 +355,33 @@ const ADVANCED_GUIDES: FeatureGuide[] = [
       "API key is required for AI features - add it here first",
       "Enforcement level syncs with the Enforcement tab",
       "Your API key is encrypted and stored locally - never sent to our servers",
+    ],
+  },
+  {
+    title: "Session Learning Extraction",
+    description:
+      "A Claude Code hook that auto-extracts learnings from your conversations. Complements Claude Code's 5-tier memory hierarchy by auto-populating CLAUDE.local.md (the personal/local tier). Learnings are categorized as [Preference], [Solution], [Pattern], or [Gotcha].",
+    tips: [
+      "Hooks run automatically at SessionEnd - no manual action needed",
+      "The hook reads the conversation transcript and calls Claude API for analysis",
+      "Learnings are appended to CLAUDE.local.md which is auto-gitignored",
+      "Deduplication prevents the same learning from being added twice",
+      "Static docs you write go in CLAUDE.md; auto-learnings accumulate in CLAUDE.local.md",
+      "Works with the new Claude Code memory hierarchy - local tier (tier 5) is loaded automatically",
+      "Requires Claude API access for transcript analysis",
+    ],
+  },
+  {
+    title: "Claude Code Hooks",
+    description:
+      "Hooks let you run custom scripts at key points in Claude Code's lifecycle. Project Jumpstart can generate hooks for auto-update documentation enforcement and session learning extraction.",
+    tips: [
+      "SessionEnd hooks run when you finish a Claude Code session",
+      "PostToolUse hooks run after specific tools are used (great for auto-running tests)",
+      "Hook configs live in .claude/settings.json",
+      "Hook scripts typically go in .claude/hooks/ directory",
+      "Hooks receive context via stdin JSON (session_id, transcript_path, cwd)",
+      "The transcript_path gives you access to the full conversation in JSONL format",
     ],
   },
 ];
