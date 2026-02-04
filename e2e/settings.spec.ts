@@ -23,8 +23,8 @@ test.describe("Settings", () => {
   });
 
   test("displays API key section", async ({ page }) => {
-    await expect(page.locator("text=API Key")).toBeVisible();
-    await expect(page.locator("text=Anthropic")).toBeVisible();
+    await expect(page.locator("main").getByText("API Key").first()).toBeVisible();
+    await expect(page.locator("main").getByText("Anthropic").first()).toBeVisible();
   });
 
   test("shows masked API key when configured", async ({ page }) => {

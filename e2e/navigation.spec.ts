@@ -31,9 +31,9 @@ test.describe("Navigation", () => {
   test("navigates to CLAUDE.md editor", async ({ page }) => {
     await page.locator("nav >> text=CLAUDE.md").click();
 
-    // Should show editor
-    await expect(page.locator("textarea")).toBeVisible({ timeout: 5000 });
-    await expect(page.locator("text=Editor")).toBeVisible();
+    // Should show editor - uses textbox role, not textarea
+    await expect(page.getByRole("textbox")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("Editor").first()).toBeVisible();
   });
 
   test("navigates to Modules", async ({ page }) => {
@@ -53,22 +53,22 @@ test.describe("Navigation", () => {
   test("navigates to Agents", async ({ page }) => {
     await page.locator("nav >> text=Agents").click();
 
-    // Should show agents view
-    await expect(page.locator("text=Agents")).toBeVisible({ timeout: 5000 });
+    // Should show agents view - look for heading or main content
+    await expect(page.locator("main").getByText("Agents").first()).toBeVisible({ timeout: 5000 });
   });
 
   test("navigates to Test Plans", async ({ page }) => {
     await page.locator("nav >> text=Test Plans").click();
 
-    // Should show test plans view
-    await expect(page.locator("text=Test Plans")).toBeVisible({ timeout: 5000 });
+    // Should show test plans view - look for heading in main content
+    await expect(page.locator("main").getByText("Test Plans").first()).toBeVisible({ timeout: 5000 });
   });
 
   test("navigates to Settings", async ({ page }) => {
     await page.locator("nav >> text=Settings").click();
 
-    // Should show settings view
-    await expect(page.locator("text=API Key")).toBeVisible({ timeout: 5000 });
+    // Should show settings view - look for API Key in main content
+    await expect(page.locator("main").getByText("API Key").first()).toBeVisible({ timeout: 5000 });
   });
 
   test("navigates back to Dashboard", async ({ page }) => {
@@ -84,8 +84,8 @@ test.describe("Navigation", () => {
   });
 
   test("project name is displayed in header", async ({ page }) => {
-    // Project name from mock should be visible
-    await expect(page.locator("text=test-project")).toBeVisible();
+    // Project name from mock should be visible (in sidebar project selector)
+    await expect(page.getByText("test-project").first()).toBeVisible();
   });
 });
 
