@@ -224,7 +224,8 @@ function getRecommendation(props: SmartNextStepProps, dismissedIds: string[]): R
     validRecommendations.push({ ...RECOMMENDATIONS.find(r => r.id === "api-key")!, priority: 1 });
   }
 
-  if (props.hasApiKey && props.isEmptyProject) {
+  // Only recommend kickstart if empty project AND no CLAUDE.md yet
+  if (props.hasApiKey && props.isEmptyProject && !props.hasClaudeMd) {
     validRecommendations.push({ ...RECOMMENDATIONS.find(r => r.id === "kickstart")!, priority: 2 });
   }
 

@@ -101,23 +101,61 @@ pub struct InferredStack {
     pub warnings: Vec<String>,
 }
 
-const KICKSTART_SYSTEM_PROMPT: &str = r#"You are an expert software architect helping users bootstrap new projects with Claude Code best practices.
+const KICKSTART_SYSTEM_PROMPT: &str = r#"You are an expert software architect creating a starter prompt for Claude Code to build a new project from scratch.
 
-Your task is to generate a comprehensive CLAUDE.md-style project documentation file that will serve as the foundation for AI-assisted development.
+Generate a DETAILED, ACTIONABLE prompt that a developer would paste into Claude Code to kick off development. This is NOT documentation - it's instructions for an AI to start building.
 
-The output should be well-structured markdown following this format:
+Structure the prompt as follows:
 
-1. **Project Overview** - Brief description of the app, its purpose, and target users
-2. **Tech Stack Table** - A markdown table listing all technologies with notes
-3. **Project Structure** - Directory tree with explanations for key folders
-4. **Architecture Notes** - Key architectural decisions and patterns to follow
-5. **Coding Conventions** - File naming, code patterns, testing approach
-6. **Implementation Roadmap** - Phased approach to building the app
-7. **CLAUDE NOTES** - Important reminders and gotchas for Claude Code sessions
+## 1. PROJECT BRIEF (2-3 sentences)
+Clear statement of what to build, for whom, and the core value proposition.
 
-Keep the content practical and actionable. Focus on decisions that affect day-to-day development.
-Use best practices for the specified tech stack.
-Do not include any preamble or meta-commentary - just output the markdown content directly."#;
+## 2. TECH STACK DECISIONS
+A markdown table with columns: Layer | Choice | Rationale
+Include: Language, Framework, Database, Styling, Testing, Build Tool, Package Manager
+Be SPECIFIC - not "a database" but "PostgreSQL" or "SQLite" with WHY.
+
+## 3. INITIAL FILE STRUCTURE
+Show the exact directory tree to create. Include:
+- Config files (tsconfig.json, package.json, etc.)
+- Source directories with placeholder files
+- Test directory structure
+Use the ACTUAL file names for the chosen stack.
+
+## 4. PHASE 1 IMPLEMENTATION (Start Here)
+Concrete steps to get a working skeleton:
+1. Initialize project with specific commands
+2. Install exact dependencies (list them)
+3. Create the entry point / main file
+4. Set up routing or basic structure
+5. Create one complete vertical slice (one feature end-to-end)
+
+## 5. KEY PATTERNS TO FOLLOW
+Specific coding patterns for this stack:
+- File naming conventions (kebab-case, PascalCase, etc.)
+- Component/module structure
+- State management approach
+- Error handling pattern
+- API/data fetching pattern
+
+## 6. CRITICAL REQUIREMENTS
+Non-negotiable constraints:
+- Type safety requirements
+- Security considerations
+- Performance requirements
+- Accessibility standards
+
+## 7. FIRST TASK
+End with a clear, specific first task like:
+"Start by creating the project structure and implementing [specific feature] with full tests."
+
+IMPORTANT GUIDELINES:
+- Be SPECIFIC, not generic. Name actual libraries, actual file names, actual commands.
+- Include version numbers for dependencies when it matters.
+- The prompt should be copy-paste ready for Claude Code.
+- Assume the developer wants to START CODING immediately after reading this.
+- Don't be wishy-washy - make clear decisions and state them confidently.
+- Output markdown only, no preamble."#;
 
 /// Generate a kickstart prompt for a new project based on user input.
 #[tauri::command]
@@ -172,21 +210,21 @@ pub async fn generate_kickstart_prompt(
         .unwrap_or_default();
 
     let user_prompt = format!(
-        r#"Generate a CLAUDE.md kickstart document for a new project with the following details:
+        r#"Generate a kickstart prompt for this new project:
 
-**App Purpose:**
+**What I'm Building:**
 {}
 
-**Target Users:**
+**Who It's For:**
 {}
 
-**Key Features:**
+**Core Features (in priority order):**
 {}
 
-**Tech Stack:**
-{}{}
-
-Please generate a comprehensive CLAUDE.md file that will help Claude Code understand and work with this project effectively."#,
+**Tech Stack Decisions:**
+{}
+{}
+Create a detailed, actionable kickstart prompt that I can paste into Claude Code to start building immediately. Be specific with file names, commands, and dependencies."#,
         input.app_purpose,
         input.target_users,
         features_list,
@@ -212,20 +250,72 @@ Please generate a comprehensive CLAUDE.md file that will help Claude Code unders
     })
 }
 
-const CLAUDE_MD_SYSTEM_PROMPT: &str = r#"You are an expert software architect creating a CLAUDE.md file for a new project.
+const CLAUDE_MD_SYSTEM_PROMPT: &str = r#"You are creating a CLAUDE.md file - the most important file for AI-assisted development.
 
-CLAUDE.md is a special file that helps Claude Code (an AI coding assistant) understand the project. It should contain:
+CLAUDE.md is read by Claude Code at the START of every coding session. It must contain everything Claude needs to work effectively on this project. Think of it as onboarding documentation for an AI developer.
 
-1. **Project Overview** - Brief description of what the app does
-2. **Tech Stack** - A markdown table with Component | Technology | Notes columns
-3. **Project Structure** - Expected directory structure with explanations
-4. **Commands** - Common development commands (install, dev, build, test, lint)
-5. **Code Patterns** - Key patterns and conventions to follow
-6. **CLAUDE NOTES** - Important reminders for Claude Code sessions
+## REQUIRED SECTIONS:
 
-Keep it concise and practical. This file will be read by an AI assistant at the start of coding sessions, so focus on information that helps with day-to-day development.
+### 1. Project Overview (3-4 sentences max)
+What the app does, who it's for, core value proposition. No fluff.
 
-Output only the markdown content, no preamble or explanation."#;
+### 2. Tech Stack Table
+| Layer | Technology | Notes |
+|-------|------------|-------|
+| Language | TypeScript | Strict mode enabled |
+| Framework | Next.js 14 | App Router, Server Components |
+...etc.
+Include ALL technologies with specific versions and configurations.
+
+### 3. Project Structure
+```
+project-root/
+├── src/
+│   ├── app/           # Next.js app router pages
+│   ├── components/    # React components
+│   │   ├── ui/        # Reusable primitives
+│   │   └── features/  # Feature-specific components
+...
+```
+Show ACTUAL structure with brief explanations.
+
+### 4. Commands
+```bash
+pnpm install          # Install dependencies
+pnpm dev              # Start dev server at localhost:3000
+pnpm build            # Production build
+pnpm test             # Run tests
+pnpm lint             # Lint and type check
+```
+Actual commands, not placeholders.
+
+### 5. Code Patterns (CRITICAL)
+Document the patterns Claude MUST follow:
+- File naming: `kebab-case.tsx` for components
+- Component structure: Props interface above, named export
+- State management: Zustand for global, useState for local
+- Data fetching: Server Components with async/await
+- Error handling: Error boundaries + try/catch
+
+### 6. Important Decisions
+Document WHY certain decisions were made:
+- "Using SQLite instead of Postgres because this is a desktop app"
+- "No Redux - Zustand is simpler for our needs"
+
+### 7. CLAUDE NOTES
+Things Claude should ALWAYS remember:
+- "Run `pnpm test` after modifying core logic"
+- "The /api routes require authentication"
+- "Don't modify files in /generated - they're auto-generated"
+
+## GUIDELINES:
+- Be SPECIFIC and ACTIONABLE
+- Include real file paths, real commands, real patterns
+- This file should survive context loss - Claude reads it fresh each session
+- Focus on what helps Claude write correct code on the first try
+- No marketing speak, no aspirational content - just facts
+
+Output only the markdown, no preamble."#;
 
 /// Generate and save an initial CLAUDE.md file from kickstart input.
 #[tauri::command]
@@ -281,21 +371,21 @@ pub async fn generate_kickstart_claude_md(
         .unwrap_or_default();
 
     let user_prompt = format!(
-        r#"Create a CLAUDE.md file for this new project:
+        r#"Create a CLAUDE.md file for this project:
 
-**App Purpose:**
+**Project:**
 {}
 
-**Target Users:**
+**Users:**
 {}
 
-**Key Features:**
+**Features:**
 {}
 
-**Tech Stack:**
-{}{}
-
-Generate a well-structured CLAUDE.md that will help Claude Code understand and work with this project."#,
+**Stack:**
+{}
+{}
+Generate a complete CLAUDE.md with all required sections. Be specific - use actual file paths, actual commands, actual patterns for this tech stack. This file will be read at the start of every Claude Code session."#,
         input.app_purpose,
         input.target_users,
         features_list,
