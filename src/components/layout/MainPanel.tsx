@@ -97,8 +97,9 @@ import { QuickWins } from "@/components/dashboard/QuickWins";
 import { ContextRotAlert } from "@/components/dashboard/ContextRotAlert";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { RefreshDocsButton } from "@/components/dashboard/RefreshDocsButton";
+import { SmartNextStep } from "@/components/dashboard/SmartNextStep";
 import type { Activity } from "@/components/dashboard/RecentActivity";
-import { getRecentActivities, startFileWatcher, stopFileWatcher } from "@/lib/tauri";
+import { getRecentActivities, startFileWatcher, stopFileWatcher, getSetting, listSkills, listAgents, getHookStatus, readClaudeMd } from "@/lib/tauri";
 import { Editor } from "@/components/claude-md/Editor";
 import { FileTree } from "@/components/modules/FileTree";
 import { DocStatus } from "@/components/modules/DocStatus";
@@ -151,7 +152,6 @@ import {
   HooksGenerator,
 } from "@/components/test-plans";
 import type { TestPlan, TestCase, TestPlanStatus } from "@/types/test-plan";
-import { getSetting } from "@/lib/tauri";
 
 interface MainPanelProps {
   activeSection: string;
@@ -165,8 +165,23 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
   const activeProject = useProjectStore((s) => s.activeProject);
   const [activities, setActivities] = useState<Activity[]>([]);
 
+  // Smart Next Step state
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [hasClaudeMd, setHasClaudeMd] = useState(false);
+  const [hasSkills, setHasSkills] = useState(false);
+  const [hasAgents, setHasAgents] = useState(false);
+  const [hasEnforcement, setHasEnforcement] = useState(false);
+  const [hasTestFramework, setHasTestFramework] = useState(false);
+  const [hasTestPlan, setHasTestPlan] = useState(false);
+
   // Check if this is an empty project (no source files after scanning)
   const isEmptyProject = hasScanned && modules.length === 0;
+
+  // Calculate module stats
+  const totalModules = modules.length;
+  const documentedModules = modules.filter(m => m.status === "current" || m.status === "outdated").length;
+  const staleModules = modules.filter(m => m.status === "outdated").length;
+  const moduleCoverage = totalModules > 0 ? Math.round((documentedModules / totalModules) * 100) : 0;
 
   const fetchActivities = useCallback(() => {
     if (activeProject) {
@@ -184,6 +199,61 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
           setActivities([]);
         });
     }
+  }, [activeProject]);
+
+  // Fetch Smart Next Step data
+  useEffect(() => {
+    const fetchSmartNextStepData = async () => {
+      if (!activeProject) return;
+
+      // Check API key
+      try {
+        const apiKey = await getSetting("anthropic_api_key");
+        setHasApiKey(!!apiKey);
+      } catch {
+        setHasApiKey(false);
+      }
+
+      // Check CLAUDE.md
+      try {
+        const claudeMd = await readClaudeMd(activeProject.path);
+        setHasClaudeMd(!!claudeMd.content && claudeMd.content.trim().length > 50);
+      } catch {
+        setHasClaudeMd(false);
+      }
+
+      // Check skills
+      try {
+        const skills = await listSkills(activeProject.id);
+        setHasSkills(skills.length > 0);
+      } catch {
+        setHasSkills(false);
+      }
+
+      // Check agents
+      try {
+        const agents = await listAgents(activeProject.id);
+        setHasAgents(agents.length > 0);
+      } catch {
+        setHasAgents(false);
+      }
+
+      // Check enforcement
+      try {
+        const hookStatus = await getHookStatus(activeProject.path);
+        setHasEnforcement(hookStatus.installed && hookStatus.mode !== "off" && hookStatus.mode !== "none");
+      } catch {
+        setHasEnforcement(false);
+      }
+
+      // Check test framework (from project detection)
+      setHasTestFramework(!!activeProject.testing);
+
+      // TODO: Check for test plans when we have that API
+      setHasTestPlan(false);
+    };
+
+    fetchSmartNextStepData();
   }, [activeProject]);
 
   useEffect(() => {
@@ -220,6 +290,27 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
         risk={contextRotRisk}
         onReview={() => onNavigate?.("modules")}
       />
+
+      {/* Smart Next Step Recommendation */}
+      {activeProject && (
+        <SmartNextStep
+          hasApiKey={hasApiKey}
+          hasClaudeMd={hasClaudeMd}
+          isEmptyProject={isEmptyProject}
+          moduleCoverage={moduleCoverage}
+          totalModules={totalModules}
+          staleModules={staleModules}
+          hasSkills={hasSkills}
+          hasAgents={hasAgents}
+          hasEnforcement={hasEnforcement}
+          hasTestFramework={hasTestFramework}
+          hasTestPlan={hasTestPlan}
+          testCoverage={0}
+          contextRotRisk={contextRotRisk}
+          projectId={activeProject.id}
+          onNavigate={(section) => onNavigate?.(section)}
+        />
+      )}
 
       {/* Kickstart Card for Empty Projects */}
       {isEmptyProject && (
