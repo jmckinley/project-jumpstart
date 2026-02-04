@@ -70,6 +70,7 @@ use commands::test_plans::{
     create_tdd_session, update_tdd_session, get_tdd_session, list_tdd_sessions,
     generate_subagent_config, generate_hooks_config,
 };
+use commands::session_analysis::{analyze_session, get_session_transcript};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -168,6 +169,9 @@ pub fn run() {
             list_tdd_sessions,
             generate_subagent_config,
             generate_hooks_config,
+            // Session Analysis commands
+            analyze_session,
+            get_session_transcript,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

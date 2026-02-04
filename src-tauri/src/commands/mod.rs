@@ -20,6 +20,7 @@
 //! - activity - Activity feed logging and retrieval
 //! - kickstart - Project kickstart prompt generation
 //! - test_plans - Test plan management and TDD workflow commands
+//! - session_analysis - AI-powered session transcript analysis
 //!
 //! PATTERNS:
 //! - Each submodule contains #[tauri::command] functions
@@ -44,3 +45,4 @@ pub mod activity;
 pub mod watcher;
 pub mod kickstart;
 pub mod test_plans;
+pub mod session_analysis;

@@ -13,6 +13,7 @@
  * - All types from skill.ts
  * - All types from ralph.ts
  * - All types from test-plan.ts
+ * - All types from session-analysis.ts
  *
  * PATTERNS:
  * - Import from '@/types' for commonly used types
@@ -61,3 +62,8 @@ export type {
   TDDPhaseConfig,
   TDDResult,
 } from "./test-plan";
+export type {
+  SessionRecommendation,
+  SessionRecommendationType,
+  SessionAnalysis,
+} from "./session-analysis";

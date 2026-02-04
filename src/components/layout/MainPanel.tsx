@@ -17,6 +17,8 @@
  * - @/components/dashboard/ContextRotAlert - Staleness risk alert banner
  * - @/components/dashboard/RecentActivity - Activity timeline
  * - @/components/dashboard/RefreshDocsButton - One-click documentation refresh button
+ * - @/components/dashboard/SmartNextStep - Adaptive recommendation card based on project state
+ * - @/components/dashboard/SessionInsights - AI-powered session transcript analysis
  * - @/components/claude-md/Editor - CLAUDE.md editor view
  * - @/components/modules/FileTree - Module file tree with status icons
  * - @/components/modules/DocStatus - Coverage statistics bar
@@ -98,6 +100,7 @@ import { ContextRotAlert } from "@/components/dashboard/ContextRotAlert";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { RefreshDocsButton } from "@/components/dashboard/RefreshDocsButton";
 import { SmartNextStep } from "@/components/dashboard/SmartNextStep";
+import { SessionInsights } from "@/components/dashboard/SessionInsights";
 import type { Activity } from "@/components/dashboard/RecentActivity";
 import { getRecentActivities, startFileWatcher, stopFileWatcher, getSetting, listSkills, listAgents, getHookStatus, readClaudeMd } from "@/lib/tauri";
 import { Editor } from "@/components/claude-md/Editor";
@@ -308,6 +311,14 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
           testCoverage={0}
           contextRotRisk={contextRotRisk}
           projectId={activeProject.id}
+          onNavigate={(section) => onNavigate?.(section)}
+        />
+      )}
+
+      {/* Session Insights - AI-powered recommendations from transcript */}
+      {activeProject && (
+        <SessionInsights
+          hasApiKey={hasApiKey}
           onNavigate={(section) => onNavigate?.(section)}
         />
       )}

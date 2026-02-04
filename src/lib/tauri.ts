@@ -122,6 +122,10 @@
  * - generateSubagentConfig - Generate Claude Code subagent markdown
  * - generateHooksConfig - Generate PostToolUse hooks JSON
  *
+ * Session Analysis:
+ * - analyzeSession - AI-powered analysis of session transcript for recommendations
+ * - getSessionTranscript - Get raw transcript content for debugging
+ *
  * PATTERNS:
  * - Each function wraps a single Tauri command
  * - Functions are async and return typed promises
@@ -720,5 +724,44 @@ export async function generateHooksConfig(
   return invoke<string>("generate_hooks_config", {
     testCommand,
     filePatterns: filePatterns ?? null,
+  });
+}
+
+// =============================================================================
+// Session Analysis Commands
+// =============================================================================
+
+import type { SessionAnalysis } from "@/types/session-analysis";
+
+/**
+ * Analyze Claude Code session transcript with AI to generate recommendations.
+ * Reads recent messages from ~/.claude/projects/{hash}/*.jsonl and uses AI
+ * to suggest agents, tests, patterns, and documentation improvements.
+ */
+export async function analyzeSession(
+  projectPath: string,
+  projectName: string,
+  projectLanguage?: string,
+  projectFramework?: string,
+): Promise<SessionAnalysis> {
+  return invoke<SessionAnalysis>("analyze_session", {
+    projectPath,
+    projectName,
+    projectLanguage: projectLanguage ?? null,
+    projectFramework: projectFramework ?? null,
+  });
+}
+
+/**
+ * Get raw transcript content for debugging purposes.
+ * Returns recent messages from the session transcript.
+ */
+export async function getSessionTranscript(
+  projectPath: string,
+  maxMessages?: number,
+): Promise<string[]> {
+  return invoke<string[]>("get_session_transcript", {
+    projectPath,
+    maxMessages: maxMessages ?? null,
   });
 }
