@@ -11,6 +11,7 @@
  * - TestPlanEditor - Form for creating/editing test plans
  * - TestCasesList - List of test cases with filters
  * - TestCaseEditor - Form for creating/editing test cases
+ * - TestCasesManager - Filterable test cases list for managing large numbers of cases
  * - TestRunProgress - Live test execution progress
  * - TestRunHistory - Historical test runs
  * - TestCoverageChart - SVG coverage trend chart
@@ -33,6 +34,7 @@ export { TestPlansList } from "./TestPlansList";
 export { TestPlanEditor } from "./TestPlanEditor";
 export { TestCasesList } from "./TestCasesList";
 export { TestCaseEditor } from "./TestCaseEditor";
+export { TestCasesManager } from "./TestCasesManager";
 export { TestRunProgress } from "./TestRunProgress";
 export { TestRunHistory } from "./TestRunHistory";
 export { TestCoverageChart } from "./TestCoverageChart";

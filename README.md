@@ -30,10 +30,10 @@ When working with Claude Code, context gets lost after ~30 minutes of conversati
 - **RALPH Loops** - Prompt optimization with Auto-Enhance for complex tasks
 
 ### TDD Workflow & Test Plans
-- **Test Plans** - Organize test cases with target coverage goals
+- **AI Test Generation** - One-click "Generate Tests" button analyzes your code and creates test cases
+- **Test Cases Manager** - Filterable list with search, type, priority, and status filters
 - **Framework Detection** - Auto-detects Vitest, Jest, Pytest, Cargo, Playwright, Mocha, Cypress
 - **TDD Workflow** - Guided Red → Green → Refactor cycle with auto-generated prompts
-- **AI Test Suggestions** - Generate test recommendations from code analysis
 - **Claude Code Integration** - Generate subagent configs and PostToolUse hooks for automated testing
 
 ### Claude Code Hooks
@@ -41,6 +41,10 @@ When working with Claude Code, context gets lost after ~30 minutes of conversati
 - **CLAUDE.local.md** - Personal learnings accumulate over time (gitignored)
 - **Deduplication** - Intelligent filtering to avoid duplicate learnings
 - **Categorized Insights** - [Preference], [Solution], [Pattern], [Gotcha] tags
+
+### User Experience
+- **Per-Page Help** - Contextual ? icon on each page with concepts and tips
+- **Auto-opens on first visit** - Learn features as you explore, stays closed after
 
 ### Monitoring
 - **Context Health** - Track token usage and identify context bloat

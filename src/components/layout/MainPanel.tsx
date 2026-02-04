@@ -10,6 +10,8 @@
  *
  * DEPENDENCIES:
  * - @tauri-apps/api/event - listen() for file-changed events from backend
+ * - @/components/layout/PageHelp - Per-page contextual help popover
+ * - @/data/pageHelpContent - Help content definitions for each page
  * - @/components/dashboard/HealthScore - Circular score display with component breakdown
  * - @/components/dashboard/QuickWins - Improvement suggestions list
  * - @/components/dashboard/ContextRotAlert - Staleness risk alert banner
@@ -88,6 +90,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { PageHelp } from "@/components/layout/PageHelp";
+import { PAGE_HELP } from "@/data/pageHelpContent";
 import { HealthScore } from "@/components/dashboard/HealthScore";
 import { QuickWins } from "@/components/dashboard/QuickWins";
 import { ContextRotAlert } from "@/components/dashboard/ContextRotAlert";
@@ -138,15 +142,15 @@ import {
   TestPlanEditor,
   TestCasesList,
   TestCaseEditor,
+  TestCasesManager,
   TestRunProgress,
   TestRunHistory,
   TestCoverageChart,
-  TestSuggestions,
   TDDWorkflow,
   SubagentGenerator,
   HooksGenerator,
 } from "@/components/test-plans";
-import type { TestPlan, TestCase, TestPlanStatus, GeneratedTestSuggestion } from "@/types/test-plan";
+import type { TestPlan, TestCase, TestPlanStatus } from "@/types/test-plan";
 import { getSetting } from "@/lib/tauri";
 
 interface MainPanelProps {
@@ -1023,7 +1027,6 @@ function TestPlansView() {
     runTests,
     generateSuggestions,
     acceptSuggestion,
-    dismissSuggestion,
     clearError: clearTestPlansError,
   } = useTestPlans();
 
@@ -1052,8 +1055,8 @@ function TestPlansView() {
   useEffect(() => {
     loadTestPlans();
     loadSessions();
-    // Check if API key is configured
-    getSetting("api_key").then((key) => setHasApiKey(!!key));
+    // Check if API key is configured (key is "anthropic_api_key" in backend)
+    getSetting("anthropic_api_key").then((key) => setHasApiKey(!!key));
   }, [loadTestPlans, loadSessions]);
 
   const handleCreatePlan = useCallback(() => {
@@ -1165,14 +1168,6 @@ function TestPlansView() {
       await runTests(selectedPlan.plan.id);
     },
     [selectedPlan, runTests],
-  );
-
-  const handleAcceptSuggestion = useCallback(
-    async (suggestion: GeneratedTestSuggestion) => {
-      if (!selectedPlan) return;
-      await acceptSuggestion(selectedPlan.plan.id, suggestion);
-    },
-    [selectedPlan, acceptSuggestion],
   );
 
   const latestRun = runs.length > 0 ? runs[0] : null;
@@ -1374,7 +1369,17 @@ function TestPlansView() {
             </div>
           </div>
 
-          {/* Bottom section: History and coverage */}
+          {/* Bottom section: Test cases manager */}
+          {selectedPlan && cases.length > 0 && !isCreatingCase && (
+            <TestCasesManager
+              cases={cases}
+              planName={selectedPlan.plan.name}
+              onEdit={handleSelectCase}
+              onDelete={removeCase}
+            />
+          )}
+
+          {/* History and coverage */}
           {selectedPlan && runs.length > 0 && (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <TestRunHistory runs={runs} />
@@ -1386,14 +1391,6 @@ function TestPlansView() {
             </div>
           )}
 
-          {/* AI Suggestions */}
-          <TestSuggestions
-            suggestions={suggestions}
-            isGenerating={generating}
-            onGenerate={generateSuggestions}
-            onAccept={handleAcceptSuggestion}
-            onDismiss={dismissSuggestion}
-          />
         </>
       )}
 
@@ -1501,6 +1498,9 @@ export function MainPanel({ activeSection, onNavigate, onCompletionChange }: Mai
             </span>
           )}
         </div>
+        {PAGE_HELP[activeSection] && (
+          <PageHelp pageId={activeSection} content={PAGE_HELP[activeSection]} />
+        )}
       </header>
       <main className="flex-1 overflow-auto p-6">
         {renderSection(activeSection, onNavigate, onCompletionChange)}

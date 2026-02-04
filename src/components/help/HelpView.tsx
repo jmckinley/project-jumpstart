@@ -134,8 +134,14 @@ const FAQS: FAQItem[] = [
   {
     question: "How do test plans work?",
     answer:
-      "Test Plans help you organize test cases with target coverage goals. They include AI-powered test suggestions based on code analysis, test framework auto-detection, and a guided TDD workflow. You can generate Claude Code subagents and hooks to automate your testing workflow.",
+      "Test Plans help you organize test cases with target coverage goals. Use the 'Generate Tests' hero button to let AI analyze your code and create test cases automatically. The Test Cases Manager shows all cases with search and filters for type, priority, and status. You can also use the TDD Workflow tab for guided red-green-refactor development.",
     tabs: ["daily-use"],
+  },
+  {
+    question: "What is the per-page help system?",
+    answer:
+      "Each page has a ? icon in the header that shows contextual help. It auto-opens on your first visit to explain what the page does, key concepts, and quick tips. Once you close it (click X, 'Got it', or outside), it stays closed for that page. You can always click the ? icon to see the help again.",
+    tabs: ["getting-started"],
   },
   {
     question: "Can I use this with multiple projects?",
@@ -200,6 +206,18 @@ const FAQS: FAQItem[] = [
 ];
 
 const GETTING_STARTED_GUIDES: FeatureGuide[] = [
+  {
+    title: "Per-Page Help System",
+    description:
+      "Every page has contextual help built in. Look for the ? icon in the header - it explains what the page does, key concepts, and quick tips to get started.",
+    tips: [
+      "Help auto-opens on your first visit to each page",
+      "Close it by clicking X, 'Got it', or clicking outside",
+      "Once closed, it stays closed for that page (won't keep popping up)",
+      "Click the ? icon anytime to re-open and review the help",
+      "Each page has concepts and tips specific to that feature",
+    ],
+  },
   {
     title: "Project Kickstart (Empty Projects)",
     description:
@@ -292,14 +310,13 @@ const DAILY_USE_GUIDES: FeatureGuide[] = [
   {
     title: "TDD Workflow & Test Plans",
     description:
-      "A complete test management system with guided Red-Green-Refactor workflow. Auto-detects your test framework (Vitest, Jest, Pytest, Cargo, Playwright, Mocha, Cypress) and generates AI-powered test suggestions. Create Claude Code subagents and hooks for automated testing.",
+      "A complete test management system with AI-powered test generation and guided Red-Green-Refactor workflow. Auto-detects your test framework (Vitest, Jest, Pytest, Cargo, Playwright, Mocha, Cypress).",
     tips: [
-      "Start by creating a Test Plan with target coverage goals",
-      "Use AI Test Suggestions to generate test recommendations from code analysis",
-      "The TDD Workflow guides you through Red (failing test) → Green (make it pass) → Refactor",
+      "Use the purple 'Generate Tests' hero button to let AI analyze your code and create test cases automatically",
+      "Test Cases Manager at the bottom shows all cases with search and filters (type, priority, status)",
+      "The TDD Workflow tab guides you through Red (failing test) → Green (make it pass) → Refactor",
       "Each phase has auto-generated prompts specific to your test framework",
-      "Generate Claude Code subagent configs for specialized test-writing agents",
-      "Generate PostToolUse hooks to auto-run tests after file changes",
+      "Tools tab generates Claude Code subagent configs and PostToolUse hooks",
       "Test coverage and pass rate contribute to your health score (10 points)",
     ],
   },

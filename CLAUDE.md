@@ -83,6 +83,7 @@ project-jumpstart/
 │   │   ├── layout/                 # App shell
 │   │   │   ├── Sidebar.tsx         # Navigation + project selector
 │   │   │   ├── MainPanel.tsx       # Content router
+│   │   │   ├── PageHelp.tsx        # Per-page contextual help popover
 │   │   │   └── StatusBar.tsx
 │   │   ├── onboarding/             # Setup wizard
 │   │   │   ├── WizardShell.tsx     # Wizard container
@@ -127,6 +128,7 @@ project-jumpstart/
 │   │   │   ├── TestPlanEditor.tsx  # Plan create/edit form
 │   │   │   ├── TestCasesList.tsx   # Test cases list with filters
 │   │   │   ├── TestCaseEditor.tsx  # Case create/edit form
+│   │   │   ├── TestCasesManager.tsx # Filterable test cases manager
 │   │   │   ├── TestRunProgress.tsx # Live execution progress
 │   │   │   ├── TestRunHistory.tsx  # Historical test runs
 │   │   │   ├── TestCoverageChart.tsx # Coverage trend chart
@@ -174,7 +176,8 @@ project-jumpstart/
 │   │   ├── skillCategories.ts
 │   │   ├── agentLibrary.ts         # Curated agent definitions
 │   │   ├── agentCategories.ts
-│   │   └── stackTemplates.ts       # Tech stack templates
+│   │   ├── stackTemplates.ts       # Tech stack templates
+│   │   └── pageHelpContent.ts      # Per-page contextual help content
 │   ├── types/                      # TypeScript types
 │   │   ├── index.ts
 │   │   ├── project.ts
