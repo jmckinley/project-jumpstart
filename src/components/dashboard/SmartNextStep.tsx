@@ -310,10 +310,10 @@ export function SmartNextStep(props: SmartNextStepProps) {
         const stored = await getSetting(`smart_next_dismissed_${props.projectId}`);
         if (stored) {
           const parsed = JSON.parse(stored);
-          // Check if dismissals are still valid (reset after 24 hours)
+          // Check if dismissals are still valid (reset after 24 hours, unless permanent)
           const now = Date.now();
-          const validDismissals = parsed.filter((d: { id: string; at: number }) =>
-            now - d.at < 24 * 60 * 60 * 1000
+          const validDismissals = parsed.filter((d: { id: string; at: number; permanent?: boolean }) =>
+            d.permanent || (now - d.at < 24 * 60 * 60 * 1000)
           );
           setDismissedIds(validDismissals.map((d: { id: string }) => d.id));
         }
@@ -324,14 +324,27 @@ export function SmartNextStep(props: SmartNextStepProps) {
     loadDismissed();
   }, [props.projectId]);
 
-  const handleDismiss = useCallback(async (id: string) => {
+  const handleDismiss = useCallback(async (id: string, permanent: boolean = false) => {
     const newDismissed = [...dismissedIds, id];
     setDismissedIds(newDismissed);
 
-    // Save with timestamps
-    const toStore = newDismissed.map(id => ({ id, at: Date.now() }));
+    // Load existing dismissals to preserve permanent flags
+    let existingDismissals: { id: string; at: number; permanent?: boolean }[] = [];
     try {
-      await saveSetting(`smart_next_dismissed_${props.projectId}`, JSON.stringify(toStore));
+      const stored = await getSetting(`smart_next_dismissed_${props.projectId}`);
+      if (stored) {
+        existingDismissals = JSON.parse(stored);
+      }
+    } catch {
+      // Ignore
+    }
+
+    // Update or add the dismissal
+    const updated = existingDismissals.filter(d => d.id !== id);
+    updated.push({ id, at: Date.now(), permanent });
+
+    try {
+      await saveSetting(`smart_next_dismissed_${props.projectId}`, JSON.stringify(updated));
     } catch {
       // Non-critical
     }
@@ -376,12 +389,22 @@ export function SmartNextStep(props: SmartNextStepProps) {
 
       <div className="mt-4 flex items-center justify-end gap-3">
         {recommendation.id !== "all-good" && (
-          <button
-            onClick={() => handleDismiss(recommendation.id)}
-            className="rounded-md px-3 py-1.5 text-sm text-neutral-500 transition-colors hover:bg-neutral-800 hover:text-neutral-300"
-          >
-            Later
-          </button>
+          <>
+            <button
+              onClick={() => handleDismiss(recommendation.id, true)}
+              className="rounded-md px-3 py-1.5 text-sm text-neutral-600 transition-colors hover:bg-neutral-800 hover:text-neutral-400"
+              title="Permanently skip this recommendation for this project"
+            >
+              Skip
+            </button>
+            <button
+              onClick={() => handleDismiss(recommendation.id, false)}
+              className="rounded-md px-3 py-1.5 text-sm text-neutral-500 transition-colors hover:bg-neutral-800 hover:text-neutral-300"
+              title="Dismiss for 24 hours"
+            >
+              Later
+            </button>
+          </>
         )}
         <button
           onClick={() => handleAction(recommendation.targetSection)}
