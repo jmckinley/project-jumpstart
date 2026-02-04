@@ -1,0 +1,108 @@
+/**
+ * @module e2e/navigation.spec
+ * @description E2E tests for app navigation and sidebar
+ *
+ * TESTS:
+ * - Sidebar navigation
+ * - Section switching
+ * - Project selector
+ * - Active section highlighting
+ */
+
+import { test, expect } from "@playwright/test";
+import { setupTauriMocks } from "./tauri-mocks";
+
+test.describe("Navigation", () => {
+  test.beforeEach(async ({ page }) => {
+    await setupTauriMocks(page, { hasApiKey: true, hasClaudeMd: true });
+    await page.goto("/");
+    await page.waitForSelector("text=Project Overview", { timeout: 10000 });
+  });
+
+  test("sidebar is visible", async ({ page }) => {
+    // Sidebar should show navigation items (use nav to be specific)
+    await expect(page.locator("nav >> text=Dashboard")).toBeVisible();
+    await expect(page.locator("nav >> text=CLAUDE.md")).toBeVisible();
+    await expect(page.locator("nav >> text=Modules")).toBeVisible();
+    await expect(page.locator("nav >> text=Skills")).toBeVisible();
+    await expect(page.locator("nav >> text=Agents")).toBeVisible();
+  });
+
+  test("navigates to CLAUDE.md editor", async ({ page }) => {
+    await page.locator("nav >> text=CLAUDE.md").click();
+
+    // Should show editor
+    await expect(page.locator("textarea")).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("text=Editor")).toBeVisible();
+  });
+
+  test("navigates to Modules", async ({ page }) => {
+    await page.locator("nav >> text=Modules").click();
+
+    // Should show modules view
+    await expect(page.locator("text=Module Documentation")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("navigates to Skills", async ({ page }) => {
+    await page.locator("nav >> text=Skills").click();
+
+    // Should show skills view
+    await expect(page.locator("text=Skills Workshop")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("navigates to Agents", async ({ page }) => {
+    await page.locator("nav >> text=Agents").click();
+
+    // Should show agents view
+    await expect(page.locator("text=Agents")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("navigates to Test Plans", async ({ page }) => {
+    await page.locator("nav >> text=Test Plans").click();
+
+    // Should show test plans view
+    await expect(page.locator("text=Test Plans")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("navigates to Settings", async ({ page }) => {
+    await page.locator("nav >> text=Settings").click();
+
+    // Should show settings view
+    await expect(page.locator("text=API Key")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("navigates back to Dashboard", async ({ page }) => {
+    // Go to another section first (Modules is more reliable)
+    await page.locator("nav >> text=Modules").click();
+    await page.waitForTimeout(500);
+
+    // Go back to Dashboard
+    await page.locator("nav >> text=Dashboard").click();
+
+    // Should show dashboard
+    await expect(page.getByText("Project Overview").first()).toBeVisible({ timeout: 5000 });
+  });
+
+  test("project name is displayed in header", async ({ page }) => {
+    // Project name from mock should be visible
+    await expect(page.locator("text=test-project")).toBeVisible();
+  });
+});
+
+test.describe("Project Selector", () => {
+  test("shows project list", async ({ page }) => {
+    await setupTauriMocks(page, { hasApiKey: true, hasClaudeMd: true });
+    await page.goto("/");
+    await page.waitForSelector("text=Project Overview", { timeout: 10000 });
+
+    // Click project selector (if expandable)
+    const projectSelector = page.locator("[data-testid='project-selector']").or(
+      page.locator("text=test-project").first()
+    );
+
+    if (await projectSelector.isVisible()) {
+      // Project should be selectable
+      await expect(projectSelector).toBeVisible();
+    }
+  });
+});

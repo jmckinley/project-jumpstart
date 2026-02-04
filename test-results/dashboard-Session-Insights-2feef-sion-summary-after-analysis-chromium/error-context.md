@@ -1,0 +1,178 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - complementary [ref=e5]:
+      - button "Project Jumpstart Project Jumpstart" [ref=e6]:
+        - img "Project Jumpstart" [ref=e7]
+        - generic [ref=e8]: Project Jumpstart
+      - button "test-project" [ref=e11]:
+        - generic [ref=e12]:
+          - img [ref=e13]
+          - generic [ref=e15]: test-project
+        - img [ref=e16]
+      - generic [ref=e18]:
+        - generic [ref=e19]: Navigation
+        - navigation [ref=e20]:
+          - button "Dashboard" [ref=e21]:
+            - generic [ref=e22]: Dashboard
+          - button "CLAUDE.md" [ref=e23]:
+            - generic [ref=e24]: CLAUDE.md
+          - button "Modules" [ref=e25]:
+            - generic [ref=e26]: Modules
+          - button "Test Plans" [ref=e27]:
+            - generic [ref=e28]: Test Plans
+          - button "Skills" [ref=e29]:
+            - generic [ref=e30]: Skills
+          - button "Agents" [ref=e31]:
+            - generic [ref=e32]: Agents
+          - button "RALPH" [ref=e33]:
+            - generic [ref=e34]: RALPH
+          - button "Context Health" [ref=e35]:
+            - generic [ref=e36]: Context Health
+          - button "Enforcement" [ref=e37]:
+            - generic [ref=e38]: Enforcement
+          - button "Settings" [ref=e39]:
+            - generic [ref=e40]: Settings
+          - button "Help" [ref=e41]:
+            - generic [ref=e42]: Help
+    - generic [ref=e43]:
+      - banner [ref=e44]:
+        - generic [ref=e45]:
+          - heading "dashboard" [level=2] [ref=e46]
+          - generic [ref=e47]: test-project
+        - generic [ref=e48]:
+          - button "Show page help" [ref=e49]:
+            - img [ref=e50]
+          - generic [ref=e52]:
+            - generic [ref=e53]:
+              - generic [ref=e54]:
+                - heading "Dashboard" [level=4] [ref=e55]
+                - button [ref=e56]:
+                  - img [ref=e57]
+              - paragraph [ref=e59]: Your project's documentation health at a glance. Monitor coverage, spot issues, and find quick improvements.
+            - generic [ref=e60]:
+              - heading "Key Concepts" [level=5] [ref=e61]
+              - generic [ref=e62]:
+                - generic [ref=e63]:
+                  - term [ref=e64]: Health Score
+                  - definition [ref=e65]: 0-100 rating based on documentation coverage, freshness, and best practices.
+                - generic [ref=e66]:
+                  - term [ref=e67]: Context Rot
+                  - definition [ref=e68]: When documentation becomes stale and no longer matches the code.
+                - generic [ref=e69]:
+                  - term [ref=e70]: Quick Wins
+                  - definition [ref=e71]: High-impact, low-effort improvements to boost your score.
+            - generic [ref=e72]:
+              - heading "Quick Tips" [level=5] [ref=e73]
+              - list [ref=e74]:
+                - listitem [ref=e75]:
+                  - generic [ref=e76]: •
+                  - generic [ref=e77]: Click a Quick Win to jump directly to that section
+                - listitem [ref=e78]:
+                  - generic [ref=e79]: •
+                  - generic [ref=e80]: Use 'Refresh Docs' to update stale documentation with AI
+                - listitem [ref=e81]:
+                  - generic [ref=e82]: •
+                  - generic [ref=e83]: Check the dashboard after major code changes
+            - button "Got it" [ref=e85]
+      - main [ref=e86]:
+        - generic [ref=e87]:
+          - generic [ref=e88]:
+            - heading "Project Overview" [level=3] [ref=e89]
+            - button "Refresh Docs" [ref=e92]:
+              - img [ref=e93]
+              - text: Refresh Docs
+          - generic [ref=e95]:
+            - generic [ref=e96]:
+              - generic [ref=e97]: 🔒
+              - generic [ref=e98]:
+                - generic [ref=e100]: Recommended Setup
+                - heading "Set up documentation enforcement" [level=3] [ref=e101]
+                - paragraph [ref=e102]: Git hooks ensure documentation stays current. Auto-update mode generates missing docs at commit time.
+            - generic [ref=e103]:
+              - button "Skip" [ref=e104]
+              - button "Later" [ref=e105]
+              - button "Set Up Hooks" [ref=e106]:
+                - text: Set Up Hooks
+                - img [ref=e107]
+          - generic [ref=e109]:
+            - generic [ref=e110]:
+              - generic [ref=e111]:
+                - img [ref=e113]
+                - generic [ref=e115]:
+                  - heading "Session Insights" [level=3] [ref=e116]
+                  - paragraph [ref=e117]: AI-powered recommendations from your session
+              - button "Analyze Session" [ref=e119]:
+                - img [ref=e120]
+                - text: Analyze Session
+            - generic [ref=e123]:
+              - img [ref=e125]
+              - paragraph [ref=e127]: Analyze your recent Claude Code session to get smart recommendations
+              - paragraph [ref=e128]: AI will suggest agents, tests, patterns, and documentation based on what you've been working on
+          - generic [ref=e129]:
+            - generic [ref=e130]:
+              - heading "Health Score" [level=3] [ref=e131]
+              - generic [ref=e133]:
+                - img [ref=e134]
+                - generic [ref=e137]:
+                  - generic [ref=e138]: "75"
+                  - generic [ref=e139]: / 100
+              - generic [ref=e140]:
+                - heading "Breakdown" [level=4] [ref=e141]
+                - generic [ref=e143]:
+                  - generic [ref=e144]: CLAUDE.md
+                  - generic [ref=e145]: 20 / 23
+                - generic [ref=e149]:
+                  - generic [ref=e150]: Modules
+                  - generic [ref=e151]: 15 / 23
+                - generic [ref=e155]:
+                  - generic [ref=e156]: Freshness
+                  - generic [ref=e157]: 12 / 14
+                - generic [ref=e161]:
+                  - generic [ref=e162]: Skills
+                  - generic [ref=e163]: 10 / 14
+                - generic [ref=e167]:
+                  - generic [ref=e168]: Context
+                  - generic [ref=e169]: 8 / 8
+                - generic [ref=e173]:
+                  - generic [ref=e174]: Enforcement
+                  - generic [ref=e175]: 10 / 8
+                - generic [ref=e179]:
+                  - generic [ref=e180]: Tests
+                  - generic [ref=e181]: / 10
+            - generic [ref=e183]:
+              - heading "Quick Wins" [level=3] [ref=e184]
+              - list [ref=e185]:
+                - listitem [ref=e186]:
+                  - generic [ref=e187]:
+                    - generic [ref=e188]:
+                      - paragraph [ref=e189]: Add documentation to 5 modules
+                      - paragraph [ref=e190]: Improve module coverage from 60% to 80%
+                    - button "Fix" [ref=e191]
+                  - generic [ref=e192]:
+                    - generic [ref=e193]: +10 points
+                    - generic [ref=e194]: Medium
+          - generic [ref=e195]:
+            - heading "Recent Activity" [level=3] [ref=e196]
+            - list [ref=e197]:
+              - listitem [ref=e198]:
+                - img [ref=e200]
+                - paragraph [ref=e203]: Generated documentation for App.tsx
+                - generic [ref=e204]: just now
+              - listitem [ref=e205]:
+                - img [ref=e207]
+                - paragraph [ref=e210]: Used Component Creator skill
+                - generic [ref=e211]: 1h ago
+  - contentinfo [ref=e212]:
+    - generic [ref=e213]:
+      - generic [ref=e214]: "Context: --"
+      - generic [ref=e215]: "|"
+      - generic [ref=e216]: "RALPH: Idle"
+      - generic [ref=e217]: "|"
+      - generic [ref=e218]: Connected
+    - button "Feedback" [ref=e220]:
+      - img [ref=e221]
+      - text: Feedback
+```

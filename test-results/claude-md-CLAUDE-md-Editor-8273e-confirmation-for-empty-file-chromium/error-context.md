@@ -1,0 +1,109 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - complementary [ref=e5]:
+      - button "Project Jumpstart Project Jumpstart" [ref=e6]:
+        - img "Project Jumpstart" [ref=e7]
+        - generic [ref=e8]: Project Jumpstart
+      - button "test-project" [ref=e11]:
+        - generic [ref=e12]:
+          - img [ref=e13]
+          - generic [ref=e15]: test-project
+        - img [ref=e16]
+      - generic [ref=e18]:
+        - generic [ref=e19]: Navigation
+        - navigation [ref=e20]:
+          - button "Dashboard" [ref=e21]:
+            - generic [ref=e22]: Dashboard
+          - button "CLAUDE.md" [ref=e23]:
+            - generic [ref=e24]: CLAUDE.md
+          - button "Modules" [ref=e25]:
+            - generic [ref=e26]: Modules
+          - button "Test Plans" [ref=e27]:
+            - generic [ref=e28]: Test Plans
+          - button "Skills" [ref=e29]:
+            - generic [ref=e30]: Skills
+          - button "Agents" [ref=e31]:
+            - generic [ref=e32]: Agents
+          - button "RALPH" [ref=e33]:
+            - generic [ref=e34]: RALPH
+          - button "Context Health" [ref=e35]:
+            - generic [ref=e36]: Context Health
+          - button "Enforcement" [ref=e37]:
+            - generic [ref=e38]: Enforcement
+          - button "Settings" [ref=e39]:
+            - generic [ref=e40]: Settings
+          - button "Help" [ref=e41]:
+            - generic [ref=e42]: Help
+    - generic [ref=e43]:
+      - banner [ref=e44]:
+        - generic [ref=e45]:
+          - heading "claude md" [level=2] [ref=e46]
+          - generic [ref=e47]: test-project
+        - button "Show page help" [ref=e49]:
+          - img [ref=e50]
+      - main [ref=e52]:
+        - generic [ref=e53]:
+          - generic [ref=e54]:
+            - generic [ref=e55]:
+              - heading "CLAUDE.md" [level=2] [ref=e56]
+              - generic [ref=e57]: ~57 tokens
+            - button "Save Changes" [ref=e59]
+          - generic [ref=e60]:
+            - generic [ref=e61]:
+              - generic [ref=e62]:
+                - generic [ref=e63]: Editor
+                - button "Regen Using AI" [ref=e64]:
+                  - img [ref=e65]
+                  - text: Regen Using AI
+              - textbox "# Project Name\\n\\nDescribe your project here..." [ref=e67]: "# Test Project ## Overview A test project for E2E testing. ## Tech Stack | Layer | Technology | |-------|------------| | Language | TypeScript | | Framework | React | ## Commands ```bash pnpm install pnpm dev pnpm test ```"
+            - generic [ref=e68]:
+              - generic [ref=e70]:
+                - heading "Claude's Understanding" [level=3] [ref=e72]
+                - generic [ref=e73]:
+                  - heading "Test Project" [level=1] [ref=e74]
+                  - heading "Overview" [level=2] [ref=e75]
+                  - paragraph [ref=e76]: A test project for E2E testing.
+                  - heading "Tech Stack" [level=2] [ref=e77]
+                  - table [ref=e79]:
+                    - rowgroup [ref=e80]:
+                      - row "Layer Technology" [ref=e81]:
+                        - columnheader "Layer" [ref=e82]
+                        - columnheader "Technology" [ref=e83]
+                    - rowgroup [ref=e84]:
+                      - row "Language TypeScript" [ref=e85]:
+                        - cell "Language" [ref=e86]
+                        - cell "TypeScript" [ref=e87]
+                      - row "Framework React" [ref=e88]:
+                        - cell "Framework" [ref=e89]
+                        - cell "React" [ref=e90]
+                  - heading "Commands" [level=2] [ref=e91]
+                  - code [ref=e93]: pnpm install pnpm dev pnpm test
+              - generic [ref=e94]:
+                - heading "Suggestions" [level=3] [ref=e96]
+                - list [ref=e98]:
+                  - listitem [ref=e99]:
+                    - generic [ref=e100]:
+                      - generic [ref=e101]:
+                        - paragraph [ref=e102]: Add Code Patterns section
+                        - paragraph [ref=e103]: Document recurring patterns and conventions so Claude follows them consistently when writing new code.
+                      - button "Add" [ref=e104]
+                  - listitem [ref=e105]:
+                    - generic [ref=e106]:
+                      - generic [ref=e107]:
+                        - paragraph [ref=e108]: Add CLAUDE NOTES section
+                        - paragraph [ref=e109]: Include important reminders and gotchas that Claude should always keep in mind when working on this project.
+                      - button "Add" [ref=e110]
+  - contentinfo [ref=e111]:
+    - generic [ref=e112]:
+      - generic [ref=e113]: "Context: --"
+      - generic [ref=e114]: "|"
+      - generic [ref=e115]: "RALPH: Idle"
+      - generic [ref=e116]: "|"
+      - generic [ref=e117]: Connected
+    - button "Feedback" [ref=e119]:
+      - img [ref=e120]
+      - text: Feedback
+```

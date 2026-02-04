@@ -1,0 +1,188 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - complementary [ref=e5]:
+      - button "Project Jumpstart Project Jumpstart" [ref=e6]:
+        - img "Project Jumpstart" [ref=e7]
+        - generic [ref=e8]: Project Jumpstart
+      - button "test-project" [ref=e11]:
+        - generic [ref=e12]:
+          - img [ref=e13]
+          - generic [ref=e15]: test-project
+        - img [ref=e16]
+      - generic [ref=e18]:
+        - button "Kickstart" [ref=e20]:
+          - img [ref=e21]
+          - generic [ref=e23]: Kickstart
+        - generic [ref=e24]: Navigation
+        - navigation [ref=e25]:
+          - button "Dashboard" [ref=e26]:
+            - generic [ref=e27]: Dashboard
+          - button "CLAUDE.md" [ref=e28]:
+            - generic [ref=e29]: CLAUDE.md
+          - button "Modules" [ref=e30]:
+            - generic [ref=e31]: Modules
+          - button "Test Plans" [ref=e32]:
+            - generic [ref=e33]: Test Plans
+          - button "Skills" [ref=e34]:
+            - generic [ref=e35]: Skills
+          - button "Agents" [ref=e36]:
+            - generic [ref=e37]: Agents
+          - button "RALPH" [ref=e38]:
+            - generic [ref=e39]: RALPH
+          - button "Context Health" [ref=e40]:
+            - generic [ref=e41]: Context Health
+          - button "Enforcement" [ref=e42]:
+            - generic [ref=e43]: Enforcement
+          - button "Settings" [ref=e44]:
+            - generic [ref=e45]: Settings
+          - button "Help" [ref=e46]:
+            - generic [ref=e47]: Help
+    - generic [ref=e48]:
+      - banner [ref=e49]:
+        - generic [ref=e50]:
+          - heading "modules" [level=2] [ref=e51]
+          - generic [ref=e52]: test-project
+        - generic [ref=e53]:
+          - button "Show page help" [ref=e54]:
+            - img [ref=e55]
+          - generic [ref=e57]:
+            - generic [ref=e58]:
+              - generic [ref=e59]:
+                - heading "Module Documentation" [level=4] [ref=e60]
+                - button [ref=e61]:
+                  - img [ref=e62]
+              - paragraph [ref=e64]: Add documentation headers to source files so Claude understands each module's purpose and dependencies.
+            - generic [ref=e65]:
+              - heading "Key Concepts" [level=5] [ref=e66]
+              - generic [ref=e67]:
+                - generic [ref=e68]:
+                  - term [ref=e69]: Module Doc
+                  - definition [ref=e70]: A structured comment at the top of each file describing its purpose, exports, and patterns.
+                - generic [ref=e71]:
+                  - term [ref=e72]: Coverage
+                  - definition [ref=e73]: Percentage of source files that have documentation headers.
+                - generic [ref=e74]:
+                  - term [ref=e75]: Freshness
+                  - definition [ref=e76]: Whether the documentation still matches the current code.
+            - generic [ref=e77]:
+              - heading "Quick Tips" [level=5] [ref=e78]
+              - list [ref=e79]:
+                - listitem [ref=e80]:
+                  - generic [ref=e81]: •
+                  - generic [ref=e82]: Start with high-traffic files that Claude reads often
+                - listitem [ref=e83]:
+                  - generic [ref=e84]: •
+                  - generic [ref=e85]: Use 'Generate' to create docs with AI, then review and apply
+                - listitem [ref=e86]:
+                  - generic [ref=e87]: •
+                  - generic [ref=e88]: Batch generate to document multiple files at once
+                - listitem [ref=e89]:
+                  - generic [ref=e90]: •
+                  - generic [ref=e91]: Green = documented, Yellow = outdated, Red = missing
+            - button "Got it" [ref=e93]
+      - main [ref=e94]:
+        - generic [ref=e95]:
+          - generic [ref=e97]:
+            - img [ref=e99]
+            - generic [ref=e101]:
+              - heading "Project Kickstart" [level=3] [ref=e102]
+              - paragraph [ref=e103]: Generate a Claude Code kickstart prompt for test-project
+              - paragraph [ref=e104]: This will create a comprehensive CLAUDE.md-style prompt you can use to bootstrap your project with AI assistance.
+          - generic [ref=e105]:
+            - generic [ref=e106]:
+              - heading "App Basics" [level=4] [ref=e107]
+              - generic [ref=e108]:
+                - generic [ref=e109]:
+                  - generic [ref=e110]: What does your app do? *
+                  - textbox "A task management app that helps teams collaborate on projects..." [active] [ref=e111]: A test application for demo purposes
+                - generic [ref=e112]:
+                  - generic [ref=e113]: Who are the target users? *
+                  - textbox "Small to medium development teams, project managers..." [ref=e114]
+            - generic [ref=e115]:
+              - heading "Key Features" [level=4] [ref=e116]
+              - generic [ref=e117]:
+                - textbox "Feature 1..." [ref=e119]
+                - button "Add another feature" [ref=e120]:
+                  - img [ref=e121]
+                  - text: Add another feature
+            - generic [ref=e123]:
+              - generic [ref=e124]:
+                - heading "Tech Stack" [level=4] [ref=e125]
+                - generic [ref=e126]: Missing selections will be suggested by AI
+              - generic [ref=e127]:
+                - generic [ref=e128]:
+                  - generic [ref=e129]: Language
+                  - combobox [ref=e130]:
+                    - option "Select language..." [selected]
+                    - option "TypeScript"
+                    - option "JavaScript"
+                    - option "Python"
+                    - option "Rust"
+                    - option "Go"
+                    - option "Dart"
+                    - option "Java"
+                    - option "Kotlin"
+                    - option "Swift"
+                    - option "Ruby"
+                    - option "PHP"
+                    - option "C#"
+                    - option "C++"
+                    - option "C"
+                - generic [ref=e131]:
+                  - generic [ref=e132]: Framework
+                  - combobox [disabled] [ref=e133]:
+                    - option "Select language first..." [selected]
+                - generic [ref=e134]:
+                  - generic [ref=e135]: Database
+                  - combobox [ref=e136]:
+                    - option "None / Not decided" [selected]
+                    - option "PostgreSQL"
+                    - option "MySQL"
+                    - option "SQLite"
+                    - option "MongoDB"
+                    - option "Redis"
+                    - option "Supabase"
+                    - option "Firebase"
+                    - option "DynamoDB"
+                    - option "Pinecone"
+                    - option "Weaviate"
+                    - option "Qdrant"
+                    - option "Chroma"
+                    - option "Milvus"
+                    - option "PlanetScale"
+                    - option "CockroachDB"
+                    - option "Neon"
+                    - option "Turso"
+                - generic [ref=e137]:
+                  - generic [ref=e138]: Styling
+                  - combobox [ref=e139]:
+                    - option "None / Not decided" [selected]
+                    - option "Tailwind CSS"
+                    - option "CSS Modules"
+                    - option "Styled Components"
+                    - option "Emotion"
+                    - option "Sass/SCSS"
+                    - option "Material UI"
+                    - option "Chakra UI"
+                    - option "Bootstrap"
+                    - option "Less"
+            - generic [ref=e140]:
+              - heading "Constraints (Optional)" [level=4] [ref=e141]
+              - textbox "Any specific requirements, limitations, or constraints for the project..." [ref=e142]
+            - button "Review & Generate" [disabled] [ref=e144]:
+              - img [ref=e145]
+              - text: Review & Generate
+  - contentinfo [ref=e147]:
+    - generic [ref=e148]:
+      - generic [ref=e149]: "Context: --"
+      - generic [ref=e150]: "|"
+      - generic [ref=e151]: "RALPH: Idle"
+      - generic [ref=e152]: "|"
+      - generic [ref=e153]: Connected
+    - button "Feedback" [ref=e155]:
+      - img [ref=e156]
+      - text: Feedback
+```

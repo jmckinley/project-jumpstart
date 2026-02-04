@@ -1,0 +1,117 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - complementary [ref=e5]:
+      - button "Project Jumpstart Project Jumpstart" [ref=e6]:
+        - img "Project Jumpstart" [ref=e7]
+        - generic [ref=e8]: Project Jumpstart
+      - button "test-project" [ref=e11]:
+        - generic [ref=e12]:
+          - img [ref=e13]
+          - generic [ref=e15]: test-project
+        - img [ref=e16]
+      - generic [ref=e18]:
+        - generic [ref=e19]: Navigation
+        - navigation [ref=e20]:
+          - button "Dashboard" [ref=e21]:
+            - generic [ref=e22]: Dashboard
+          - button "CLAUDE.md" [ref=e23]:
+            - generic [ref=e24]: CLAUDE.md
+          - button "Modules" [ref=e25]:
+            - generic [ref=e26]: Modules
+          - button "Test Plans" [active] [ref=e27]:
+            - generic [ref=e28]: Test Plans
+          - button "Skills" [ref=e29]:
+            - generic [ref=e30]: Skills
+          - button "Agents" [ref=e31]:
+            - generic [ref=e32]: Agents
+          - button "RALPH" [ref=e33]:
+            - generic [ref=e34]: RALPH
+          - button "Context Health" [ref=e35]:
+            - generic [ref=e36]: Context Health
+          - button "Enforcement" [ref=e37]:
+            - generic [ref=e38]: Enforcement
+          - button "Settings" [ref=e39]:
+            - generic [ref=e40]: Settings
+          - button "Help" [ref=e41]:
+            - generic [ref=e42]: Help
+    - generic [ref=e43]:
+      - banner [ref=e44]:
+        - generic [ref=e45]:
+          - heading "test plans" [level=2] [ref=e46]
+          - generic [ref=e47]: test-project
+        - generic [ref=e48]:
+          - button "Show page help" [ref=e49]:
+            - img [ref=e50]
+          - generic [ref=e52]:
+            - generic [ref=e53]:
+              - generic [ref=e54]:
+                - heading "Test Plans" [level=4] [ref=e55]
+                - button [ref=e56]:
+                  - img [ref=e57]
+              - paragraph [ref=e59]: Plan, track, and generate test cases for your codebase. Use AI to analyze code and suggest tests.
+            - generic [ref=e60]:
+              - heading "Key Concepts" [level=5] [ref=e61]
+              - generic [ref=e62]:
+                - generic [ref=e63]:
+                  - term [ref=e64]: Test Plan
+                  - definition [ref=e65]: A collection of related test cases with a coverage target.
+                - generic [ref=e66]:
+                  - term [ref=e67]: TDD Workflow
+                  - definition [ref=e68]: Red → Green → Refactor cycle for test-driven development.
+                - generic [ref=e69]:
+                  - term [ref=e70]: Coverage Target
+                  - definition [ref=e71]: The percentage of code you aim to cover with tests.
+            - generic [ref=e72]:
+              - heading "Quick Tips" [level=5] [ref=e73]
+              - list [ref=e74]:
+                - listitem [ref=e75]:
+                  - generic [ref=e76]: •
+                  - generic [ref=e77]: Use 'Generate Tests' to let AI analyze your code and suggest test cases
+                - listitem [ref=e78]:
+                  - generic [ref=e79]: •
+                  - generic [ref=e80]: Filter test cases by type, priority, or status to manage large lists
+                - listitem [ref=e81]:
+                  - generic [ref=e82]: •
+                  - generic [ref=e83]: Try the TDD Workflow tab for guided test-driven development
+                - listitem [ref=e84]:
+                  - generic [ref=e85]: •
+                  - generic [ref=e86]: Use Tools tab to generate subagent configs and hooks
+            - button "Got it" [ref=e88]
+      - main [ref=e89]:
+        - generic [ref=e90]:
+          - generic [ref=e91]:
+            - button "Test Plans" [ref=e92]
+            - button "TDD Workflow" [ref=e93]
+            - button "Tools" [ref=e94]
+          - generic [ref=e96]:
+            - generic [ref=e97]:
+              - generic [ref=e98]:
+                - img [ref=e99]
+                - heading "AI Test Generation" [level=3] [ref=e101]
+              - paragraph [ref=e102]: Analyze your codebase and generate test cases automatically
+            - button "Generate Tests" [ref=e103]:
+              - img [ref=e104]
+              - text: Generate Tests
+          - generic [ref=e106]:
+            - generic [ref=e108]:
+              - generic [ref=e109]:
+                - heading "Test Plans" [level=3] [ref=e110]
+                - button "+ New Plan" [ref=e111]
+              - generic [ref=e113]:
+                - paragraph [ref=e114]: No test plans yet.
+                - paragraph [ref=e115]: Click "New Plan" to create one.
+            - paragraph [ref=e118]: Select a test plan or create a new one
+  - contentinfo [ref=e119]:
+    - generic [ref=e120]:
+      - generic [ref=e121]: "Context: --"
+      - generic [ref=e122]: "|"
+      - generic [ref=e123]: "RALPH: Idle"
+      - generic [ref=e124]: "|"
+      - generic [ref=e125]: Connected
+    - button "Feedback" [ref=e127]:
+      - img [ref=e128]
+      - text: Feedback
+```

@@ -1,0 +1,125 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - complementary [ref=e5]:
+      - button "Project Jumpstart Project Jumpstart" [ref=e6]:
+        - img "Project Jumpstart" [ref=e7]
+        - generic [ref=e8]: Project Jumpstart
+      - button "test-project" [ref=e11]:
+        - generic [ref=e12]:
+          - img [ref=e13]
+          - generic [ref=e15]: test-project
+        - img [ref=e16]
+      - generic [ref=e18]:
+        - generic [ref=e19]: Navigation
+        - navigation [ref=e20]:
+          - button "Dashboard" [ref=e21]:
+            - generic [ref=e22]: Dashboard
+          - button "CLAUDE.md" [ref=e23]:
+            - generic [ref=e24]: CLAUDE.md
+          - button "Modules" [ref=e25]:
+            - generic [ref=e26]: Modules
+          - button "Test Plans" [ref=e27]:
+            - generic [ref=e28]: Test Plans
+          - button "Skills" [ref=e29]:
+            - generic [ref=e30]: Skills
+          - button "Agents" [ref=e31]:
+            - generic [ref=e32]: Agents
+          - button "RALPH" [ref=e33]:
+            - generic [ref=e34]: RALPH
+          - button "Context Health" [ref=e35]:
+            - generic [ref=e36]: Context Health
+          - button "Enforcement" [ref=e37]:
+            - generic [ref=e38]: Enforcement
+          - button "Settings" [active] [ref=e39]:
+            - generic [ref=e40]: Settings
+          - button "Help" [ref=e41]:
+            - generic [ref=e42]: Help
+    - generic [ref=e43]:
+      - banner [ref=e44]:
+        - generic [ref=e45]:
+          - heading "settings" [level=2] [ref=e46]
+          - generic [ref=e47]: test-project
+        - generic [ref=e48]:
+          - button "Show page help" [ref=e49]:
+            - img [ref=e50]
+          - generic [ref=e52]:
+            - generic [ref=e53]:
+              - generic [ref=e54]:
+                - heading "Settings" [level=4] [ref=e55]
+                - button [ref=e56]:
+                  - img [ref=e57]
+              - paragraph [ref=e59]: Configure your API key, preferences, and application behavior.
+            - generic [ref=e60]:
+              - heading "Key Concepts" [level=5] [ref=e61]
+              - generic [ref=e63]:
+                - term [ref=e64]: API Key
+                - definition [ref=e65]: Your Anthropic API key for AI-powered features like doc generation.
+            - generic [ref=e66]:
+              - heading "Quick Tips" [level=5] [ref=e67]
+              - list [ref=e68]:
+                - listitem [ref=e69]:
+                  - generic [ref=e70]: •
+                  - generic [ref=e71]: API key is required for AI generation features
+                - listitem [ref=e72]:
+                  - generic [ref=e73]: •
+                  - generic [ref=e74]: Key is stored encrypted locally, never sent to our servers
+                - listitem [ref=e75]:
+                  - generic [ref=e76]: •
+                  - generic [ref=e77]: Enforcement level here syncs with the Enforcement page
+            - button "Got it" [ref=e79]
+      - main [ref=e80]:
+        - generic [ref=e81]:
+          - generic [ref=e82]:
+            - heading "Enforcement Level" [level=3] [ref=e84]
+            - generic [ref=e85]:
+              - paragraph [ref=e86]: Control how strictly documentation requirements are enforced.
+              - generic [ref=e87]:
+                - button "Off" [ref=e88]
+                - button "Warn" [ref=e89]
+                - button "Block" [ref=e90]
+                - button "Auto-Update" [ref=e91]
+              - paragraph [ref=e92]: Allow commits but show warnings for missing docs
+          - generic [ref=e93]:
+            - heading "Notifications" [level=3] [ref=e95]
+            - generic [ref=e97]:
+              - generic [ref=e98]:
+                - paragraph [ref=e99]: Enable notifications
+                - paragraph [ref=e100]: Receive alerts for stale docs and context rot warnings.
+              - button "On" [ref=e101]
+          - generic [ref=e102]:
+            - heading "Anthropic API Key" [level=3] [ref=e104]
+            - generic [ref=e105]:
+              - generic [ref=e106]:
+                - generic [ref=e107]: Configured
+                - generic [ref=e108]: sk-...2345
+              - generic [ref=e109]:
+                - paragraph [ref=e110]: API key is set. AI-powered generation is enabled for CLAUDE.md and module docs.
+                - button "Remove Key" [ref=e111]
+              - paragraph [ref=e112]: Your API key is stored locally in the SQLite database. It is never sent anywhere except to the Anthropic API.
+          - generic [ref=e113]:
+            - heading "About" [level=3] [ref=e115]
+            - generic [ref=e117]:
+              - generic [ref=e118]:
+                - generic [ref=e119]: Application
+                - generic [ref=e120]: Project Jumpstart
+              - generic [ref=e121]:
+                - generic [ref=e122]: Version
+                - generic [ref=e123]: 1.0.0
+              - generic [ref=e124]:
+                - generic [ref=e125]: Specification
+                - link "project-jumpstart-spec.md" [ref=e126] [cursor=pointer]:
+                  - /url: project-jumpstart-spec.md
+  - contentinfo [ref=e127]:
+    - generic [ref=e128]:
+      - generic [ref=e129]: "Context: --"
+      - generic [ref=e130]: "|"
+      - generic [ref=e131]: "RALPH: Idle"
+      - generic [ref=e132]: "|"
+      - generic [ref=e133]: Connected
+    - button "Feedback" [ref=e135]:
+      - img [ref=e136]
+      - text: Feedback
+```
