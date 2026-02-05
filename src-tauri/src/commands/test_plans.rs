@@ -625,24 +625,7 @@ pub async fn generate_test_suggestions(
     // Get API key (in a block to release DB lock before async call)
     let api_key = {
         let db = state.db.lock().map_err(|e| format!("DB lock error: {}", e))?;
-        let api_key: Option<String> = db
-            .query_row("SELECT value FROM settings WHERE key = 'api_key'", [], |row| {
-                row.get(0)
-            })
-            .ok();
-
-        match api_key {
-            Some(key) if !key.is_empty() => {
-                // Decrypt if encrypted (prefixed with "enc:")
-                if key.starts_with("enc:") {
-                    crate::core::crypto::decrypt(&key[4..])
-                        .map_err(|e| format!("Failed to decrypt API key: {}", e))?
-                } else {
-                    key
-                }
-            }
-            _ => return Err("API key not configured. Please add your Anthropic API key in Settings.".to_string()),
-        }
+        crate::core::ai::get_api_key(&db)?
     };
     // DB lock released here at end of block
 
