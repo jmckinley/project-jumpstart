@@ -103,10 +103,10 @@ describe("Editor", () => {
       expect(screen.getByRole("textbox")).toBeInTheDocument();
     });
 
-    it("should render Regen fresh CLAUDE.md button", () => {
+    it("should render Regen Using AI button", () => {
       render(<Editor />);
 
-      expect(screen.getByText(/Regen fresh CLAUDE.md/)).toBeInTheDocument();
+      expect(screen.getByText(/Regen Using AI/)).toBeInTheDocument();
     });
 
     it("should render preview component", () => {
@@ -275,7 +275,7 @@ describe("Editor", () => {
 
       render(<Editor />);
 
-      const generateButton = screen.getByText(/Regen fresh CLAUDE.md/);
+      const generateButton = screen.getByText(/Regen Using AI/);
       await user.click(generateButton);
 
       expect(mockGenerate).toHaveBeenCalled();
@@ -299,7 +299,7 @@ describe("Editor", () => {
 
       render(<Editor />);
 
-      const generateButton = screen.getByText(/Regen fresh CLAUDE.md/);
+      const generateButton = screen.getByText(/Regen Using AI/);
       await user.click(generateButton);
 
       expect(screen.getByText(/Replace existing content/)).toBeInTheDocument();
@@ -324,7 +324,7 @@ describe("Editor", () => {
 
       render(<Editor />);
 
-      await user.click(screen.getByText(/Regen fresh CLAUDE.md/));
+      await user.click(screen.getByText(/Regen Using AI/));
       await user.click(screen.getByText(/Replace & Generate/));
 
       expect(mockGenerate).toHaveBeenCalled();
@@ -348,7 +348,7 @@ describe("Editor", () => {
 
       render(<Editor />);
 
-      await user.click(screen.getByText(/Regen fresh CLAUDE.md/));
+      await user.click(screen.getByText(/Regen Using AI/));
       await user.click(screen.getByText("Cancel"));
 
       expect(screen.queryByText(/Replace existing content/)).not.toBeInTheDocument();

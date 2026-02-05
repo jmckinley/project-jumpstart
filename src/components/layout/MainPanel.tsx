@@ -47,7 +47,7 @@
  * - @/hooks/useContextHealth - Context health and MCP monitoring actions
  * - @/hooks/useEnforcement - Enforcement hook/CI status and actions
  * - @/stores/projectStore - Active project for display name
- * - @/lib/tauri (getRecentActivities, startFileWatcher, stopFileWatcher) - Backend IPC
+ * - @/lib/tauri (getRecentActivities, startFileWatcher, stopFileWatcher, listTestPlans) - Backend IPC
  *
  * EXPORTS:
  * - MainPanel - Content area component
@@ -102,7 +102,7 @@ import { RefreshDocsButton } from "@/components/dashboard/RefreshDocsButton";
 import { SmartNextStep } from "@/components/dashboard/SmartNextStep";
 import { SessionInsights } from "@/components/dashboard/SessionInsights";
 import type { Activity } from "@/components/dashboard/RecentActivity";
-import { getRecentActivities, startFileWatcher, stopFileWatcher, getSetting, listSkills, listAgents, getHookStatus, readClaudeMd } from "@/lib/tauri";
+import { getRecentActivities, startFileWatcher, stopFileWatcher, getSetting, listSkills, listAgents, getHookStatus, readClaudeMd, listTestPlans } from "@/lib/tauri";
 import { Editor } from "@/components/claude-md/Editor";
 import { FileTree } from "@/components/modules/FileTree";
 import { DocStatus } from "@/components/modules/DocStatus";
@@ -252,8 +252,13 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
       // Check test framework (from project detection)
       setHasTestFramework(!!activeProject.testing);
 
-      // TODO: Check for test plans when we have that API
-      setHasTestPlan(false);
+      // Check for existing test plans
+      try {
+        const plans = await listTestPlans(activeProject.id);
+        setHasTestPlan(plans.length > 0);
+      } catch {
+        setHasTestPlan(false);
+      }
     };
 
     fetchSmartNextStepData();
