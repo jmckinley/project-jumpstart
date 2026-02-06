@@ -67,6 +67,107 @@ const mockProjects: Project[] = [
 ];
 
 describe("Sidebar", () => {
+  describe("Hooks Setup Section", () => {
+    it("should show Hooks Setup when showHooksSetup=true", () => {
+      render(
+        <Sidebar
+          showHooksSetup={true}
+          completion={{}}
+          activeSection="dashboard"
+          onNavigate={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText("Set Up Hooks")).toBeInTheDocument();
+    });
+
+    it("should hide Hooks Setup when showHooksSetup=false", () => {
+      render(
+        <Sidebar
+          showHooksSetup={false}
+          completion={{}}
+          activeSection="dashboard"
+          onNavigate={vi.fn()}
+        />
+      );
+
+      expect(screen.queryByText("Set Up Hooks")).not.toBeInTheDocument();
+    });
+
+    it("should navigate to 'hooks-setup' when clicked", async () => {
+      const mockNavigate = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <Sidebar
+          showHooksSetup={true}
+          completion={{}}
+          activeSection="dashboard"
+          onNavigate={mockNavigate}
+        />
+      );
+
+      await user.click(screen.getByText("Set Up Hooks"));
+
+      expect(mockNavigate).toHaveBeenCalledWith("hooks-setup");
+    });
+
+    it("should highlight Hooks Setup when activeSection='hooks-setup'", () => {
+      render(
+        <Sidebar
+          showHooksSetup={true}
+          completion={{}}
+          activeSection="hooks-setup"
+          onNavigate={vi.fn()}
+        />
+      );
+
+      const hooksButton = screen.getByText("Set Up Hooks").closest("button");
+      expect(hooksButton).toHaveClass("border-blue-500/50");
+      expect(hooksButton).toHaveClass("bg-blue-600/20");
+    });
+
+    it("should show 'New' badge styling", () => {
+      render(
+        <Sidebar
+          showHooksSetup={true}
+          completion={{}}
+          activeSection="dashboard"
+          onNavigate={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText("New")).toBeInTheDocument();
+    });
+
+    it("should not highlight when not active", () => {
+      render(
+        <Sidebar
+          showHooksSetup={true}
+          completion={{}}
+          activeSection="dashboard"
+          onNavigate={vi.fn()}
+        />
+      );
+
+      const hooksButton = screen.getByText("Set Up Hooks").closest("button");
+      expect(hooksButton).not.toHaveClass("bg-blue-600/20");
+      expect(hooksButton).toHaveClass("border-blue-500/30");
+    });
+
+    it("should hide Hooks Setup by default", () => {
+      render(
+        <Sidebar
+          completion={{}}
+          activeSection="dashboard"
+          onNavigate={vi.fn()}
+        />
+      );
+
+      expect(screen.queryByText("Set Up Hooks")).not.toBeInTheDocument();
+    });
+  });
+
   describe("Kickstart Section", () => {
     it("should show Kickstart when isEmptyProject=true and no CLAUDE.md", () => {
       render(

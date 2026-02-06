@@ -173,12 +173,16 @@ export async function setupTauriMocks(page: Page, options: {
   hasClaudeMd?: boolean;
   isEmptyProject?: boolean;
   projectId?: string;
+  hasTestFramework?: boolean;
+  hasClaudeCodeHooks?: boolean;
 } = {}) {
   const {
     hasApiKey = true,
     hasClaudeMd = true,
     isEmptyProject = false,
     projectId = "test-project-1",
+    hasTestFramework = true,
+    hasClaudeCodeHooks = false,
   } = options;
 
   // Use route interception to inject mocks before any scripts load
@@ -186,7 +190,7 @@ export async function setupTauriMocks(page: Page, options: {
     await route.continue();
   });
 
-  await page.addInitScript(({ hasApiKey, hasClaudeMd, isEmptyProject, projectId, mocks }) => {
+  await page.addInitScript(({ hasApiKey, hasClaudeMd, isEmptyProject, projectId, hasTestFramework, hasClaudeCodeHooks, mocks }) => {
     // Store settings in memory - always include has_seen_welcome to bypass first-run
     const settingsStore: Record<string, string> = {
       ...mocks.settings,
@@ -205,10 +209,18 @@ export async function setupTauriMocks(page: Page, options: {
 
       switch (cmd) {
         case "list_projects":
-          return mocks.projects;
+          // Adjust testing field based on hasTestFramework option
+          return mocks.projects.map((p: { id: string; testing: string | null }) => ({
+            ...p,
+            testing: hasTestFramework ? (p.testing || "vitest") : null,
+          }));
 
         case "get_project":
-          return mocks.projects.find((p: { id: string }) => p.id === args?.id) || mocks.projects[0];
+          const project = mocks.projects.find((p: { id: string }) => p.id === args?.id) || mocks.projects[0];
+          return {
+            ...project,
+            testing: hasTestFramework ? (project.testing || "vitest") : null,
+          };
 
         case "get_health_score":
           return mocks.healthScore;
@@ -291,7 +303,36 @@ export async function setupTauriMocks(page: Page, options: {
           return [];
 
         case "detect_project_test_framework":
-          return null;
+          if (!hasTestFramework) {
+            return null;
+          }
+          return {
+            name: "vitest",
+            command: "pnpm vitest run",
+            configFile: "vitest.config.ts",
+            coverageCommand: "pnpm vitest run --coverage",
+          };
+
+        case "check_hooks_configured":
+          return hasClaudeCodeHooks;
+
+        case "generate_hooks_config":
+          return JSON.stringify({
+            hooks: [{
+              event: "PostToolUse",
+              filter: { toolName: { oneOf: ["Edit", "Write"] } },
+              command: args?.testCommand || "pnpm vitest run",
+            }]
+          }, null, 2);
+
+        case "log_activity":
+          return {
+            id: `act-${Date.now()}`,
+            projectId: args?.projectId,
+            activityType: args?.activityType,
+            message: args?.message,
+            createdAt: new Date().toISOString(),
+          };
 
         default:
           console.warn(`[Mock] Unhandled command: ${cmd}`);
@@ -340,6 +381,8 @@ export async function setupTauriMocks(page: Page, options: {
     hasClaudeMd,
     isEmptyProject,
     projectId,
+    hasTestFramework,
+    hasClaudeCodeHooks,
     mocks: {
       projects: mockProjects,
       healthScore: mockHealthScore,

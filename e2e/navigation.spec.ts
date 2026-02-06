@@ -106,3 +106,52 @@ test.describe("Project Selector", () => {
     }
   });
 });
+
+test.describe("Hooks Setup Navigation", () => {
+  test("shows Set Up Hooks in sidebar when conditions met", async ({ page }) => {
+    await setupTauriMocks(page, {
+      hasApiKey: true,
+      hasClaudeMd: true,
+      hasTestFramework: true,
+      hasClaudeCodeHooks: false,
+    });
+    await page.goto("/");
+    await page.waitForSelector("text=Project Overview", { timeout: 10000 });
+
+    // Should show Set Up Hooks in sidebar
+    await expect(page.locator("aside").getByText("Set Up Hooks")).toBeVisible();
+    await expect(page.locator("aside").getByText("New")).toBeVisible(); // New badge
+  });
+
+  test("navigating to hooks-setup displays HooksSetupView", async ({ page }) => {
+    await setupTauriMocks(page, {
+      hasApiKey: true,
+      hasClaudeMd: true,
+      hasTestFramework: true,
+      hasClaudeCodeHooks: false,
+    });
+    await page.goto("/");
+    await page.waitForSelector("text=Project Overview", { timeout: 10000 });
+
+    // Click Set Up Hooks in sidebar
+    await page.locator("aside").getByText("Set Up Hooks").click();
+
+    // Should show hooks setup view in main area
+    await expect(page.locator("main").getByRole("heading", { name: "Claude Code Hooks" })).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("main").getByText("Auto-run tests on every file change")).toBeVisible();
+  });
+
+  test("hooks section hidden when hooks already configured", async ({ page }) => {
+    await setupTauriMocks(page, {
+      hasApiKey: true,
+      hasClaudeMd: true,
+      hasTestFramework: true,
+      hasClaudeCodeHooks: true, // Already configured
+    });
+    await page.goto("/");
+    await page.waitForSelector("text=Project Overview", { timeout: 10000 });
+
+    // Should NOT show Set Up Hooks in sidebar
+    await expect(page.locator("aside").getByText("Set Up Hooks")).not.toBeVisible();
+  });
+});

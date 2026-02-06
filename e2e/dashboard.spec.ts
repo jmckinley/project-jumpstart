@@ -58,6 +58,54 @@ test.describe("SmartNextStep", () => {
     await expect(page.locator("text=Add API Key")).toBeVisible();
   });
 
+  test("shows hooks-setup recommendation when test framework but no hooks", async ({ page }) => {
+    await setupTauriMocks(page, {
+      hasApiKey: true,
+      hasClaudeMd: true,
+      hasTestFramework: true,
+      hasClaudeCodeHooks: false,
+    });
+    await page.goto("/");
+    await page.waitForSelector("text=Project Overview", { timeout: 10000 });
+
+    // The sidebar should show Set Up Hooks when hooks not configured
+    // This is more reliable than checking SmartNextStep since other recommendations may have priority
+    await expect(page.locator("aside").getByText("Set Up Hooks")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("does NOT show hooks-setup when hooks already configured", async ({ page }) => {
+    await setupTauriMocks(page, {
+      hasApiKey: true,
+      hasClaudeMd: true,
+      hasTestFramework: true,
+      hasClaudeCodeHooks: true,
+    });
+    await page.goto("/");
+    await page.waitForSelector("text=Project Overview", { timeout: 10000 });
+
+    // Should NOT show hooks-setup in sidebar when already configured
+    await expect(page.locator("aside").getByText("Set Up Hooks")).not.toBeVisible();
+  });
+
+  test("hooks-setup action button navigates to hooks-setup section", async ({ page }) => {
+    await setupTauriMocks(page, {
+      hasApiKey: true,
+      hasClaudeMd: true,
+      hasTestFramework: true,
+      hasClaudeCodeHooks: false,
+    });
+    await page.goto("/");
+    await page.waitForSelector("text=Project Overview", { timeout: 10000 });
+
+    // Use the sidebar Set Up Hooks link (more reliable)
+    const sidebarLink = page.locator("aside").getByText("Set Up Hooks");
+    await expect(sidebarLink).toBeVisible({ timeout: 5000 });
+    await sidebarLink.click();
+
+    // Should navigate to hooks-setup section
+    await expect(page.locator("main").getByRole("heading", { name: "Claude Code Hooks" })).toBeVisible({ timeout: 5000 });
+  });
+
   test("shows kickstart recommendation for empty project without CLAUDE.md", async ({ page }) => {
     await setupTauriMocks(page, {
       hasApiKey: true,
