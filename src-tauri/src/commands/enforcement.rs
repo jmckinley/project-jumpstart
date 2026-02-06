@@ -80,16 +80,33 @@ fn export_api_key_for_hook(db: &rusqlite::Connection) -> Result<(), String> {
     let json = serde_json::json!({
         "anthropic_api_key": api_key
     });
-    std::fs::write(&settings_path, serde_json::to_string_pretty(&json).unwrap())
-        .map_err(|e| format!("Failed to write settings.json: {}", e))?;
+    let json_bytes = serde_json::to_string_pretty(&json)
+        .map_err(|e| format!("Failed to serialize settings: {}", e))?;
 
-    // Set restrictive permissions (owner read/write only)
+    // Write file with restrictive permissions from the start (no race condition)
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        let perms = std::fs::Permissions::from_mode(0o600);
-        std::fs::set_permissions(&settings_path, perms)
-            .map_err(|e| format!("Failed to set permissions on settings.json: {}", e))?;
+        use std::fs::OpenOptions;
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .mode(0o600) // Owner read/write only - set at creation time
+            .open(&settings_path)
+            .map_err(|e| format!("Failed to create settings.json: {}", e))?;
+
+        file.write_all(json_bytes.as_bytes())
+            .map_err(|e| format!("Failed to write settings.json: {}", e))?;
+    }
+
+    #[cfg(not(unix))]
+    {
+        // On Windows, just write normally (no mode support)
+        std::fs::write(&settings_path, json_bytes)
+            .map_err(|e| format!("Failed to write settings.json: {}", e))?;
     }
 
     Ok(())
@@ -512,9 +529,26 @@ fn generate_auto_update_hook_script() -> String {
 
 set -e
 
+# Prevent API key from appearing in debug output
+set +x
+
 EXTENSIONS="ts tsx js jsx rs py go"
-MISSING_FILES=""
 SETTINGS_FILE="$HOME/.project-jumpstart/settings.json"
+
+# Cleanup function for temp files
+cleanup() {
+    if [ -n "$TEMP_FILE" ] && [ -f "$TEMP_FILE" ]; then
+        rm -f "$TEMP_FILE"
+    fi
+}
+trap cleanup EXIT
+
+# Check for jq (required for safe JSON parsing)
+if ! command -v jq >/dev/null 2>&1; then
+    echo "ERROR: jq is required for auto-update mode but not installed."
+    echo "Install with: brew install jq (macOS) or apt install jq (Linux)"
+    exit 1
+fi
 
 # Check if settings file exists
 if [ ! -f "$SETTINGS_FILE" ]; then
@@ -523,82 +557,153 @@ if [ ! -f "$SETTINGS_FILE" ]; then
     exit 1
 fi
 
-# Extract API key (handles JSON with or without spaces)
-API_KEY=$(grep -o '"anthropic_api_key"[[:space:]]*:[[:space:]]*"[^"]*"' "$SETTINGS_FILE" 2>/dev/null | sed 's/.*:.*"\([^"]*\)".*/\1/')
+# Extract API key safely using jq
+API_KEY=$(jq -r '.anthropic_api_key // empty' "$SETTINGS_FILE" 2>/dev/null)
 if [ -z "$API_KEY" ]; then
     echo "ERROR: No API key found in Project Jumpstart settings."
     echo "Please configure your Anthropic API key in Project Jumpstart."
     exit 1
 fi
 
-# Find files missing documentation
-for file in $(git diff --cached --name-only --diff-filter=ACM); do
+# Validate API key format (basic check)
+case "$API_KEY" in
+    sk-ant-*)
+        # Valid Anthropic API key format
+        ;;
+    *)
+        echo "ERROR: Invalid API key format in settings."
+        exit 1
+        ;;
+esac
+
+# Find files missing documentation (handle spaces in filenames)
+MISSING_FILES=""
+git diff --cached --name-only --diff-filter=ACM -z | while IFS= read -r -d '' file; do
     ext="${file##*.}"
     case " $EXTENSIONS " in
         *" $ext "*)
             if ! head -30 "$file" 2>/dev/null | grep -q "@module\|@description\|//! @module"; then
-                MISSING_FILES="$MISSING_FILES $file"
+                printf '%s\0' "$file" >> "$HOME/.project-jumpstart/.missing_files_$$"
             fi
             ;;
     esac
 done
 
-# If no missing files, exit successfully
-if [ -z "$MISSING_FILES" ]; then
+# Read missing files list (if any)
+MISSING_LIST="$HOME/.project-jumpstart/.missing_files_$$"
+if [ ! -f "$MISSING_LIST" ] || [ ! -s "$MISSING_LIST" ]; then
+    rm -f "$MISSING_LIST" 2>/dev/null
     exit 0
 fi
 
 echo "Auto-generating documentation for files with missing headers..."
 
-for file in $MISSING_FILES; do
+# Track if any files were processed
+FILES_PROCESSED=0
+
+while IFS= read -r -d '' file; do
     echo "  Generating docs for: $file"
 
-    # Read file content
-    CONTENT=$(cat "$file")
+    # Read file content (escape for JSON)
+    CONTENT=$(cat "$file" | jq -Rs .)
     FILENAME=$(basename "$file")
     EXT="${file##*.}"
 
-    # Determine comment style
-    if [ "$EXT" = "rs" ]; then
-        COMMENT_STYLE="rust"
-    else
-        COMMENT_STYLE="typescript"
-    fi
+    # Determine comment style based on extension
+    case "$EXT" in
+        rs)
+            COMMENT_STYLE="rust (//! doc comments)"
+            ;;
+        py)
+            COMMENT_STYLE="python (triple-quote docstrings)"
+            ;;
+        go)
+            COMMENT_STYLE="go (// comments)"
+            ;;
+        *)
+            COMMENT_STYLE="typescript/javascript (/** JSDoc */)"
+            ;;
+    esac
 
-    # Call Anthropic API to generate documentation header
-    DOC_HEADER=$(curl -s https://api.anthropic.com/v1/messages \
+    # Build JSON payload safely
+    PAYLOAD=$(jq -n \
+        --arg model "claude-sonnet-4-20250514" \
+        --arg content "Generate ONLY a documentation header for this $EXT file named $FILENAME. Use $COMMENT_STYLE style comments. Include @module, @description, PURPOSE, EXPORTS, and CLAUDE NOTES sections. Output ONLY the comment block, nothing else:\n\n$(cat "$file")" \
+        '{
+            model: $model,
+            max_tokens: 1024,
+            messages: [{role: "user", content: $content}]
+        }')
+
+    # Call Anthropic API with timeout
+    RESPONSE=$(curl -s --max-time 30 https://api.anthropic.com/v1/messages \
         -H "Content-Type: application/json" \
         -H "x-api-key: $API_KEY" \
         -H "anthropic-version: 2023-06-01" \
-        -d "{
-            \"model\": \"claude-sonnet-4-20250514\",
-            \"max_tokens\": 1024,
-            \"messages\": [{
-                \"role\": \"user\",
-                \"content\": \"Generate ONLY a documentation header for this $EXT file named $FILENAME. Use $COMMENT_STYLE style comments. Include @module, @description, PURPOSE, EXPORTS, and CLAUDE NOTES sections. Output ONLY the comment block, nothing else:\\n\\n$CONTENT\"
-            }]
-        }" 2>/dev/null | grep -o '"text":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\\n/\n/g')
+        -d "$PAYLOAD" 2>/dev/null) || {
+        echo "    ✗ API request failed (network error or timeout)"
+        rm -f "$MISSING_LIST"
+        exit 1
+    }
 
-    if [ -n "$DOC_HEADER" ]; then
-        # Prepend documentation to file
-        TEMP_FILE=$(mktemp)
-        echo "$DOC_HEADER" > "$TEMP_FILE"
-        echo "" >> "$TEMP_FILE"
-        cat "$file" >> "$TEMP_FILE"
-        mv "$TEMP_FILE" "$file"
+    # Check for API errors
+    API_ERROR=$(echo "$RESPONSE" | jq -r '.error.message // empty' 2>/dev/null)
+    if [ -n "$API_ERROR" ]; then
+        echo "    ✗ API error: $API_ERROR"
+        rm -f "$MISSING_LIST"
+        exit 1
+    fi
+
+    # Extract documentation header safely using jq
+    DOC_HEADER=$(echo "$RESPONSE" | jq -r '.content[0].text // empty' 2>/dev/null)
+
+    if [ -n "$DOC_HEADER" ] && [ "$DOC_HEADER" != "null" ]; then
+        # Create temp file in same directory as target (same filesystem for atomic mv)
+        TEMP_FILE=$(mktemp "$(dirname "$file")/.doc_gen_XXXXXX") || {
+            echo "    ✗ Failed to create temp file"
+            rm -f "$MISSING_LIST"
+            exit 1
+        }
+
+        # Write new content (printf preserves formatting better than echo)
+        printf '%s\n\n' "$DOC_HEADER" > "$TEMP_FILE" || {
+            echo "    ✗ Failed to write documentation"
+            rm -f "$TEMP_FILE" "$MISSING_LIST"
+            exit 1
+        }
+        cat "$file" >> "$TEMP_FILE" || {
+            echo "    ✗ Failed to append original content"
+            rm -f "$TEMP_FILE" "$MISSING_LIST"
+            exit 1
+        }
+
+        # Atomic move (same filesystem)
+        mv "$TEMP_FILE" "$file" || {
+            echo "    ✗ Failed to update file"
+            rm -f "$TEMP_FILE" "$MISSING_LIST"
+            exit 1
+        }
+        TEMP_FILE=""  # Clear so cleanup doesn't try to remove
 
         # Re-stage the file
         git add "$file"
         echo "    ✓ Documentation added and staged"
+        FILES_PROCESSED=$((FILES_PROCESSED + 1))
     else
-        echo "    ✗ Failed to generate documentation (API error)"
+        echo "    ✗ Failed to generate documentation (empty response)"
+        rm -f "$MISSING_LIST"
         exit 1
     fi
-done
+done < "$MISSING_LIST"
 
-echo ""
-echo "Documentation auto-generated for $(echo $MISSING_FILES | wc -w | tr -d ' ') file(s)."
-echo "Changes have been staged. Proceeding with commit..."
+# Cleanup
+rm -f "$MISSING_LIST"
+
+if [ "$FILES_PROCESSED" -gt 0 ]; then
+    echo ""
+    echo "Documentation auto-generated for $FILES_PROCESSED file(s)."
+    echo "Changes have been staged. Proceeding with commit..."
+fi
 
 exit 0
 "#.to_string()

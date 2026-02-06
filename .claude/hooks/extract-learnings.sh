@@ -45,7 +45,8 @@ fi
 if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
     SETTINGS_FILE="$HOME/.project-jumpstart/settings.json"
     if [[ -f "$SETTINGS_FILE" ]]; then
-        ANTHROPIC_API_KEY=$(jq -r '.apiKey // empty' "$SETTINGS_FILE" 2>/dev/null || true)
+        # Use correct key name: anthropic_api_key
+        ANTHROPIC_API_KEY=$(jq -r '.anthropic_api_key // empty' "$SETTINGS_FILE" 2>/dev/null || true)
     fi
 fi
 
@@ -104,8 +105,8 @@ Example output:
 - [Pattern] Always run tests after modifying Rust files
 - [Gotcha] The legacy API endpoint /v1/users is deprecated, use /v2/users"
 
-# Call Claude API to extract learnings
-RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
+# Call Claude API to extract learnings (with 30s timeout)
+RESPONSE=$(curl -s --max-time 30 https://api.anthropic.com/v1/messages \
     -H "Content-Type: application/json" \
     -H "x-api-key: $ANTHROPIC_API_KEY" \
     -H "anthropic-version: 2023-06-01" \
