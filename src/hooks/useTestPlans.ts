@@ -21,12 +21,14 @@
  * - Test plans are scoped to the active project
  * - Call runTests() to execute tests for a plan
  * - Call generateSuggestions() for AI-powered test recommendations
+ * - Call refreshFramework() after user installs a new test framework
  *
  * CLAUDE NOTES:
  * - loadTestPlans fetches plans scoped to the active project
  * - selectPlan loads full summary with cases, runs, and coverage
  * - After CRUD operations, lists are refreshed automatically
  * - Test execution may take time; loading state tracks this
+ * - refreshFramework re-detects framework without reloading plans
  */
 
 import { useCallback, useState } from "react";
@@ -376,6 +378,21 @@ export function useTestPlans() {
     setState((s) => ({ ...s, error: null }));
   }, []);
 
+  // Refresh framework detection (after user installs a framework)
+  const refreshFramework = useCallback(async () => {
+    if (!activeProject) return;
+
+    try {
+      const framework = await detectProjectTestFramework(activeProject.path);
+      setState((s) => ({ ...s, framework, error: null }));
+    } catch (err) {
+      setState((s) => ({
+        ...s,
+        error: err instanceof Error ? err.message : "Failed to detect framework",
+      }));
+    }
+  }, [activeProject]);
+
   return {
     ...state,
     loadTestPlans,
@@ -392,5 +409,6 @@ export function useTestPlans() {
     acceptSuggestion,
     dismissSuggestion,
     clearError,
+    refreshFramework,
   };
 }

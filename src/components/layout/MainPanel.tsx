@@ -1135,6 +1135,7 @@ function TestPlansView() {
     generateSuggestions,
     acceptSuggestion,
     clearError: clearTestPlansError,
+    refreshFramework,
   } = useTestPlans();
 
   const {
@@ -1464,6 +1465,7 @@ function TestPlansView() {
                         framework={framework}
                         isRunning={running}
                         onRunTests={handleRunTests}
+                        onRefreshFramework={refreshFramework}
                       />
                     </>
                   )}

@@ -7,10 +7,12 @@
  * - Display pass/fail counts as they update
  * - Show test output with color-coded results
  * - Provide controls to run with/without coverage
+ * - Show FrameworkInstaller when no framework detected
  *
  * DEPENDENCIES:
  * - react - Component rendering
  * - @/types/test-plan - TestRun, TestFrameworkInfo types
+ * - ./FrameworkInstaller - One-click framework installation
  *
  * EXPORTS:
  * - TestRunProgress - Test execution progress component
@@ -19,20 +21,24 @@
  * - Shows spinner while running
  * - Displays summary after completion
  * - Output is scrollable with auto-scroll to bottom
+ * - Shows FrameworkInstaller with one-click install when no framework detected
  *
  * CLAUDE NOTES:
  * - Running = blue spinner
  * - Passed = green summary
  * - Failed = red summary with failure count
+ * - onRefreshFramework callback re-detects framework after installation
  */
 
 import type { TestRun, TestFrameworkInfo } from "@/types/test-plan";
+import { FrameworkInstaller } from "./FrameworkInstaller";
 
 interface TestRunProgressProps {
   run: TestRun | null;
   framework: TestFrameworkInfo | null;
   isRunning: boolean;
   onRunTests: (withCoverage: boolean) => void;
+  onRefreshFramework?: () => void;
 }
 
 export function TestRunProgress({
@@ -40,6 +46,7 @@ export function TestRunProgress({
   framework,
   isRunning,
   onRunTests,
+  onRefreshFramework,
 }: TestRunProgressProps) {
   return (
     <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
@@ -96,11 +103,18 @@ export function TestRunProgress({
         </div>
       </div>
 
-      {/* No framework warning */}
+      {/* No framework - show installer */}
       {!framework && (
-        <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-400">
-          No test framework detected. Make sure your project has a test framework
-          installed (e.g., Vitest, Jest, Playwright).
+        <div className="space-y-4">
+          <FrameworkInstaller />
+          {onRefreshFramework && (
+            <button
+              onClick={onRefreshFramework}
+              className="w-full rounded-md border border-neutral-600 px-4 py-2 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:bg-neutral-800"
+            >
+              Refresh Framework Detection
+            </button>
+          )}
         </div>
       )}
 

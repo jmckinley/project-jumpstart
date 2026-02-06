@@ -20,6 +20,7 @@
  * - TDDPhaseCard - Individual TDD phase card
  * - SubagentGenerator - Generate subagent configurations
  * - HooksGenerator - Generate PostToolUse hooks
+ * - FrameworkInstaller - One-click test framework installation
  *
  * PATTERNS:
  * - Import from '@/components/test-plans' for all components
@@ -43,3 +44,4 @@ export { TDDWorkflow } from "./TDDWorkflow";
 export { TDDPhaseCard } from "./TDDPhaseCard";
 export { SubagentGenerator } from "./SubagentGenerator";
 export { HooksGenerator } from "./HooksGenerator";
+export { FrameworkInstaller } from "./FrameworkInstaller";
