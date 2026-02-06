@@ -51,7 +51,7 @@ use crate::models::enforcement::{CiSnippet, EnforcementEvent, HookStatus};
 /// - MAJOR: Breaking changes (requires jq, different behavior)
 /// - MINOR: New features (backward compatible)
 /// - PATCH: Bug fixes
-pub const HOOK_VERSION: &str = "2.0.0";
+pub const HOOK_VERSION: &str = "2.1.0";
 
 /// Parse version from hook script content
 fn parse_hook_version(content: &str) -> Option<String> {
@@ -696,7 +696,7 @@ while IFS= read -r -d '' file; do
 
     # Build JSON payload safely
     PAYLOAD=$(jq -n \
-        --arg model "claude-sonnet-4-20250514" \
+        --arg model "claude-sonnet-4-5-20250929" \
         --arg content "Generate ONLY a documentation header for this $EXT file named $FILENAME. Use $COMMENT_STYLE style comments. Include @module, @description, PURPOSE, EXPORTS, and CLAUDE NOTES sections. Output ONLY the comment block, nothing else:\n\n$(cat "$file")" \
         '{
             model: $model,

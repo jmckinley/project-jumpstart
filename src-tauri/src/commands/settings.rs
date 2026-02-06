@@ -165,7 +165,7 @@ pub async fn validate_api_key(
     // Make a minimal API call to verify the key works
     // We use a very short max_tokens to minimize cost
     let body = serde_json::json!({
-        "model": "claude-sonnet-4-20250514",
+        "model": "claude-sonnet-4-5-20250929",
         "max_tokens": 1,
         "messages": [
             {

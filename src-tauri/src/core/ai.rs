@@ -18,7 +18,7 @@
 //! PATTERNS:
 //! - call_claude is async and returns Result<String, String>
 //! - API key is stored as "anthropic_api_key" in the settings table
-//! - Model used: claude-sonnet-4-20250514
+//! - Model used: claude-sonnet-4-5-20250929
 //! - Errors are mapped to descriptive strings for IPC
 //!
 //! CLAUDE NOTES:
@@ -30,7 +30,7 @@
 use rusqlite::Connection;
 use serde_json::json;
 
-const MODEL: &str = "claude-sonnet-4-20250514";
+const MODEL: &str = "claude-sonnet-4-5-20250929";
 const API_URL: &str = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
 
@@ -122,7 +122,7 @@ mod tests {
                     "text": "Hello, world!"
                 }
             ],
-            "model": "claude-sonnet-4-20250514",
+            "model": "claude-sonnet-4-5-20250929",
             "stop_reason": "end_turn"
         }"#;
 
