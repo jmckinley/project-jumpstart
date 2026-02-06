@@ -438,4 +438,653 @@ describe("useRalph", () => {
       expect(success).toBe(false);
     });
   });
+
+  describe("loadLoops", () => {
+    const mockLoops = [
+      {
+        id: "loop-1",
+        projectId: "test-project-id",
+        prompt: "Fix the bug",
+        enhancedPrompt: null,
+        qualityScore: 75,
+        status: "completed" as const,
+        mode: "iterative" as const,
+        iterations: 3,
+        outcome: "Success",
+        createdAt: "2024-01-15T10:00:00Z",
+        completedAt: "2024-01-15T10:30:00Z",
+      },
+    ];
+
+    it("should load loops and update state", async () => {
+      vi.mocked(invoke).mockResolvedValue(mockLoops);
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.loadLoops();
+      });
+
+      expect(result.current.loops).toEqual(mockLoops);
+      expect(result.current.loading).toBe(false);
+    });
+
+    it("should call list_ralph_loops with project id", async () => {
+      vi.mocked(invoke).mockResolvedValue(mockLoops);
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.loadLoops();
+      });
+
+      expect(invoke).toHaveBeenCalledWith("list_ralph_loops", {
+        projectId: mockProject.id,
+      });
+    });
+
+    it("should set loading to true during fetch", async () => {
+      let resolvePromise: (value: unknown) => void;
+      vi.mocked(invoke).mockImplementation(
+        () => new Promise((resolve) => { resolvePromise = resolve; })
+      );
+
+      const { result } = renderHook(() => useRalph());
+
+      act(() => {
+        result.current.loadLoops();
+      });
+
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => {
+        resolvePromise!(mockLoops);
+      });
+
+      expect(result.current.loading).toBe(false);
+    });
+
+    it("should set error on failure", async () => {
+      vi.mocked(invoke).mockRejectedValue(new Error("Network error"));
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.loadLoops();
+      });
+
+      expect(result.current.error).toBe("Network error");
+      expect(result.current.loading).toBe(false);
+    });
+
+    it("should not fetch when no project selected", async () => {
+      vi.mocked(useProjectStore).mockImplementation((selector) =>
+        selector({ activeProject: null } as ReturnType<typeof useProjectStore.getState>)
+      );
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.loadLoops();
+      });
+
+      expect(invoke).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("loadMistakes", () => {
+    const mockMistakes: RalphMistake[] = [
+      {
+        id: "mistake-1",
+        projectId: "test-project-id",
+        loopId: "loop-1",
+        mistakeType: "implementation",
+        description: "Forgot null check",
+        context: null,
+        resolution: "Added null check",
+        learnedPattern: null,
+        createdAt: "2024-01-15T10:00:00Z",
+      },
+    ];
+
+    it("should load mistakes and update state", async () => {
+      vi.mocked(invoke).mockResolvedValue(mockMistakes);
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.loadMistakes();
+      });
+
+      expect(result.current.mistakes).toEqual(mockMistakes);
+    });
+
+    it("should call list_ralph_mistakes with project id", async () => {
+      vi.mocked(invoke).mockResolvedValue(mockMistakes);
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.loadMistakes();
+      });
+
+      expect(invoke).toHaveBeenCalledWith("list_ralph_mistakes", {
+        projectId: mockProject.id,
+      });
+    });
+
+    it("should not crash on error (non-critical)", async () => {
+      vi.mocked(invoke).mockRejectedValue(new Error("DB error"));
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.loadMistakes();
+      });
+
+      // Should not set error state for non-critical mistakes loading
+      expect(result.current.error).toBeNull();
+      consoleSpy.mockRestore();
+    });
+
+    it("should not fetch when no project selected", async () => {
+      vi.mocked(useProjectStore).mockImplementation((selector) =>
+        selector({ activeProject: null } as ReturnType<typeof useProjectStore.getState>)
+      );
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.loadMistakes();
+      });
+
+      expect(invoke).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("analyzePrompt", () => {
+    const mockAnalysis = {
+      qualityScore: 85,
+      issues: [],
+      suggestions: ["Add more context"],
+      enhancedPrompt: "Enhanced version of the prompt",
+    };
+
+    it("should analyze prompt with heuristics (no AI)", async () => {
+      vi.mocked(invoke).mockResolvedValue(mockAnalysis);
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.analyzePrompt("Fix the bug in user.ts");
+      });
+
+      expect(result.current.analysis).toEqual(mockAnalysis);
+      expect(invoke).toHaveBeenCalledWith("analyze_ralph_prompt", {
+        prompt: "Fix the bug in user.ts",
+      });
+    });
+
+    it("should set analyzing to true during analysis", async () => {
+      let resolvePromise: (value: unknown) => void;
+      vi.mocked(invoke).mockImplementation(
+        () => new Promise((resolve) => { resolvePromise = resolve; })
+      );
+
+      const { result } = renderHook(() => useRalph());
+
+      act(() => {
+        result.current.analyzePrompt("Test prompt");
+      });
+
+      expect(result.current.analyzing).toBe(true);
+
+      await act(async () => {
+        resolvePromise!(mockAnalysis);
+      });
+
+      expect(result.current.analyzing).toBe(false);
+    });
+
+    it("should use AI analysis when useAi=true and API key available", async () => {
+      vi.mocked(useSettingsStore).mockImplementation((selector) =>
+        selector({ hasApiKey: true } as ReturnType<typeof useSettingsStore.getState>)
+      );
+      vi.mocked(invoke)
+        .mockResolvedValueOnce([{ path: "src/test.ts" }]) // scanModules
+        .mockResolvedValueOnce(mockAnalysis); // analyzeRalphPromptWithAi
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.analyzePrompt("Fix the bug", true);
+      });
+
+      // Verify AI analysis was called (second call after scanModules)
+      expect(invoke).toHaveBeenCalledWith("analyze_ralph_prompt_with_ai", {
+        prompt: "Fix the bug",
+        projectName: mockProject.name,
+        projectLanguage: mockProject.language,
+        projectFramework: mockProject.framework,
+        projectFiles: ["src/test.ts"],
+      });
+    });
+
+    it("should fall back to heuristic when AI unavailable", async () => {
+      vi.mocked(useSettingsStore).mockImplementation((selector) =>
+        selector({ hasApiKey: false } as ReturnType<typeof useSettingsStore.getState>)
+      );
+      vi.mocked(invoke).mockResolvedValue(mockAnalysis);
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.analyzePrompt("Fix the bug", true); // useAi=true but no key
+      });
+
+      expect(invoke).toHaveBeenCalledWith("analyze_ralph_prompt", {
+        prompt: "Fix the bug",
+      });
+    });
+
+    it("should return the analysis result", async () => {
+      vi.mocked(invoke).mockResolvedValue(mockAnalysis);
+
+      const { result } = renderHook(() => useRalph());
+
+      let analysis;
+      await act(async () => {
+        analysis = await result.current.analyzePrompt("Test prompt");
+      });
+
+      expect(analysis).toEqual(mockAnalysis);
+    });
+
+    it("should set error on failure", async () => {
+      vi.mocked(invoke).mockRejectedValue(new Error("Analysis failed"));
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.analyzePrompt("Test prompt");
+      });
+
+      expect(result.current.error).toBe("Analysis failed");
+      expect(result.current.analyzing).toBe(false);
+    });
+
+    it("should return null on failure", async () => {
+      vi.mocked(invoke).mockRejectedValue(new Error("Analysis failed"));
+
+      const { result } = renderHook(() => useRalph());
+
+      let analysis;
+      await act(async () => {
+        analysis = await result.current.analyzePrompt("Test prompt");
+      });
+
+      expect(analysis).toBeNull();
+    });
+  });
+
+  describe("startLoop", () => {
+    const mockLoop = {
+      id: "loop-new",
+      projectId: "test-project-id",
+      prompt: "Fix the bug",
+      enhancedPrompt: null,
+      qualityScore: 0,
+      status: "running" as const,
+      mode: "iterative" as const,
+      iterations: 0,
+      outcome: null,
+      createdAt: "2024-01-16T10:00:00Z",
+      completedAt: null,
+    };
+
+    it("should start a loop and add to state", async () => {
+      vi.mocked(invoke).mockResolvedValue(mockLoop);
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.startLoop("Fix the bug");
+      });
+
+      expect(result.current.loops).toContainEqual(mockLoop);
+    });
+
+    it("should call start_ralph_loop with prompt and analysis data", async () => {
+      vi.mocked(invoke).mockResolvedValue(mockLoop);
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.startLoop("Fix the bug");
+      });
+
+      expect(invoke).toHaveBeenCalledWith("start_ralph_loop", {
+        projectId: mockProject.id,
+        prompt: "Fix the bug",
+        enhancedPrompt: null,
+        qualityScore: 0,
+      });
+    });
+
+    it("should set loading during start", async () => {
+      let resolvePromise: (value: unknown) => void;
+      vi.mocked(invoke).mockImplementation(
+        () => new Promise((resolve) => { resolvePromise = resolve; })
+      );
+
+      const { result } = renderHook(() => useRalph());
+
+      act(() => {
+        result.current.startLoop("Test");
+      });
+
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => {
+        resolvePromise!(mockLoop);
+      });
+
+      expect(result.current.loading).toBe(false);
+    });
+
+    it("should set error on failure", async () => {
+      vi.mocked(invoke).mockRejectedValue(new Error("Start failed"));
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.startLoop("Test");
+      });
+
+      expect(result.current.error).toBe("Start failed");
+    });
+
+    it("should not start when no project selected", async () => {
+      vi.mocked(useProjectStore).mockImplementation((selector) =>
+        selector({ activeProject: null } as ReturnType<typeof useProjectStore.getState>)
+      );
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.startLoop("Test");
+      });
+
+      expect(invoke).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("startLoopPrd", () => {
+    const mockPrdLoop = {
+      id: "loop-prd",
+      projectId: "test-project-id",
+      prompt: "PRD: My Feature",
+      enhancedPrompt: null,
+      qualityScore: 0,
+      status: "running" as const,
+      mode: "prd" as const,
+      iterations: 0,
+      outcome: null,
+      createdAt: "2024-01-16T10:00:00Z",
+      completedAt: null,
+    };
+
+    it("should start a PRD loop", async () => {
+      vi.mocked(invoke).mockResolvedValue(mockPrdLoop);
+
+      const { result } = renderHook(() => useRalph());
+      const prdJson = JSON.stringify({ name: "Feature", stories: [] });
+
+      await act(async () => {
+        await result.current.startLoopPrd(prdJson);
+      });
+
+      expect(result.current.loops).toContainEqual(mockPrdLoop);
+    });
+
+    it("should call start_ralph_loop_prd with PRD JSON", async () => {
+      vi.mocked(invoke).mockResolvedValue(mockPrdLoop);
+
+      const { result } = renderHook(() => useRalph());
+      const prdJson = JSON.stringify({ name: "Feature", stories: [{ id: "1", title: "Story 1" }] });
+
+      await act(async () => {
+        await result.current.startLoopPrd(prdJson);
+      });
+
+      expect(invoke).toHaveBeenCalledWith("start_ralph_loop_prd", {
+        projectId: mockProject.id,
+        prdJson,
+      });
+    });
+
+    it("should set error on failure", async () => {
+      vi.mocked(invoke).mockRejectedValue(new Error("PRD start failed"));
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.startLoopPrd("{}");
+      });
+
+      expect(result.current.error).toBe("PRD start failed");
+    });
+  });
+
+  describe("pauseLoop", () => {
+    it("should pause a loop and update status", async () => {
+      const runningLoop = {
+        id: "loop-1",
+        projectId: "test-project-id",
+        prompt: "Test",
+        enhancedPrompt: null,
+        qualityScore: 0,
+        status: "running" as const,
+        mode: "iterative" as const,
+        iterations: 1,
+        outcome: null,
+        createdAt: "2024-01-16T10:00:00Z",
+        completedAt: null,
+      };
+
+      vi.mocked(invoke)
+        .mockResolvedValueOnce([runningLoop]) // loadLoops
+        .mockResolvedValueOnce(undefined); // pauseRalphLoop
+
+      const { result } = renderHook(() => useRalph());
+
+      // First load the loop
+      await act(async () => {
+        await result.current.loadLoops();
+      });
+
+      // Then pause it
+      await act(async () => {
+        await result.current.pauseLoop("loop-1");
+      });
+
+      expect(result.current.loops[0].status).toBe("paused");
+    });
+
+    it("should call pause_ralph_loop with loop id", async () => {
+      vi.mocked(invoke).mockResolvedValue(undefined);
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.pauseLoop("loop-123");
+      });
+
+      expect(invoke).toHaveBeenCalledWith("pause_ralph_loop", {
+        loopId: "loop-123",
+      });
+    });
+
+    it("should set error on failure", async () => {
+      vi.mocked(invoke).mockRejectedValue(new Error("Pause failed"));
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.pauseLoop("loop-1");
+      });
+
+      expect(result.current.error).toBe("Pause failed");
+    });
+  });
+
+  describe("resumeLoop", () => {
+    it("should resume a loop and update status", async () => {
+      const pausedLoop = {
+        id: "loop-1",
+        projectId: "test-project-id",
+        prompt: "Test",
+        enhancedPrompt: null,
+        qualityScore: 0,
+        status: "paused" as const,
+        mode: "iterative" as const,
+        iterations: 1,
+        outcome: null,
+        createdAt: "2024-01-16T10:00:00Z",
+        completedAt: null,
+      };
+
+      vi.mocked(invoke)
+        .mockResolvedValueOnce([pausedLoop])
+        .mockResolvedValueOnce(undefined);
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.loadLoops();
+      });
+
+      await act(async () => {
+        await result.current.resumeLoop("loop-1");
+      });
+
+      expect(result.current.loops[0].status).toBe("running");
+    });
+
+    it("should call resume_ralph_loop with loop id", async () => {
+      vi.mocked(invoke).mockResolvedValue(undefined);
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.resumeLoop("loop-456");
+      });
+
+      expect(invoke).toHaveBeenCalledWith("resume_ralph_loop", {
+        loopId: "loop-456",
+      });
+    });
+
+    it("should set error on failure", async () => {
+      vi.mocked(invoke).mockRejectedValue(new Error("Resume failed"));
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.resumeLoop("loop-1");
+      });
+
+      expect(result.current.error).toBe("Resume failed");
+    });
+  });
+
+  describe("killLoop", () => {
+    it("should kill a loop and update status to failed", async () => {
+      const runningLoop = {
+        id: "loop-1",
+        projectId: "test-project-id",
+        prompt: "Test",
+        enhancedPrompt: null,
+        qualityScore: 0,
+        status: "running" as const,
+        mode: "iterative" as const,
+        iterations: 1,
+        outcome: null,
+        createdAt: "2024-01-16T10:00:00Z",
+        completedAt: null,
+      };
+
+      vi.mocked(invoke)
+        .mockResolvedValueOnce([runningLoop])
+        .mockResolvedValueOnce(undefined);
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.loadLoops();
+      });
+
+      await act(async () => {
+        await result.current.killLoop("loop-1");
+      });
+
+      expect(result.current.loops[0].status).toBe("failed");
+      expect(result.current.loops[0].outcome).toBe("Killed by user");
+    });
+
+    it("should call kill_ralph_loop with loop id", async () => {
+      vi.mocked(invoke).mockResolvedValue(undefined);
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.killLoop("loop-789");
+      });
+
+      expect(invoke).toHaveBeenCalledWith("kill_ralph_loop", {
+        loopId: "loop-789",
+      });
+    });
+
+    it("should set error on failure", async () => {
+      vi.mocked(invoke).mockRejectedValue(new Error("Kill failed"));
+
+      const { result } = renderHook(() => useRalph());
+
+      await act(async () => {
+        await result.current.killLoop("loop-1");
+      });
+
+      expect(result.current.error).toBe("Kill failed");
+    });
+  });
+
+  describe("clearAnalysis", () => {
+    it("should clear analysis state", async () => {
+      const mockAnalysis = {
+        qualityScore: 85,
+        issues: [],
+        suggestions: [],
+        enhancedPrompt: null,
+      };
+      vi.mocked(invoke).mockResolvedValue(mockAnalysis);
+
+      const { result } = renderHook(() => useRalph());
+
+      // First set analysis
+      await act(async () => {
+        await result.current.analyzePrompt("Test");
+      });
+
+      expect(result.current.analysis).not.toBeNull();
+
+      // Then clear it
+      act(() => {
+        result.current.clearAnalysis();
+      });
+
+      expect(result.current.analysis).toBeNull();
+    });
+  });
 });
