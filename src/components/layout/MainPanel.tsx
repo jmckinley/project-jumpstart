@@ -153,6 +153,7 @@ import {
   TDDWorkflow,
   SubagentGenerator,
   HooksGenerator,
+  FrameworkInstaller,
 } from "@/components/test-plans";
 import type { TestPlan, TestCase, TestPlanStatus } from "@/types/test-plan";
 
@@ -1327,6 +1328,19 @@ function TestPlansView() {
                 className="text-xs text-red-400 hover:text-red-300"
               >
                 Dismiss
+              </button>
+            </div>
+          )}
+
+          {/* No framework - show installer at top level */}
+          {!framework && (
+            <div className="space-y-4">
+              <FrameworkInstaller />
+              <button
+                onClick={refreshFramework}
+                className="w-full rounded-md border border-neutral-600 px-4 py-2 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:bg-neutral-800"
+              >
+                Refresh Framework Detection
               </button>
             </div>
           )}
