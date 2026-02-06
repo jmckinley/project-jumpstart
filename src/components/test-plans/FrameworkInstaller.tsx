@@ -93,6 +93,13 @@ export function FrameworkInstaller() {
         configCommand: "pnpm cypress open",
         type: "e2e",
       });
+
+      options.push({
+        name: "Testcontainers",
+        description: "Spin up Docker containers for integration tests (databases, queues, etc.).",
+        installCommand: "pnpm add -D testcontainers",
+        type: "unit",
+      });
     }
 
     // Rust projects
@@ -120,7 +127,29 @@ export function FrameworkInstaller() {
         description: "Simple and powerful testing for Python with great plugin ecosystem.",
         installCommand: "pip install pytest pytest-cov",
         recommended: true,
-        type: "both",
+        type: "unit",
+      });
+
+      options.push({
+        name: "Selenium",
+        description: "Browser automation for E2E testing. Works with Chrome, Firefox, Safari.",
+        installCommand: "pip install selenium webdriver-manager",
+        type: "e2e",
+      });
+
+      options.push({
+        name: "Playwright for Python",
+        description: "Modern E2E testing with auto-wait and cross-browser support.",
+        installCommand: "pip install playwright && playwright install",
+        recommended: true,
+        type: "e2e",
+      });
+
+      options.push({
+        name: "Testcontainers",
+        description: "Spin up Docker containers for integration tests (databases, queues, etc.).",
+        installCommand: "pip install testcontainers",
+        type: "unit",
       });
     }
 
@@ -131,7 +160,40 @@ export function FrameworkInstaller() {
         description: "Built-in Go testing. No installation needed - just create _test.go files.",
         installCommand: "# No installation needed - go test is built-in",
         recommended: true,
-        type: "both",
+        type: "unit",
+      });
+
+      options.push({
+        name: "Testcontainers for Go",
+        description: "Spin up Docker containers for integration tests (databases, queues, etc.).",
+        installCommand: "go get github.com/testcontainers/testcontainers-go",
+        type: "unit",
+      });
+    }
+
+    // Java projects
+    if (language === "java") {
+      options.push({
+        name: "JUnit 5",
+        description: "The standard testing framework for Java with modern features.",
+        installCommand: "# Add to pom.xml: org.junit.jupiter:junit-jupiter:5.10.0",
+        recommended: true,
+        type: "unit",
+      });
+
+      options.push({
+        name: "Testcontainers",
+        description: "Spin up Docker containers for integration tests. The original Testcontainers.",
+        installCommand: "# Add to pom.xml: org.testcontainers:testcontainers:1.19.0",
+        recommended: true,
+        type: "unit",
+      });
+
+      options.push({
+        name: "Selenium",
+        description: "Browser automation for E2E testing. Industry standard for Java.",
+        installCommand: "# Add to pom.xml: org.seleniumhq.selenium:selenium-java:4.15.0",
+        type: "e2e",
       });
     }
 
