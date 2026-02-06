@@ -949,4 +949,61 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("requires database"));
     }
+
+    #[test]
+    fn test_parse_hook_version_with_version() {
+        let content = r#"#!/bin/sh
+# Project Jumpstart — Documentation Enforcement Hook
+# Version: 2.0.0
+# Mode: warn
+"#;
+        let version = parse_hook_version(content);
+        assert_eq!(version, Some("2.0.0".to_string()));
+    }
+
+    #[test]
+    fn test_parse_hook_version_legacy() {
+        let content = r#"#!/bin/sh
+# Project Jumpstart — Documentation Enforcement Hook
+# Mode: warn
+"#;
+        let version = parse_hook_version(content);
+        assert_eq!(version, Some("1.0.0".to_string())); // Legacy hooks get 1.0.0
+    }
+
+    #[test]
+    fn test_parse_hook_version_external() {
+        let content = r#"#!/bin/sh
+# Some other hook
+echo "Hello"
+"#;
+        let version = parse_hook_version(content);
+        assert_eq!(version, None); // External hooks have no version
+    }
+
+    #[test]
+    fn test_is_version_outdated() {
+        assert!(is_version_outdated("1.0.0", "2.0.0"));
+        assert!(is_version_outdated("1.9.9", "2.0.0"));
+        assert!(is_version_outdated("2.0.0", "2.0.1"));
+        assert!(!is_version_outdated("2.0.0", "2.0.0"));
+        assert!(!is_version_outdated("2.0.1", "2.0.0"));
+        assert!(!is_version_outdated("3.0.0", "2.0.0"));
+    }
+
+    #[test]
+    fn test_hook_version_constant() {
+        // Ensure version is valid semver format
+        let parts: Vec<&str> = HOOK_VERSION.split('.').collect();
+        assert_eq!(parts.len(), 3);
+        for part in parts {
+            assert!(part.parse::<u32>().is_ok());
+        }
+    }
+
+    #[test]
+    fn test_generated_hook_includes_version() {
+        let script = generate_auto_update_hook_script();
+        assert!(script.contains(&format!("# Version: {}", HOOK_VERSION)));
+    }
 }
