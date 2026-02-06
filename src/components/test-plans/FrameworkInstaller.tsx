@@ -30,6 +30,7 @@
 
 import { useState, useMemo } from "react";
 import { useProjectStore } from "@/stores/projectStore";
+import { QuickHooksSetup } from "@/components/hooks/QuickHooksSetup";
 
 interface FrameworkOption {
   name: string;
@@ -40,7 +41,14 @@ interface FrameworkOption {
   type: "unit" | "e2e" | "both";
 }
 
-export function FrameworkInstaller() {
+interface FrameworkInstallerProps {
+  /** If true, only show the hooks setup (for projects that already have a framework) */
+  hooksOnly?: boolean;
+  /** The detected framework name for hooks setup */
+  detectedFramework?: string;
+}
+
+export function FrameworkInstaller({ hooksOnly = false, detectedFramework }: FrameworkInstallerProps = {}) {
   const activeProject = useProjectStore((s) => s.activeProject);
   const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
   const [installing, setInstalling] = useState<string | null>(null);
@@ -219,6 +227,15 @@ export function FrameworkInstaller() {
     return null;
   }
 
+  // If hooksOnly mode, just show the hooks setup
+  if (hooksOnly) {
+    return (
+      <div className="space-y-6">
+        <QuickHooksSetup variant="full" framework={detectedFramework} />
+      </div>
+    );
+  }
+
   const unitFrameworks = frameworkOptions.filter(f => f.type === "unit" || f.type === "both");
   const e2eFrameworks = frameworkOptions.filter(f => f.type === "e2e" || f.type === "both");
 
@@ -303,6 +320,18 @@ export function FrameworkInstaller() {
           </ol>
         </div>
       )}
+
+      {/* Hooks Setup - Always show after framework options */}
+      <div className="pt-2">
+        <div className="mb-3 flex items-center gap-2">
+          <div className="h-px flex-1 bg-neutral-800" />
+          <span className="text-xs font-medium uppercase tracking-wider text-neutral-500">
+            After Installing
+          </span>
+          <div className="h-px flex-1 bg-neutral-800" />
+        </div>
+        <QuickHooksSetup variant="compact" />
+      </div>
     </div>
   );
 }

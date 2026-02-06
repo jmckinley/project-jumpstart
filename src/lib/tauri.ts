@@ -405,6 +405,14 @@ export async function getHookStatus(projectPath: string): Promise<HookStatus> {
   return invoke<HookStatus>("get_hook_status", { projectPath });
 }
 
+/**
+ * Check if Claude Code PostToolUse hooks are configured for the project.
+ * Looks for hooks in .claude/settings.json or .claude/settings.local.json.
+ */
+export async function checkHooksConfigured(projectPath: string): Promise<boolean> {
+  return invoke<boolean>("check_hooks_configured", { projectPath });
+}
+
 export async function getEnforcementEvents(
   projectId: string,
   limit?: number,

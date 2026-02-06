@@ -26,6 +26,7 @@
  * - Active phase items improve project health
  * - Maintenance tips rotate when everything is healthy
  * - Dismissed state stored per-project in settings
+ * - hooks-setup recommendation shown when test framework detected but no Claude Code hooks configured
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -58,6 +59,7 @@ interface SmartNextStepProps {
   hasEnforcement: boolean;
   hasTestFramework: boolean;
   hasTestPlan: boolean;
+  hasClaudeCodeHooks: boolean; // Claude Code PostToolUse hooks configured
   testCoverage: number; // 0-100
   contextRotRisk: "low" | "medium" | "high";
   projectId: string;
@@ -166,6 +168,18 @@ const RECOMMENDATIONS: Omit<Recommendation, "priority">[] = [
     category: "active",
   },
   {
+    id: "hooks-setup",
+    icon: "⚡",
+    iconColor: "text-blue-400",
+    bgColor: "bg-blue-500/10",
+    borderColor: "border-blue-500/30",
+    title: "Set up auto-test hooks",
+    description: "Configure Claude Code to automatically run tests after every file edit. One-click setup.",
+    actionLabel: "Set Up Hooks",
+    targetSection: "hooks-setup",
+    category: "active",
+  },
+  {
     id: "test-coverage",
     icon: "📊",
     iconColor: "text-indigo-400",
@@ -263,6 +277,11 @@ function getRecommendation(props: SmartNextStepProps, dismissedIds: string[]): R
 
   if (props.hasTestFramework && !props.hasTestPlan) {
     validRecommendations.push({ ...RECOMMENDATIONS.find(r => r.id === "test-plan")!, priority: 11 });
+  }
+
+  // Hooks setup: show if test framework detected but no Claude Code hooks configured
+  if (props.hasTestFramework && !props.hasClaudeCodeHooks) {
+    validRecommendations.push({ ...RECOMMENDATIONS.find(r => r.id === "hooks-setup")!, priority: 7 }); // High priority after setup phase
   }
 
   if (props.hasTestPlan && props.testCoverage < 50) {

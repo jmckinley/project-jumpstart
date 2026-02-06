@@ -52,7 +52,7 @@ use commands::ralph::{
     get_ralph_context, record_ralph_mistake, update_claude_md_with_pattern,
 };
 use commands::enforcement::{
-    get_ci_snippets, get_enforcement_events, get_hook_status, init_git, install_git_hooks,
+    check_hooks_configured, get_ci_snippets, get_enforcement_events, get_hook_status, init_git, install_git_hooks,
 };
 use commands::settings::{get_all_settings, get_setting, save_setting, validate_api_key};
 use commands::watcher::{start_file_watcher, stop_file_watcher};
@@ -136,6 +136,7 @@ pub fn run() {
             install_git_hooks,
             init_git,
             get_hook_status,
+            check_hooks_configured,
             get_enforcement_events,
             get_ci_snippets,
             get_setting,

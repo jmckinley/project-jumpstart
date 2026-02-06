@@ -56,6 +56,7 @@
  * - Switch on activeSection to render the correct view
  * - "dashboard" section renders health cards and activity feed
  * - "kickstart" section renders ProjectKickstart for new project setup
+ * - "hooks-setup" section renders QuickHooksSetup for Claude Code hooks configuration
  * - "claude-md" section renders the Editor component
  * - "modules" section renders file tree, doc preview, and batch generator (or ProjectKickstart for empty projects)
  * - "test-plans" section renders test plans list, TDD workflow, and tools (subagent/hooks generators)
@@ -102,7 +103,7 @@ import { RefreshDocsButton } from "@/components/dashboard/RefreshDocsButton";
 import { SmartNextStep } from "@/components/dashboard/SmartNextStep";
 import { SessionInsights } from "@/components/dashboard/SessionInsights";
 import type { Activity } from "@/components/dashboard/RecentActivity";
-import { getRecentActivities, startFileWatcher, stopFileWatcher, getSetting, listSkills, listAgents, getHookStatus, readClaudeMd, listTestPlans } from "@/lib/tauri";
+import { getRecentActivities, startFileWatcher, stopFileWatcher, getSetting, listSkills, listAgents, getHookStatus, readClaudeMd, listTestPlans, checkHooksConfigured } from "@/lib/tauri";
 import { Editor } from "@/components/claude-md/Editor";
 import { FileTree } from "@/components/modules/FileTree";
 import { DocStatus } from "@/components/modules/DocStatus";
@@ -138,6 +139,7 @@ import { CISetup } from "@/components/enforcement/CISetup";
 import { useEnforcement } from "@/hooks/useEnforcement";
 import { SettingsView } from "@/components/settings/SettingsView";
 import { HelpView } from "@/components/help/HelpView";
+import { QuickHooksSetup } from "@/components/hooks/QuickHooksSetup";
 import type { Skill } from "@/types/skill";
 import { useTestPlans } from "@/hooks/useTestPlans";
 import { useTDDWorkflow, TDD_PHASES } from "@/hooks/useTDDWorkflow";
@@ -177,6 +179,7 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
   const [hasEnforcement, setHasEnforcement] = useState(false);
   const [hasTestFramework, setHasTestFramework] = useState(false);
   const [hasTestPlan, setHasTestPlan] = useState(false);
+  const [hasClaudeCodeHooks, setHasClaudeCodeHooks] = useState(false);
 
   // Check if this is an empty project (no source files after scanning)
   const isEmptyProject = hasScanned && modules.length === 0;
@@ -260,6 +263,14 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
       } catch {
         setHasTestPlan(false);
       }
+
+      // Check for Claude Code hooks
+      try {
+        const hooksConfigured = await checkHooksConfigured(activeProject.path);
+        setHasClaudeCodeHooks(hooksConfigured);
+      } catch {
+        setHasClaudeCodeHooks(false);
+      }
     };
 
     fetchSmartNextStepData();
@@ -314,6 +325,7 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
           hasEnforcement={hasEnforcement}
           hasTestFramework={hasTestFramework}
           hasTestPlan={hasTestPlan}
+          hasClaudeCodeHooks={hasClaudeCodeHooks}
           testCoverage={0}
           contextRotRisk={contextRotRisk}
           projectId={activeProject.id}
@@ -1113,6 +1125,56 @@ function KickstartView({ onClaudeMdCreated, onNavigate }: { onClaudeMdCreated?: 
   return <ProjectKickstart onClaudeMdCreated={onClaudeMdCreated} onNavigate={onNavigate} />;
 }
 
+function HooksSetupView({ onNavigate }: { onNavigate?: (section: string) => void }) {
+  const activeProject = useProjectStore((s) => s.activeProject);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-neutral-200">Set Up Auto-Test Hooks</h2>
+          <p className="text-sm text-neutral-400">
+            Configure Claude Code to automatically run tests after every file edit
+          </p>
+        </div>
+      </div>
+
+      <QuickHooksSetup
+        variant="full"
+        framework={activeProject?.testing ?? undefined}
+        onSetupComplete={() => {
+          // Navigate to test plans after setup
+          onNavigate?.("test-plans");
+        }}
+      />
+
+      <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-6">
+        <h3 className="font-medium text-neutral-200 mb-4">What are PostToolUse Hooks?</h3>
+        <div className="space-y-4 text-sm text-neutral-400">
+          <p>
+            Claude Code hooks allow you to run custom commands automatically when Claude performs
+            certain actions. <strong className="text-neutral-300">PostToolUse hooks</strong> run
+            after Claude edits or writes files.
+          </p>
+          <p>
+            By configuring a PostToolUse hook to run your test suite, you enable true TDD
+            workflow where tests run automatically after every change Claude makes.
+          </p>
+          <div className="rounded-md bg-neutral-800/50 p-4">
+            <h4 className="font-medium text-neutral-300 mb-2">Benefits:</h4>
+            <ul className="list-inside list-disc space-y-1">
+              <li>Immediate feedback on test failures</li>
+              <li>Claude can see and fix failing tests automatically</li>
+              <li>Enforce test-driven development workflow</li>
+              <li>Catch regressions as they happen</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TestPlansView() {
   const {
     plans,
@@ -1553,6 +1615,8 @@ function renderSection(
       return <DashboardView onNavigate={onNavigate} />;
     case "kickstart":
       return <KickstartView onClaudeMdCreated={onCompletionChange} onNavigate={onNavigate} />;
+    case "hooks-setup":
+      return <HooksSetupView onNavigate={onNavigate} />;
     case "claude-md":
       return <Editor onSave={onCompletionChange} />;
     case "modules":

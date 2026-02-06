@@ -53,7 +53,7 @@ import { useOnboardingStore } from "@/stores/onboardingStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useSectionCompletion } from "@/hooks/useSectionCompletion";
 import { useModules } from "@/hooks/useModules";
-import { listProjects, getSetting, saveSetting } from "@/lib/tauri";
+import { listProjects, getSetting, saveSetting, checkHooksConfigured } from "@/lib/tauri";
 import type { Project } from "@/types/project";
 
 function App() {
@@ -74,6 +74,9 @@ function App() {
 
   // Check if project is empty (no source files) - used for Kickstart visibility
   const isEmptyProject = hasScanned && modules.length === 0;
+
+  // Track if hooks setup should be shown (test framework detected, no hooks configured)
+  const [showHooksSetup, setShowHooksSetup] = useState(false);
 
   // Check if this is first launch
   useEffect(() => {
@@ -157,6 +160,30 @@ function App() {
     }
   }, [projects, scanModules]);
 
+  // Check if hooks setup should be shown (test framework detected, no hooks configured)
+  useEffect(() => {
+    const activeProject = useProjectStore.getState().activeProject;
+    if (!activeProject) {
+      setShowHooksSetup(false);
+      return;
+    }
+
+    // Only show if project has a test framework
+    if (!activeProject.testing) {
+      setShowHooksSetup(false);
+      return;
+    }
+
+    // Check if hooks are already configured
+    checkHooksConfigured(activeProject.path)
+      .then((configured) => {
+        setShowHooksSetup(!configured);
+      })
+      .catch(() => {
+        setShowHooksSetup(false);
+      });
+  }, [projects]);
+
   // Show loading while checking welcome status
   if (checkingWelcome) {
     return (
@@ -212,6 +239,7 @@ function App() {
           onProjectChange={handleProjectChange}
           onNewProject={handleNewProject}
           isEmptyProject={isEmptyProject}
+          showHooksSetup={showHooksSetup}
         />
         <MainPanel
           activeSection={activeSection}

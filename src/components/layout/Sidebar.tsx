@@ -26,11 +26,13 @@
  * - Checkmark icon shown for sections with completion status true
  * - Checkmarks are per-project - refresh automatically on project switch
  * - Kickstart shown when isEmptyProject=true AND CLAUDE.md not yet created
+ * - Hooks Setup shown when showHooksSetup=true (test framework detected, no hooks configured)
  *
  * CLAUDE NOTES:
  * - Clicking the app logo/title at top navigates to dashboard
  * - Sections: Dashboard, CLAUDE.md, Modules, Test Plans, Skills, Agents, RALPH, Context Health, Enforcement, Settings
  * - Kickstart section is temporary - disappears after CLAUDE.md is created
+ * - Hooks Setup section is temporary - disappears after hooks are configured
  * - Sections with completion tracking: claude-md, modules, skills, agents, ralph, enforcement
  * - Project selector is at the top of the sidebar
  * - Completion state is fetched per-project by useSectionCompletion hook
@@ -49,6 +51,8 @@ interface SidebarProps {
   onProjectChange?: (project: Project) => void;
   onNewProject?: () => void;
   isEmptyProject?: boolean;
+  /** Show hooks setup banner when true (test framework detected, no hooks) */
+  showHooksSetup?: boolean;
 }
 
 const sections = [
@@ -143,6 +147,24 @@ function SparkleIcon() {
   );
 }
 
+function LightningIcon() {
+  return (
+    <svg
+      className="h-4 w-4 text-blue-400"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M13 10V3L4 14h7v7l9-11h-7z"
+      />
+    </svg>
+  );
+}
+
 export function Sidebar({
   activeSection,
   onNavigate,
@@ -152,6 +174,7 @@ export function Sidebar({
   onProjectChange,
   onNewProject,
   isEmptyProject = false,
+  showHooksSetup = false,
 }: SidebarProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
@@ -249,6 +272,26 @@ export function Sidebar({
             >
               <SparkleIcon />
               <span>Kickstart</span>
+            </button>
+          </div>
+        )}
+
+        {/* Hooks Setup - shown when test framework detected but no hooks configured */}
+        {showHooksSetup && (
+          <div className="mb-4">
+            <button
+              onClick={() => onNavigate("hooks-setup")}
+              className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                activeSection === "hooks-setup"
+                  ? "border-blue-500/50 bg-blue-600/20 text-blue-300"
+                  : "border-blue-500/30 bg-gradient-to-r from-blue-950/30 to-cyan-950/30 text-blue-300 hover:border-blue-500/50 hover:bg-blue-600/20"
+              }`}
+            >
+              <LightningIcon />
+              <span>Set Up Hooks</span>
+              <span className="ml-auto rounded-full bg-blue-500/20 px-1.5 py-0.5 text-xs">
+                New
+              </span>
             </button>
           </div>
         )}

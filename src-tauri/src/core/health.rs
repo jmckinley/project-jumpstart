@@ -33,6 +33,7 @@
 //! - Context rot risk is based on doc scores only (CLAUDE.md + modules + freshness)
 //! - Risk thresholds: low (>=70% of doc max), medium (40-69%), high (<40%)
 //! - Quick wins include TDD subagent setup when test framework detected but no subagent exists
+//! - Quick wins include Claude Code hooks setup when test framework detected but no hooks configured
 
 use crate::commands::enforcement;
 use crate::core::freshness;
@@ -515,6 +516,27 @@ fn has_tdd_subagent(project_path: &Path) -> bool {
     false
 }
 
+/// Check if Claude Code hooks are configured for the project.
+/// Looks for PostToolUse hooks in .claude/settings.json or .claude/settings.local.json.
+fn has_claude_code_hooks(project_path: &Path) -> bool {
+    let settings_paths = [
+        project_path.join(".claude").join("settings.json"),
+        project_path.join(".claude").join("settings.local.json"),
+    ];
+
+    for settings_path in settings_paths {
+        if settings_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&settings_path) {
+                // Check for hooks configuration
+                if content.contains("PostToolUse") || content.contains("hooks") {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 /// Generate quick win suggestions based on current scores.
 fn generate_quick_wins(
     project_path: &Path,
@@ -656,6 +678,16 @@ fn generate_quick_wins(
             title: "Set up TDD subagent".to_string(),
             description: "Generate a Claude Code subagent for TDD workflow. Automates test writing with your detected test framework.".to_string(),
             impact: 5, // Moderate impact - improves workflow but doesn't affect health score directly
+            effort: "low".to_string(),
+        });
+    }
+
+    // Claude Code Hooks: suggest if test framework detected but no hooks configured
+    if has_test_framework(project_path) && !has_claude_code_hooks(project_path) {
+        wins.push(QuickWin {
+            title: "Set up auto-test hooks".to_string(),
+            description: "Configure Claude Code hooks to automatically run tests after every file edit. One-click setup available.".to_string(),
+            impact: 8, // High impact - enables TDD workflow with automatic test feedback
             effort: "low".to_string(),
         });
     }

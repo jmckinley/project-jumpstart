@@ -18,6 +18,7 @@
 //! - install_git_hooks - Install pre-commit hook for doc enforcement
 //! - install_git_hooks_internal - Internal function for hook installation (used by onboarding)
 //! - get_hook_status - Check if hooks are installed
+//! - check_hooks_configured - Check if Claude Code PostToolUse hooks are configured
 //! - get_enforcement_events - List recent enforcement events
 //! - get_ci_snippets - Generate CI integration templates
 //! - get_enforcement_score - Calculate enforcement score (0-10) for health
@@ -364,6 +365,31 @@ pub async fn get_hook_status(project_path: String) -> Result<HookStatus, String>
         has_husky,
         has_git,
     })
+}
+
+/// Check if Claude Code PostToolUse hooks are configured for the project.
+/// Looks for hooks in .claude/settings.json or .claude/settings.local.json.
+#[tauri::command]
+pub async fn check_hooks_configured(project_path: String) -> Result<bool, String> {
+    let path = Path::new(&project_path);
+
+    let settings_paths = [
+        path.join(".claude").join("settings.json"),
+        path.join(".claude").join("settings.local.json"),
+    ];
+
+    for settings_path in settings_paths {
+        if settings_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&settings_path) {
+                // Check for hooks configuration (PostToolUse hooks for running tests)
+                if content.contains("PostToolUse") || content.contains("\"hooks\"") {
+                    return Ok(true);
+                }
+            }
+        }
+    }
+
+    Ok(false)
 }
 
 /// List recent enforcement events for a project.
