@@ -49,6 +49,12 @@ pub struct HookStatus {
     pub mode: String,
     pub has_husky: bool,
     pub has_git: bool,
+    /// Version of the installed hook (e.g., "1.0.0")
+    pub version: Option<String>,
+    /// Whether the installed hook is older than the current app version
+    pub outdated: bool,
+    /// Current app hook version for reference
+    pub current_version: String,
 }
 
 /// CI integration template snippet.

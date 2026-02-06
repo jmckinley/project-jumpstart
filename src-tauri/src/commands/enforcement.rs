@@ -46,6 +46,47 @@ use crate::core::crypto;
 use crate::db::{self, AppState};
 use crate::models::enforcement::{CiSnippet, EnforcementEvent, HookStatus};
 
+/// Current hook version - increment when hook logic changes
+/// Format: MAJOR.MINOR.PATCH
+/// - MAJOR: Breaking changes (requires jq, different behavior)
+/// - MINOR: New features (backward compatible)
+/// - PATCH: Bug fixes
+pub const HOOK_VERSION: &str = "2.0.0";
+
+/// Parse version from hook script content
+fn parse_hook_version(content: &str) -> Option<String> {
+    // Look for "# Version: X.Y.Z" comment
+    for line in content.lines() {
+        if let Some(version) = line.strip_prefix("# Version: ") {
+            return Some(version.trim().to_string());
+        }
+    }
+    // Legacy hooks without version are 1.0.0
+    if content.contains("Project Jumpstart") || content.contains("Claude Code Copilot") {
+        return Some("1.0.0".to_string());
+    }
+    None
+}
+
+/// Compare semantic versions, returns true if installed < current
+fn is_version_outdated(installed: &str, current: &str) -> bool {
+    let parse_version = |v: &str| -> (u32, u32, u32) {
+        let parts: Vec<u32> = v.split('.')
+            .filter_map(|p| p.parse().ok())
+            .collect();
+        (
+            parts.first().copied().unwrap_or(0),
+            parts.get(1).copied().unwrap_or(0),
+            parts.get(2).copied().unwrap_or(0),
+        )
+    };
+
+    let (i_major, i_minor, i_patch) = parse_version(installed);
+    let (c_major, c_minor, c_patch) = parse_version(current);
+
+    (i_major, i_minor, i_patch) < (c_major, c_minor, c_patch)
+}
+
 /// Export the decrypted API key to a JSON file for the auto-update hook.
 /// The hook script reads this file since it can't decrypt the SQLite-stored key.
 fn export_api_key_for_hook(db: &rusqlite::Connection) -> Result<(), String> {
@@ -151,6 +192,7 @@ pub async fn install_git_hooks(
         format!(
             r#"#!/bin/sh
 # Project Jumpstart — Documentation Enforcement Hook
+# Version: {version}
 # Mode: {mode}
 # Auto-generated. Edit via Project Jumpstart settings.
 
@@ -180,6 +222,7 @@ fi
 
 exit 0
 "#,
+            version = HOOK_VERSION,
             mode = mode,
             exit_code = exit_code,
         )
@@ -221,6 +264,9 @@ exit 0
         mode,
         has_husky,
         has_git: true,
+        version: Some(HOOK_VERSION.to_string()),
+        outdated: false,
+        current_version: HOOK_VERSION.to_string(),
     })
 }
 
@@ -263,6 +309,7 @@ pub fn install_git_hooks_internal(
         format!(
             r#"#!/bin/sh
 # Project Jumpstart — Documentation Enforcement Hook
+# Version: {version}
 # Mode: {mode}
 # Auto-generated. Edit via Project Jumpstart settings.
 
@@ -292,6 +339,7 @@ fi
 
 exit 0
 "#,
+            version = HOOK_VERSION,
             mode = mode,
             exit_code = exit_code,
         )
@@ -356,6 +404,9 @@ pub async fn get_hook_status(project_path: String) -> Result<HookStatus, String>
             mode: "none".to_string(),
             has_husky,
             has_git,
+            version: None,
+            outdated: false,
+            current_version: HOOK_VERSION.to_string(),
         });
     }
 
@@ -375,12 +426,29 @@ pub async fn get_hook_status(project_path: String) -> Result<HookStatus, String>
         "warn".to_string()
     };
 
+    // Parse version from hook content
+    let version = if is_jumpstart_hook {
+        parse_hook_version(&content)
+    } else {
+        None
+    };
+
+    // Check if outdated
+    let outdated = if let Some(ref v) = version {
+        is_version_outdated(v, HOOK_VERSION)
+    } else {
+        false
+    };
+
     Ok(HookStatus {
         installed: is_jumpstart_hook,
         hook_path: hook_path.to_string_lossy().to_string(),
         mode,
         has_husky,
         has_git,
+        version,
+        outdated,
+        current_version: HOOK_VERSION.to_string(),
     })
 }
 
@@ -519,8 +587,9 @@ pub fn calculate_enforcement_score(project_path: &str) -> u32 {
 // --- Hook Script Generators ---
 
 fn generate_auto_update_hook_script() -> String {
-    r#"#!/bin/sh
+    format!(r#"#!/bin/sh
 # Project Jumpstart — Documentation Enforcement Hook
+# Version: {version}
 # Mode: auto-update
 # Auto-generated. Edit via Project Jumpstart settings.
 #
@@ -530,7 +599,7 @@ fn generate_auto_update_hook_script() -> String {
 set -e
 
 # Prevent API key from appearing in debug output
-set +x
+set +x"#, version = HOOK_VERSION).to_string() + r#"
 
 EXTENSIONS="ts tsx js jsx rs py go"
 SETTINGS_FILE="$HOME/.project-jumpstart/settings.json"
@@ -706,7 +775,7 @@ if [ "$FILES_PROCESSED" -gt 0 ]; then
 fi
 
 exit 0
-"#.to_string()
+"#
 }
 
 // --- CI Template Generators ---

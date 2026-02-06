@@ -43,6 +43,12 @@ export interface HookStatus {
   mode: string;
   hasHusky: boolean;
   hasGit: boolean;
+  /** Version of the installed hook (e.g., "1.0.0") */
+  version: string | null;
+  /** Whether the installed hook is older than the current app version */
+  outdated: boolean;
+  /** Current app hook version for reference */
+  currentVersion: string;
 }
 
 export interface CiSnippet {

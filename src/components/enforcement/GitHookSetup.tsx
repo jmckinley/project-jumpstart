@@ -149,6 +149,35 @@ export function GitHookSetup({ hookStatus, projectPath, loading, installing, onI
           </div>
         )}
 
+        {/* Outdated hook warning */}
+        {hookStatus?.installed && hookStatus?.outdated && (
+          <div className="rounded-md border border-orange-800 bg-orange-950/40 p-4 space-y-3">
+            <div className="flex items-center gap-2 text-orange-400">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span className="font-medium">Hook Update Available</span>
+            </div>
+            <p className="text-sm text-orange-300/80">
+              Your hook (v{hookStatus.version}) is outdated. Version {hookStatus.currentVersion} includes
+              important fixes: proper JSON parsing with jq, better error handling, and security improvements.
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => handleInstall(hookStatus.mode as "warn" | "block" | "auto-update")}
+                disabled={installing}
+                className="bg-orange-500 hover:bg-orange-400 text-neutral-900 font-medium"
+              >
+                {installing ? "Updating..." : "Update Hook Now"}
+              </Button>
+              {hookStatus.mode === "auto-update" && (
+                <span className="text-xs text-orange-400">Requires jq to be installed</span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Only show hook buttons if git exists */}
         {hookStatus?.hasGit && (
           <>
@@ -206,8 +235,17 @@ export function GitHookSetup({ hookStatus, projectPath, loading, installing, onI
             </div>
 
             {hookStatus?.installed && (
-              <div className="rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-xs text-neutral-500">
-                Hook path: {hookStatus.hookPath}
+              <div className="rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-xs text-neutral-500 space-y-1">
+                <p>Hook path: {hookStatus.hookPath}</p>
+                <p>
+                  Version: {hookStatus.version || "unknown"}
+                  {hookStatus.outdated && (
+                    <span className="text-orange-400 ml-2">(update available: v{hookStatus.currentVersion})</span>
+                  )}
+                  {!hookStatus.outdated && hookStatus.version && (
+                    <span className="text-emerald-400 ml-2">(up to date)</span>
+                  )}
+                </p>
               </div>
             )}
           </>
