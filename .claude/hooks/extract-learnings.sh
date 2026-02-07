@@ -105,6 +105,12 @@ Example output:
 - [Pattern] Always run tests after modifying Rust files
 - [Gotcha] The legacy API endpoint /v1/users is deprecated, use /v2/users"
 
+# Read model from settings.json (with fallback)
+CLAUDE_MODEL=$(jq -r '.claude_model // empty' "$SETTINGS_FILE" 2>/dev/null || true)
+if [[ -z "$CLAUDE_MODEL" ]]; then
+    CLAUDE_MODEL="claude-sonnet-4-5-latest"
+fi
+
 # Call Claude API to extract learnings (with 30s timeout)
 RESPONSE=$(curl -s --max-time 30 https://api.anthropic.com/v1/messages \
     -H "Content-Type: application/json" \
@@ -112,8 +118,9 @@ RESPONSE=$(curl -s --max-time 30 https://api.anthropic.com/v1/messages \
     -H "anthropic-version: 2023-06-01" \
     -d "$(jq -n \
         --arg prompt "$EXTRACTION_PROMPT" \
+        --arg model "$CLAUDE_MODEL" \
         '{
-            model: "claude-sonnet-4-5-20250929",
+            model: $model,
             max_tokens: 1024,
             messages: [{role: "user", content: $prompt}]
         }')" 2>/dev/null || true)

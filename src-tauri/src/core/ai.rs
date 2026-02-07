@@ -12,6 +12,7 @@
 //! - rusqlite - Database access for API key retrieval
 //!
 //! EXPORTS:
+//! - MODEL - The Claude model ID string (single source of truth for all callers)
 //! - call_claude - Send a prompt to the Claude API and return the text response
 //! - get_api_key - Read and decrypt the Anthropic API key from the settings table
 //!
@@ -30,7 +31,7 @@
 use rusqlite::Connection;
 use serde_json::json;
 
-const MODEL: &str = "claude-sonnet-4-5-20250929";
+pub const MODEL: &str = "claude-sonnet-4-5-20250929";
 const API_URL: &str = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
 

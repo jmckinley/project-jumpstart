@@ -31,9 +31,11 @@
 //! - Enforcement score: 5 for hooks installed, 5 for CI config present
 //!
 //! CLAUDE NOTES:
-//! - Hook modes: "block" (exit 1), "warn" (exit 0 with message), "auto-update" (generate docs)
+//! - Hook modes: "block" (exit 1), "warn" (exit 0 with message), "auto-update" (always exit 0)
+//! - Auto-update mode NEVER blocks commits — all errors become warnings + exit 0
 //! - Auto-update mode reads API key from ~/.project-jumpstart/settings.json
-//! - When installing auto-update hook, API key is exported from encrypted SQLite to JSON
+//! - Model ID for hook comes from settings.json "claude_model" key (set by export_api_key_for_hook)
+//! - When installing auto-update hook, API key + model are exported from encrypted SQLite to JSON
 //! - The settings.json file has 0600 permissions (owner read/write only)
 //! - Husky detection: checks for .husky/ directory
 //! - CI detection: checks for .github/workflows/ or .gitlab-ci.yml
@@ -42,7 +44,7 @@
 use std::path::Path;
 use tauri::State;
 
-use crate::core::crypto;
+use crate::core::{ai, crypto};
 use crate::db::{self, AppState};
 use crate::models::enforcement::{CiSnippet, EnforcementEvent, HookStatus};
 
@@ -51,7 +53,7 @@ use crate::models::enforcement::{CiSnippet, EnforcementEvent, HookStatus};
 /// - MAJOR: Breaking changes (requires jq, different behavior)
 /// - MINOR: New features (backward compatible)
 /// - PATCH: Bug fixes
-pub const HOOK_VERSION: &str = "2.1.0";
+pub const HOOK_VERSION: &str = "3.0.0";
 
 /// Parse version from hook script content
 fn parse_hook_version(content: &str) -> Option<String> {
@@ -119,7 +121,8 @@ fn export_api_key_for_hook(db: &rusqlite::Connection) -> Result<(), String> {
 
     let settings_path = settings_dir.join("settings.json");
     let json = serde_json::json!({
-        "anthropic_api_key": api_key
+        "anthropic_api_key": api_key,
+        "claude_model": ai::MODEL
     });
     let json_bytes = serde_json::to_string_pretty(&json)
         .map_err(|e| format!("Failed to serialize settings: {}", e))?;
@@ -595,60 +598,148 @@ fn generate_auto_update_hook_script() -> String {
 #
 # This hook automatically generates documentation for files missing headers.
 # It reads the Anthropic API key from ~/.project-jumpstart/settings.json
-
-set -e
+#
+# RESILIENCE POLICY: This hook NEVER blocks commits. All errors become warnings.
 
 # Prevent API key from appearing in debug output
-set +x"#, version = HOOK_VERSION).to_string() + r#"
+set +x
 
+# --- Configuration ---
+PER_FILE_TIMEOUT=15
+TOTAL_TIMEOUT=120
 EXTENSIONS="ts tsx js jsx rs py go"
 SETTINGS_FILE="$HOME/.project-jumpstart/settings.json"
+FALLBACK_MODEL="claude-sonnet-4-5-latest"
+START_TIME=$(date +%s)
+
+# --- Counters ---
+FILES_PROCESSED=0
+FILES_SKIPPED=0
 
 # Cleanup function for temp files
-cleanup() {
+cleanup() {{
     if [ -n "$TEMP_FILE" ] && [ -f "$TEMP_FILE" ]; then
         rm -f "$TEMP_FILE"
     fi
-}
+    rm -f "$HOME/.project-jumpstart/.missing_files_$$" 2>/dev/null
+}}
 trap cleanup EXIT
 
-# Check for jq (required for safe JSON parsing)
+# Check if total timeout has been exceeded
+check_timeout() {{
+    ELAPSED=$(( $(date +%s) - START_TIME ))
+    if [ "$ELAPSED" -ge "$TOTAL_TIMEOUT" ]; then
+        echo "[Project Jumpstart] Total timeout (${{TOTAL_TIMEOUT}}s) exceeded. Skipping remaining files."
+        return 1
+    fi
+    return 0
+}}
+
+# Call the Anthropic API with model fallback
+# Usage: call_api MODEL PAYLOAD
+# Returns response on stdout, empty string on failure
+call_api() {{
+    local model="$1"
+    local payload="$2"
+
+    local response
+    response=$(curl -s --max-time "$PER_FILE_TIMEOUT" https://api.anthropic.com/v1/messages \
+        -H "Content-Type: application/json" \
+        -H "x-api-key: $API_KEY" \
+        -H "anthropic-version: 2023-06-01" \
+        -d "$payload" 2>/dev/null) || {{
+        echo ""
+        return
+    }}
+
+    # Check for model-not-found or deprecated error
+    local error_type
+    error_type=$(echo "$response" | jq -r '.error.type // empty' 2>/dev/null)
+    if [ "$error_type" = "not_found_error" ] || [ "$error_type" = "invalid_request_error" ]; then
+        local error_msg
+        error_msg=$(echo "$response" | jq -r '.error.message // empty' 2>/dev/null)
+        case "$error_msg" in
+            *model*|*deprecated*|*not available*)
+                # Model issue — retry with fallback if not already using it
+                if [ "$model" != "$FALLBACK_MODEL" ]; then
+                    echo "    [warn] Model $model unavailable, trying $FALLBACK_MODEL..." >&2
+                    local fallback_payload
+                    fallback_payload=$(echo "$payload" | jq --arg m "$FALLBACK_MODEL" '.model = $m' 2>/dev/null)
+                    if [ -n "$fallback_payload" ]; then
+                        response=$(curl -s --max-time "$PER_FILE_TIMEOUT" https://api.anthropic.com/v1/messages \
+                            -H "Content-Type: application/json" \
+                            -H "x-api-key: $API_KEY" \
+                            -H "anthropic-version: 2023-06-01" \
+                            -d "$fallback_payload" 2>/dev/null) || {{
+                            echo ""
+                            return
+                        }}
+                    else
+                        echo ""
+                        return
+                    fi
+                else
+                    echo ""
+                    return
+                fi
+                ;;
+            *)
+                echo ""
+                return
+                ;;
+        esac
+    fi
+
+    # Check for other API errors
+    local api_error
+    api_error=$(echo "$response" | jq -r '.error.message // empty' 2>/dev/null)
+    if [ -n "$api_error" ]; then
+        echo ""
+        return
+    fi
+
+    echo "$response"
+}}
+
+# --- Pre-flight checks (all graceful) ---
+
 if ! command -v jq >/dev/null 2>&1; then
-    echo "ERROR: jq is required for auto-update mode but not installed."
-    echo "Install with: brew install jq (macOS) or apt install jq (Linux)"
-    exit 1
+    echo "[Project Jumpstart] Warning: jq not installed. Skipping auto-update."
+    echo "  Install with: brew install jq (macOS) or apt install jq (Linux)"
+    exit 0
 fi
 
-# Check if settings file exists
 if [ ! -f "$SETTINGS_FILE" ]; then
-    echo "ERROR: Project Jumpstart settings not found at $SETTINGS_FILE"
-    echo "Please run Project Jumpstart to configure your API key."
-    exit 1
+    echo "[Project Jumpstart] Warning: Settings not found at $SETTINGS_FILE. Skipping auto-update."
+    echo "  Please run Project Jumpstart to configure your API key."
+    exit 0
 fi
 
-# Extract API key safely using jq
 API_KEY=$(jq -r '.anthropic_api_key // empty' "$SETTINGS_FILE" 2>/dev/null)
 if [ -z "$API_KEY" ]; then
-    echo "ERROR: No API key found in Project Jumpstart settings."
-    echo "Please configure your Anthropic API key in Project Jumpstart."
-    exit 1
+    echo "[Project Jumpstart] Warning: No API key found in settings. Skipping auto-update."
+    exit 0
 fi
 
-# Validate API key format (basic check)
 case "$API_KEY" in
     sk-ant-*)
-        # Valid Anthropic API key format
         ;;
     *)
-        echo "ERROR: Invalid API key format in settings."
-        exit 1
+        echo "[Project Jumpstart] Warning: Invalid API key format. Skipping auto-update."
+        exit 0
         ;;
 esac
 
-# Find files missing documentation (handle spaces in filenames)
-MISSING_FILES=""
+# Read model from settings.json (with hardcoded fallback)
+CLAUDE_MODEL=$(jq -r '.claude_model // empty' "$SETTINGS_FILE" 2>/dev/null)
+if [ -z "$CLAUDE_MODEL" ]; then
+    CLAUDE_MODEL="$FALLBACK_MODEL"
+fi
+
+# --- Find files missing documentation ---
+
 git diff --cached --name-only --diff-filter=ACM -z | while IFS= read -r -d '' file; do
-    ext="${file##*.}"
+    ext="${{file##*.}}"
     case " $EXTENSIONS " in
         *" $ext "*)
             if ! head -30 "$file" 2>/dev/null | grep -q "@module\|@description\|//! @module"; then
@@ -658,25 +749,27 @@ git diff --cached --name-only --diff-filter=ACM -z | while IFS= read -r -d '' fi
     esac
 done
 
-# Read missing files list (if any)
 MISSING_LIST="$HOME/.project-jumpstart/.missing_files_$$"
 if [ ! -f "$MISSING_LIST" ] || [ ! -s "$MISSING_LIST" ]; then
     rm -f "$MISSING_LIST" 2>/dev/null
     exit 0
 fi
 
-echo "Auto-generating documentation for files with missing headers..."
+echo "[Project Jumpstart] Auto-generating documentation for files with missing headers..."
 
-# Track if any files were processed
-FILES_PROCESSED=0
+# --- Process each file (with per-file resilience) ---
 
 while IFS= read -r -d '' file; do
+    # Check total timeout before each file
+    if ! check_timeout; then
+        FILES_SKIPPED=$((FILES_SKIPPED + 1))
+        continue
+    fi
+
     echo "  Generating docs for: $file"
 
-    # Read file content (escape for JSON)
-    CONTENT=$(cat "$file" | jq -Rs .)
     FILENAME=$(basename "$file")
-    EXT="${file##*.}"
+    EXT="${{file##*.}}"
 
     # Determine comment style based on extension
     case "$EXT" in
@@ -694,88 +787,94 @@ while IFS= read -r -d '' file; do
             ;;
     esac
 
-    # Build JSON payload safely
+    # Build JSON payload safely using jq (model from variable)
     PAYLOAD=$(jq -n \
-        --arg model "claude-sonnet-4-5-20250929" \
+        --arg model "$CLAUDE_MODEL" \
         --arg content "Generate ONLY a documentation header for this $EXT file named $FILENAME. Use $COMMENT_STYLE style comments. Include @module, @description, PURPOSE, EXPORTS, and CLAUDE NOTES sections. Output ONLY the comment block, nothing else:\n\n$(cat "$file")" \
-        '{
+        '{{
             model: $model,
             max_tokens: 1024,
-            messages: [{role: "user", content: $content}]
-        }')
+            messages: [{{role: "user", content: $content}}]
+        }}') || {{
+        echo "    [warn] Failed to build request payload, skipping $file"
+        FILES_SKIPPED=$((FILES_SKIPPED + 1))
+        continue
+    }}
 
-    # Call Anthropic API with timeout
-    RESPONSE=$(curl -s --max-time 30 https://api.anthropic.com/v1/messages \
-        -H "Content-Type: application/json" \
-        -H "x-api-key: $API_KEY" \
-        -H "anthropic-version: 2023-06-01" \
-        -d "$PAYLOAD" 2>/dev/null) || {
-        echo "    ✗ API request failed (network error or timeout)"
-        rm -f "$MISSING_LIST"
-        exit 1
-    }
+    # Call API with model fallback
+    RESPONSE=$(call_api "$CLAUDE_MODEL" "$PAYLOAD")
 
-    # Check for API errors
-    API_ERROR=$(echo "$RESPONSE" | jq -r '.error.message // empty' 2>/dev/null)
-    if [ -n "$API_ERROR" ]; then
-        echo "    ✗ API error: $API_ERROR"
-        rm -f "$MISSING_LIST"
-        exit 1
+    if [ -z "$RESPONSE" ]; then
+        echo "    [warn] API request failed, skipping $file"
+        FILES_SKIPPED=$((FILES_SKIPPED + 1))
+        continue
     fi
 
-    # Extract documentation header safely using jq
+    # Extract documentation header
     DOC_HEADER=$(echo "$RESPONSE" | jq -r '.content[0].text // empty' 2>/dev/null)
 
-    if [ -n "$DOC_HEADER" ] && [ "$DOC_HEADER" != "null" ]; then
-        # Create temp file in same directory as target (same filesystem for atomic mv)
-        TEMP_FILE=$(mktemp "$(dirname "$file")/.doc_gen_XXXXXX") || {
-            echo "    ✗ Failed to create temp file"
-            rm -f "$MISSING_LIST"
-            exit 1
-        }
-
-        # Write new content (printf preserves formatting better than echo)
-        printf '%s\n\n' "$DOC_HEADER" > "$TEMP_FILE" || {
-            echo "    ✗ Failed to write documentation"
-            rm -f "$TEMP_FILE" "$MISSING_LIST"
-            exit 1
-        }
-        cat "$file" >> "$TEMP_FILE" || {
-            echo "    ✗ Failed to append original content"
-            rm -f "$TEMP_FILE" "$MISSING_LIST"
-            exit 1
-        }
-
-        # Atomic move (same filesystem)
-        mv "$TEMP_FILE" "$file" || {
-            echo "    ✗ Failed to update file"
-            rm -f "$TEMP_FILE" "$MISSING_LIST"
-            exit 1
-        }
-        TEMP_FILE=""  # Clear so cleanup doesn't try to remove
-
-        # Re-stage the file
-        git add "$file"
-        echo "    ✓ Documentation added and staged"
-        FILES_PROCESSED=$((FILES_PROCESSED + 1))
-    else
-        echo "    ✗ Failed to generate documentation (empty response)"
-        rm -f "$MISSING_LIST"
-        exit 1
+    if [ -z "$DOC_HEADER" ] || [ "$DOC_HEADER" = "null" ]; then
+        echo "    [warn] Empty response from API, skipping $file"
+        FILES_SKIPPED=$((FILES_SKIPPED + 1))
+        continue
     fi
+
+    # Create temp file in same directory as target (same filesystem for atomic mv)
+    TEMP_FILE=$(mktemp "$(dirname "$file")/.doc_gen_XXXXXX") || {{
+        echo "    [warn] Failed to create temp file, skipping $file"
+        FILES_SKIPPED=$((FILES_SKIPPED + 1))
+        continue
+    }}
+
+    # Write new content
+    if ! printf '%s\n\n' "$DOC_HEADER" > "$TEMP_FILE" 2>/dev/null; then
+        echo "    [warn] Failed to write documentation, skipping $file"
+        rm -f "$TEMP_FILE"
+        TEMP_FILE=""
+        FILES_SKIPPED=$((FILES_SKIPPED + 1))
+        continue
+    fi
+
+    if ! cat "$file" >> "$TEMP_FILE" 2>/dev/null; then
+        echo "    [warn] Failed to append original content, skipping $file"
+        rm -f "$TEMP_FILE"
+        TEMP_FILE=""
+        FILES_SKIPPED=$((FILES_SKIPPED + 1))
+        continue
+    fi
+
+    # Atomic move (same filesystem)
+    if ! mv "$TEMP_FILE" "$file" 2>/dev/null; then
+        echo "    [warn] Failed to update file, skipping $file"
+        rm -f "$TEMP_FILE"
+        TEMP_FILE=""
+        FILES_SKIPPED=$((FILES_SKIPPED + 1))
+        continue
+    fi
+    TEMP_FILE=""
+
+    # Re-stage the file
+    git add "$file"
+    echo "    ✓ Documentation added and staged"
+    FILES_PROCESSED=$((FILES_PROCESSED + 1))
 done < "$MISSING_LIST"
 
-# Cleanup
+# --- Summary ---
+
 rm -f "$MISSING_LIST"
 
 if [ "$FILES_PROCESSED" -gt 0 ]; then
-    echo ""
-    echo "Documentation auto-generated for $FILES_PROCESSED file(s)."
-    echo "Changes have been staged. Proceeding with commit..."
+    echo "[Project Jumpstart] Auto-generated docs for $FILES_PROCESSED file(s)."
+fi
+
+if [ "$FILES_SKIPPED" -gt 0 ]; then
+    echo "[Project Jumpstart] Skipped $FILES_SKIPPED file(s) due to errors (commit will proceed)."
 fi
 
 exit 0
-"#
+"#,
+        version = HOOK_VERSION
+    )
 }
 
 // --- CI Template Generators ---
@@ -884,6 +983,44 @@ mod tests {
         assert!(script.contains("api.anthropic.com"));
         // Check it stages files after generating docs
         assert!(script.contains("git add"));
+        // Check model is read from settings (not hardcoded in payload)
+        assert!(script.contains("claude_model"));
+        // Check fallback model is present
+        assert!(script.contains("claude-sonnet-4-5-latest"));
+        // Check total timeout is present
+        assert!(script.contains("TOTAL_TIMEOUT"));
+        // Check set -e is NOT present (would cause premature exit)
+        assert!(!script.contains("set -e"));
+    }
+
+    #[test]
+    fn test_auto_update_hook_never_blocks() {
+        let script = generate_auto_update_hook_script();
+        // Scan every non-comment line for "exit 1" — there should be NONE
+        for line in script.lines() {
+            let trimmed = line.trim();
+            // Skip comment lines and empty lines
+            if trimmed.starts_with('#') || trimmed.is_empty() {
+                continue;
+            }
+            assert!(
+                !trimmed.contains("exit 1"),
+                "Found 'exit 1' in non-comment line: {}",
+                line
+            );
+        }
+    }
+
+    #[test]
+    fn test_auto_update_hook_no_hardcoded_model_in_payload() {
+        let script = generate_auto_update_hook_script();
+        // The model should NOT be hardcoded as a jq --arg literal in the payload builder.
+        // It should use the $CLAUDE_MODEL variable instead.
+        // Check that there's no `--arg model "claude-sonnet-` pattern
+        assert!(
+            !script.contains(r#"--arg model "claude-sonnet-4-5-20250929""#),
+            "Model ID should not be hardcoded in the jq payload"
+        );
     }
 
     #[test]
