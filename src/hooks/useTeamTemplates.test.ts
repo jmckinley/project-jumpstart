@@ -9,6 +9,9 @@
  * - Verify removeTemplate calls deleteTeamTemplate and refreshes list
  * - Verify bumpUsage increments usage count optimistically
  * - Verify isTemplateAdded checks by name case-insensitive
+ * - Verify generateOutput calls backend without context
+ * - Verify generateOutput calls backend with project context
+ * - Verify generateOutput sets error on failure
  * - Verify error state is set on failure
  *
  * DEPENDENCIES:
@@ -355,6 +358,68 @@ describe("useTeamTemplates", () => {
       });
 
       expect(result.current.isTemplateAdded("Nonexistent Team")).toBe(false);
+    });
+  });
+
+  describe("generateOutput", () => {
+    it("should call generateTeamDeployOutput without context", async () => {
+      vi.mocked(invoke).mockResolvedValue("# Generated Output");
+
+      const { result } = renderHook(() => useTeamTemplates());
+
+      let output: string | null = null;
+      await act(async () => {
+        output = await result.current.generateOutput(mockTemplates[0], "prompt");
+      });
+
+      expect(output).toBe("# Generated Output");
+      expect(invoke).toHaveBeenCalledWith("generate_team_deploy_output", {
+        templateJson: JSON.stringify(mockTemplates[0]),
+        format: "prompt",
+        projectContextJson: null,
+      });
+    });
+
+    it("should call generateTeamDeployOutput with project context", async () => {
+      vi.mocked(invoke).mockResolvedValue("# Personalized Output");
+
+      const { result } = renderHook(() => useTeamTemplates());
+
+      const context = {
+        name: "My App",
+        language: "TypeScript",
+        framework: "React",
+        testFramework: "Vitest",
+        buildTool: null,
+        styling: null,
+        database: null,
+      };
+
+      let output: string | null = null;
+      await act(async () => {
+        output = await result.current.generateOutput(mockTemplates[0], "prompt", context);
+      });
+
+      expect(output).toBe("# Personalized Output");
+      expect(invoke).toHaveBeenCalledWith("generate_team_deploy_output", {
+        templateJson: JSON.stringify(mockTemplates[0]),
+        format: "prompt",
+        projectContextJson: JSON.stringify(context),
+      });
+    });
+
+    it("should set error on generateOutput failure", async () => {
+      vi.mocked(invoke).mockRejectedValue(new Error("Generation failed"));
+
+      const { result } = renderHook(() => useTeamTemplates());
+
+      let output: string | null = null;
+      await act(async () => {
+        output = await result.current.generateOutput(mockTemplates[0], "prompt");
+      });
+
+      expect(output).toBeNull();
+      expect(result.current.error).toBe("Generation failed");
     });
   });
 

@@ -14,6 +14,7 @@
 //! - TeammateDef - Definition of a single teammate
 //! - TeamTaskDef - Definition of a task with dependencies
 //! - TeamHookDef - Definition of a hook for coordination
+//! - ProjectContext - Active project tech stack context for deploy output personalization
 //!
 //! PATTERNS:
 //! - Team templates have JSON-serialized teammates, tasks, hooks
@@ -50,6 +51,18 @@ pub struct TeamHookDef {
     pub event: String,
     pub command: String,
     pub description: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectContext {
+    pub name: Option<String>,
+    pub language: Option<String>,
+    pub framework: Option<String>,
+    pub test_framework: Option<String>,
+    pub build_tool: Option<String>,
+    pub styling: Option<String>,
+    pub database: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

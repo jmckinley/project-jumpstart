@@ -141,7 +141,9 @@ export const TEAM_TEMPLATE_LIBRARY: LibraryTeamTemplate[] = [
         blockedBy: ["green"],
       },
     ],
-    hooks: [],
+    hooks: [
+      { event: "PostToolUse", command: "{{testCommand}}", description: "Run tests after each code change to verify TDD phase progress" },
+    ],
     leadSpawnInstructions: "You are coordinating a TDD Pipeline. The phases run sequentially: RED (write failing tests) -> GREEN (make tests pass) -> REFACTOR (clean up). Ensure each phase completes before the next begins.",
   },
 
@@ -245,7 +247,9 @@ export const TEAM_TEMPLATE_LIBRARY: LibraryTeamTemplate[] = [
         blockedBy: [],
       },
     ],
-    hooks: [],
+    hooks: [
+      { event: "PostToolUse", command: "{{testCommand}}", description: "Run tests after code changes to validate coverage" },
+    ],
     leadSpawnInstructions: "You are coordinating a Parallel Test Suite Builder. All three testers work simultaneously on different test levels. Monitor progress and resolve any test conflicts or shared fixture issues.",
   },
 

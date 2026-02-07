@@ -169,7 +169,7 @@ import {
   TeamDeployOutput,
 } from "@/components/team-templates";
 import { useTeamTemplates } from "@/hooks/useTeamTemplates";
-import type { TeamTemplate, LibraryTeamTemplate, TeammateDef, TeamTaskDef, TeamHookDef } from "@/types/team-template";
+import type { TeamTemplate, LibraryTeamTemplate, TeammateDef, TeamTaskDef, TeamHookDef, ProjectContext } from "@/types/team-template";
 
 interface MainPanelProps {
   activeSection: string;
@@ -1630,6 +1630,18 @@ function TeamTemplatesView({ onTeamTemplatesChange }: { onTeamTemplatesChange?: 
     generateOutput,
   } = useTeamTemplates();
 
+  const activeProject = useProjectStore((s) => s.activeProject);
+
+  const projectContext: ProjectContext | undefined = activeProject ? {
+    name: activeProject.name,
+    language: activeProject.language || null,
+    framework: activeProject.framework,
+    testFramework: activeProject.testing ?? null,
+    buildTool: null,
+    styling: activeProject.styling ?? null,
+    database: activeProject.database ?? null,
+  } : undefined;
+
   const [selectedTemplate, setSelectedTemplate] = useState<TeamTemplate | null>(null);
   const [editing, setEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<"my-teams" | "library" | "deploy">("library");
@@ -1788,6 +1800,7 @@ function TeamTemplatesView({ onTeamTemplatesChange }: { onTeamTemplatesChange?: 
         deployTemplate ? (
           <TeamDeployOutput
             template={deployTemplate}
+            projectContext={projectContext}
             onGenerate={generateOutput}
             onBack={() => {
               setDeployTemplate(null);

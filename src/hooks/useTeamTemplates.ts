@@ -12,7 +12,7 @@
  * DEPENDENCIES:
  * - @/lib/tauri - listTeamTemplates, createTeamTemplate, updateTeamTemplate, deleteTeamTemplate, incrementTeamTemplateUsage, generateTeamDeployOutput
  * - @/stores/projectStore - Active project for scoping templates
- * - @/types/team-template - TeamTemplate, LibraryTeamTemplate types
+ * - @/types/team-template - TeamTemplate, LibraryTeamTemplate, ProjectContext types
  *
  * EXPORTS:
  * - useTeamTemplates - Hook returning templates state and actions
@@ -27,7 +27,7 @@
  * - After add/edit/remove, the templates list is refreshed automatically
  * - isTemplateAdded checks by name (case-insensitive)
  * - addFromLibrary creates a template from a LibraryTeamTemplate object
- * - generateOutput calls the backend to produce deploy output
+ * - generateOutput calls the backend to produce deploy output (optionally with project context)
  */
 
 import { useCallback, useState } from "react";
@@ -40,7 +40,7 @@ import {
   incrementTeamTemplateUsage,
   generateTeamDeployOutput,
 } from "@/lib/tauri";
-import type { TeamTemplate, LibraryTeamTemplate, TeammateDef, TeamTaskDef, TeamHookDef } from "@/types/team-template";
+import type { TeamTemplate, LibraryTeamTemplate, TeammateDef, TeamTaskDef, TeamHookDef, ProjectContext } from "@/types/team-template";
 
 interface TeamTemplatesState {
   templates: TeamTemplate[];
@@ -201,10 +201,11 @@ export function useTeamTemplates() {
   );
 
   const generateOutput = useCallback(
-    async (template: TeamTemplate | LibraryTeamTemplate, format: string): Promise<string | null> => {
+    async (template: TeamTemplate | LibraryTeamTemplate, format: string, projectContext?: ProjectContext): Promise<string | null> => {
       try {
         const templateJson = JSON.stringify(template);
-        return await generateTeamDeployOutput(templateJson, format);
+        const contextJson = projectContext ? JSON.stringify(projectContext) : undefined;
+        return await generateTeamDeployOutput(templateJson, format, contextJson);
       } catch (err) {
         setState((s) => ({
           ...s,

@@ -825,8 +825,16 @@ export async function incrementTeamTemplateUsage(id: string): Promise<number> {
   return invoke<number>("increment_team_template_usage", { id });
 }
 
-export async function generateTeamDeployOutput(templateJson: string, format: string): Promise<string> {
-  return invoke<string>("generate_team_deploy_output", { templateJson, format });
+export async function generateTeamDeployOutput(
+  templateJson: string,
+  format: string,
+  projectContextJson?: string,
+): Promise<string> {
+  return invoke<string>("generate_team_deploy_output", {
+    templateJson,
+    format,
+    projectContextJson: projectContextJson ?? null,
+  });
 }
 
 /**

@@ -9,7 +9,7 @@
 //! DEPENDENCIES:
 //! - tauri - Command macro and State
 //! - db::AppState - Database connection state
-//! - models::team_template - TeamTemplate, TeammateDef, TeamTaskDef, TeamHookDef
+//! - models::team_template - TeamTemplate, TeammateDef, TeamTaskDef, TeamHookDef, ProjectContext
 //! - chrono - Timestamp generation
 //! - uuid - Unique ID generation
 //!
@@ -19,7 +19,11 @@
 //! - update_team_template - Update an existing template
 //! - delete_team_template - Delete a template by ID
 //! - increment_team_template_usage - Bump usage count
-//! - generate_team_deploy_output - Generate deploy output string
+//! - generate_team_deploy_output - Generate deploy output string (with optional project context)
+//! - build_context_block - Generate "## Project Context" markdown block
+//! - apply_context_substitutions - Replace generic tech phrases with project-specific values
+//! - resolve_test_command - Map test framework name to CLI command
+//! - render_hooks_section - Render hooks as Claude Code settings.json snippet
 //!
 //! PATTERNS:
 //! - All commands use AppState for DB access
@@ -27,6 +31,7 @@
 //! - JSON fields (teammates, tasks, hooks) are serialized/deserialized
 //! - generate_team_deploy_output uses pure string templating, no AI
 //! - Deploy output matches real Claude Code Agent Teams behavior (natural language prompts)
+//! - When project context is provided, output is personalized with tech stack details
 //!
 //! CLAUDE NOTES:
 //! - Mirrors agents.rs command pattern exactly
@@ -41,7 +46,7 @@ use tauri::State;
 use uuid::Uuid;
 
 use crate::db::{self, AppState};
-use crate::models::team_template::{TeamTemplate, TeammateDef, TeamTaskDef, TeamHookDef};
+use crate::models::team_template::{TeamTemplate, TeammateDef, TeamTaskDef, TeamHookDef, ProjectContext};
 
 /// List all team templates for a project (or global if project_id is None).
 #[tauri::command]
@@ -265,10 +270,12 @@ pub async fn increment_team_template_usage(id: String, state: State<'_, AppState
 
 /// Generate deploy output for a team template.
 /// Format: "prompt" (paste-ready lead prompt), "script" (shell script), or "config" (directory config)
+/// Optionally accepts project context JSON to personalize output with the project's tech stack.
 #[tauri::command]
 pub async fn generate_team_deploy_output(
     template_json: String,
     format: String,
+    project_context_json: Option<String>,
     _state: State<'_, AppState>,
 ) -> Result<String, String> {
     #[derive(serde::Deserialize)]
@@ -286,10 +293,17 @@ pub async fn generate_team_deploy_output(
     let template: TemplateInput =
         serde_json::from_str(&template_json).map_err(|e| format!("Invalid template JSON: {}", e))?;
 
+    let ctx: Option<ProjectContext> = match project_context_json {
+        Some(ref json) if !json.is_empty() => {
+            serde_json::from_str(json).ok()
+        }
+        _ => None,
+    };
+
     match format.as_str() {
-        "prompt" => Ok(generate_prompt_output(&template.name, &template.description, &template.orchestration_pattern, &template.teammates, &template.tasks, &template.hooks, &template.lead_spawn_instructions)),
-        "script" => Ok(generate_script_output(&template.name, &template.description, &template.orchestration_pattern, &template.teammates, &template.tasks, &template.hooks, &template.lead_spawn_instructions)),
-        "config" => Ok(generate_config_output(&template.name, &template.description, &template.orchestration_pattern, &template.teammates, &template.tasks, &template.lead_spawn_instructions)),
+        "prompt" => Ok(generate_prompt_output(&template.name, &template.description, &template.orchestration_pattern, &template.teammates, &template.tasks, &template.hooks, &template.lead_spawn_instructions, ctx.as_ref())),
+        "script" => Ok(generate_script_output(&template.name, &template.description, &template.orchestration_pattern, &template.teammates, &template.tasks, &template.hooks, &template.lead_spawn_instructions, ctx.as_ref())),
+        "config" => Ok(generate_config_output(&template.name, &template.description, &template.orchestration_pattern, &template.teammates, &template.tasks, &template.hooks, &template.lead_spawn_instructions, ctx.as_ref())),
         _ => Err(format!("Unknown format: {}", format)),
     }
 }
@@ -324,6 +338,148 @@ fn pattern_description(pattern: &str) -> &str {
     }
 }
 
+/// Map a test framework name to its CLI command.
+fn resolve_test_command(test_framework: &str) -> &str {
+    match test_framework.to_lowercase().as_str() {
+        "vitest" => "npx vitest run",
+        "jest" => "npx jest",
+        "pytest" | "python" => "pytest",
+        "cargo test" | "cargo" | "rust" => "cargo test",
+        "go test" | "go" => "go test ./...",
+        "mocha" => "npx mocha",
+        "playwright" => "npx playwright test",
+        "cypress" => "npx cypress run",
+        _ => "npm test",
+    }
+}
+
+/// Build a "## Project Context" markdown block from project context.
+fn build_context_block(ctx: &ProjectContext) -> String {
+    let mut lines: Vec<String> = Vec::new();
+
+    if let Some(ref name) = ctx.name {
+        lines.push(format!("- **Project:** {}", name));
+    }
+    if let Some(ref lang) = ctx.language {
+        lines.push(format!("- **Language:** {}", lang));
+    }
+    if let Some(ref fw) = ctx.framework {
+        lines.push(format!("- **Framework:** {}", fw));
+    }
+    if let Some(ref tf) = ctx.test_framework {
+        lines.push(format!("- **Test Framework:** {}", tf));
+    }
+    if let Some(ref bt) = ctx.build_tool {
+        lines.push(format!("- **Build Tool:** {}", bt));
+    }
+    if let Some(ref st) = ctx.styling {
+        lines.push(format!("- **Styling:** {}", st));
+    }
+    if let Some(ref db) = ctx.database {
+        lines.push(format!("- **Database:** {}", db));
+    }
+
+    if lines.is_empty() {
+        return String::new();
+    }
+
+    format!("## Project Context\n\n{}\n\n", lines.join("\n"))
+}
+
+/// Replace generic tech phrases in text with project-specific values.
+fn apply_context_substitutions(text: &str, ctx: &ProjectContext) -> String {
+    let mut result = text.to_string();
+
+    // Test framework substitutions
+    if let Some(ref tf) = ctx.test_framework {
+        let test_cmd = resolve_test_command(tf);
+        result = result.replace(
+            "Use the project's testing framework (detect from config)",
+            &format!("Use **{}** for testing", tf),
+        );
+        result = result.replace("{{testCommand}}", test_cmd);
+        result = result.replace(
+            "Detect the project's build system and test framework",
+            &format!("The project uses **{}**", tf),
+        );
+    }
+
+    // E2E framework — only substitute if test framework looks like an E2E tool
+    if let Some(ref tf) = ctx.test_framework {
+        let lower = tf.to_lowercase();
+        if lower.contains("playwright") || lower.contains("cypress") {
+            result = result.replace(
+                "Use the project's E2E framework (Playwright, Cypress, etc.)",
+                &format!("Use **{}** for E2E testing", tf),
+            );
+        }
+    }
+
+    // Framework substitutions
+    if let Some(ref fw) = ctx.framework {
+        result = result.replace("React/UI components", &format!("**{}** components", fw));
+    }
+
+    result
+}
+
+/// Render hooks as a Claude Code settings.json snippet.
+fn render_hooks_section(hooks: &[TeamHookDef], ctx: Option<&ProjectContext>) -> String {
+    if hooks.is_empty() {
+        return String::new();
+    }
+
+    let mut out = String::new();
+    out.push_str("## Hooks\n\n");
+    out.push_str("Add to `.claude/settings.json` or `.claude/settings.local.json`:\n\n");
+    out.push_str("```json\n");
+    out.push_str("{\n");
+    out.push_str("  \"hooks\": {\n");
+
+    // Group hooks by event
+    let mut events: std::collections::BTreeMap<&str, Vec<&TeamHookDef>> = std::collections::BTreeMap::new();
+    for hook in hooks {
+        events.entry(&hook.event).or_default().push(hook);
+    }
+
+    let event_count = events.len();
+    for (idx, (event, event_hooks)) in events.iter().enumerate() {
+        out.push_str(&format!("    \"{}\": [\n", event));
+        for (hidx, hook) in event_hooks.iter().enumerate() {
+            let cmd = if let Some(c) = ctx {
+                apply_context_substitutions(&hook.command, c)
+            } else {
+                hook.command.clone()
+            };
+            out.push_str("      {\n");
+            out.push_str(&format!("        \"matcher\": \"Edit|Write\",\n"));
+            out.push_str(&format!("        \"command\": \"{}\"\n", cmd));
+            if hidx + 1 < event_hooks.len() {
+                out.push_str("      },\n");
+            } else {
+                out.push_str("      }\n");
+            }
+        }
+        if idx + 1 < event_count {
+            out.push_str("    ],\n");
+        } else {
+            out.push_str("    ]\n");
+        }
+    }
+
+    out.push_str("  }\n");
+    out.push_str("}\n");
+    out.push_str("```\n\n");
+
+    // Add description comments
+    for hook in hooks {
+        out.push_str(&format!("- **{}**: {}\n", hook.event, hook.description));
+    }
+    out.push_str("\n");
+
+    out
+}
+
 /// Generate a paste-ready natural language prompt for Claude Code Agent Teams.
 ///
 /// The user pastes this into an active Claude Code session (with Agent Teams
@@ -335,8 +491,9 @@ fn generate_prompt_output(
     pattern: &str,
     teammates: &[TeammateDef],
     tasks: &[TeamTaskDef],
-    _hooks: &[TeamHookDef],
+    hooks: &[TeamHookDef],
     lead_instructions: &str,
+    ctx: Option<&ProjectContext>,
 ) -> String {
     let mut out = String::new();
 
@@ -359,6 +516,14 @@ fn generate_prompt_output(
         pattern_description(pattern)
     ));
 
+    // Project context block
+    if let Some(c) = ctx {
+        let block = build_context_block(c);
+        if !block.is_empty() {
+            out.push_str(&block);
+        }
+    }
+
     // Teammates
     out.push_str(&format!("## Spawn {} Teammates\n\n", teammates.len()));
     for (i, mate) in teammates.iter().enumerate() {
@@ -369,7 +534,12 @@ fn generate_prompt_output(
             mate.description
         ));
         out.push_str("Spawn this teammate with the following prompt:\n\n");
-        for line in mate.spawn_prompt.lines() {
+        let prompt = if let Some(c) = ctx {
+            apply_context_substitutions(&mate.spawn_prompt, c)
+        } else {
+            mate.spawn_prompt.clone()
+        };
+        for line in prompt.lines() {
             out.push_str(&format!("> {}\n", line));
         }
         out.push_str("\n");
@@ -398,6 +568,12 @@ fn generate_prompt_output(
         }
     }
 
+    // Hooks
+    let hooks_section = render_hooks_section(hooks, ctx);
+    if !hooks_section.is_empty() {
+        out.push_str(&hooks_section);
+    }
+
     // Lead instructions
     if !lead_instructions.is_empty() {
         out.push_str("## Your Role as Lead\n\n");
@@ -423,8 +599,9 @@ fn generate_script_output(
     pattern: &str,
     teammates: &[TeammateDef],
     tasks: &[TeamTaskDef],
-    _hooks: &[TeamHookDef],
+    hooks: &[TeamHookDef],
     lead_instructions: &str,
+    ctx: Option<&ProjectContext>,
 ) -> String {
     let mut out = String::new();
     let slug = name.to_lowercase().replace(' ', "-");
@@ -454,6 +631,14 @@ fn generate_script_output(
         pattern_description(pattern)
     ));
 
+    // Project context block
+    if let Some(c) = ctx {
+        let block = build_context_block(c);
+        if !block.is_empty() {
+            prompt.push_str(&block);
+        }
+    }
+
     prompt.push_str(&format!("## Spawn {} Teammates\n\n", teammates.len()));
     for (i, mate) in teammates.iter().enumerate() {
         prompt.push_str(&format!(
@@ -462,7 +647,12 @@ fn generate_script_output(
             mate.role,
             mate.description
         ));
-        for line in mate.spawn_prompt.lines() {
+        let spawn = if let Some(c) = ctx {
+            apply_context_substitutions(&mate.spawn_prompt, c)
+        } else {
+            mate.spawn_prompt.clone()
+        };
+        for line in spawn.lines() {
             prompt.push_str(&format!("> {}\n", line));
         }
         prompt.push_str("\n");
@@ -487,6 +677,12 @@ fn generate_script_output(
             }
             prompt.push_str(&format!("   - {}\n\n", task.description));
         }
+    }
+
+    // Hooks
+    let hooks_section = render_hooks_section(hooks, ctx);
+    if !hooks_section.is_empty() {
+        prompt.push_str(&hooks_section);
     }
 
     if !lead_instructions.is_empty() {
@@ -541,7 +737,9 @@ fn generate_config_output(
     pattern: &str,
     teammates: &[TeammateDef],
     tasks: &[TeamTaskDef],
+    hooks: &[TeamHookDef],
     lead_instructions: &str,
+    ctx: Option<&ProjectContext>,
 ) -> String {
     let mut out = String::new();
     let slug = name.to_lowercase().replace(' ', "-");
@@ -578,6 +776,14 @@ fn generate_config_output(
         pattern,
         pattern_description(pattern)
     ));
+
+    // Project context inside the team prompt
+    if let Some(c) = ctx {
+        let block = build_context_block(c);
+        if !block.is_empty() {
+            out.push_str(&block);
+        }
+    }
 
     out.push_str(&format!("Spawn {} teammates:\n\n", teammates.len()));
     for (i, mate) in teammates.iter().enumerate() {
@@ -619,7 +825,8 @@ fn generate_config_output(
     out.push_str("```\n\n");
 
     // 3. Individual teammate spawn prompts
-    out.push_str("## 3. Teammate Spawn Prompts\n\n");
+    let section_num = if !hooks.is_empty() { 4 } else { 3 };
+    out.push_str(&format!("## 3. Teammate Spawn Prompts\n\n"));
     out.push_str("Reference prompts for each teammate (the lead uses these when spawning):\n\n");
     for mate in teammates {
         let mate_slug = mate.role.to_lowercase().replace(' ', "-");
@@ -628,8 +835,20 @@ fn generate_config_output(
             slug, mate_slug
         ));
         out.push_str("```markdown\n");
-        out.push_str(&mate.spawn_prompt);
+        let spawn = if let Some(c) = ctx {
+            apply_context_substitutions(&mate.spawn_prompt, c)
+        } else {
+            mate.spawn_prompt.clone()
+        };
+        out.push_str(&spawn);
         out.push_str("\n```\n\n");
+    }
+
+    // Hooks section (if present)
+    if !hooks.is_empty() {
+        out.push_str(&format!("## {}. Hooks\n\n", section_num));
+        let hooks_section = render_hooks_section(hooks, ctx);
+        out.push_str(&hooks_section);
     }
 
     // Usage
@@ -690,4 +909,182 @@ fn map_template_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TeamTemplate> {
         created_at,
         updated_at,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_ctx() -> ProjectContext {
+        ProjectContext {
+            name: Some("My App".to_string()),
+            language: Some("TypeScript".to_string()),
+            framework: Some("React".to_string()),
+            test_framework: Some("Vitest".to_string()),
+            build_tool: Some("Vite".to_string()),
+            styling: Some("Tailwind CSS".to_string()),
+            database: Some("PostgreSQL".to_string()),
+        }
+    }
+
+    #[test]
+    fn test_build_context_block_full() {
+        let ctx = make_ctx();
+        let block = build_context_block(&ctx);
+        assert!(block.contains("## Project Context"));
+        assert!(block.contains("**Project:** My App"));
+        assert!(block.contains("**Language:** TypeScript"));
+        assert!(block.contains("**Framework:** React"));
+        assert!(block.contains("**Test Framework:** Vitest"));
+        assert!(block.contains("**Build Tool:** Vite"));
+        assert!(block.contains("**Styling:** Tailwind CSS"));
+        assert!(block.contains("**Database:** PostgreSQL"));
+    }
+
+    #[test]
+    fn test_build_context_block_partial() {
+        let ctx = ProjectContext {
+            name: Some("Bare".to_string()),
+            language: Some("Rust".to_string()),
+            framework: None,
+            test_framework: None,
+            build_tool: None,
+            styling: None,
+            database: None,
+        };
+        let block = build_context_block(&ctx);
+        assert!(block.contains("**Project:** Bare"));
+        assert!(block.contains("**Language:** Rust"));
+        assert!(!block.contains("**Framework:**"));
+    }
+
+    #[test]
+    fn test_build_context_block_empty() {
+        let ctx = ProjectContext {
+            name: None,
+            language: None,
+            framework: None,
+            test_framework: None,
+            build_tool: None,
+            styling: None,
+            database: None,
+        };
+        let block = build_context_block(&ctx);
+        assert!(block.is_empty());
+    }
+
+    #[test]
+    fn test_apply_context_substitutions_test_framework() {
+        let ctx = make_ctx();
+        let input = "Use the project's testing framework (detect from config)";
+        let result = apply_context_substitutions(input, &ctx);
+        assert_eq!(result, "Use **Vitest** for testing");
+    }
+
+    #[test]
+    fn test_apply_context_substitutions_test_command() {
+        let ctx = make_ctx();
+        let input = "Run {{testCommand}} after each change";
+        let result = apply_context_substitutions(input, &ctx);
+        assert_eq!(result, "Run npx vitest run after each change");
+    }
+
+    #[test]
+    fn test_apply_context_substitutions_framework() {
+        let ctx = make_ctx();
+        let input = "Implement React/UI components for the dashboard";
+        let result = apply_context_substitutions(input, &ctx);
+        assert_eq!(result, "Implement **React** components for the dashboard");
+    }
+
+    #[test]
+    fn test_apply_context_substitutions_no_match() {
+        let ctx = make_ctx();
+        let input = "This text has no placeholders";
+        let result = apply_context_substitutions(input, &ctx);
+        assert_eq!(result, input);
+    }
+
+    #[test]
+    fn test_resolve_test_command_known() {
+        assert_eq!(resolve_test_command("Vitest"), "npx vitest run");
+        assert_eq!(resolve_test_command("Jest"), "npx jest");
+        assert_eq!(resolve_test_command("pytest"), "pytest");
+        assert_eq!(resolve_test_command("cargo test"), "cargo test");
+        assert_eq!(resolve_test_command("Playwright"), "npx playwright test");
+        assert_eq!(resolve_test_command("Mocha"), "npx mocha");
+    }
+
+    #[test]
+    fn test_resolve_test_command_unknown() {
+        assert_eq!(resolve_test_command("SomeUnknown"), "npm test");
+    }
+
+    #[test]
+    fn test_render_hooks_section_empty() {
+        let hooks: Vec<TeamHookDef> = vec![];
+        let result = render_hooks_section(&hooks, None);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_render_hooks_section_with_hooks() {
+        let hooks = vec![TeamHookDef {
+            event: "PostToolUse".to_string(),
+            command: "{{testCommand}}".to_string(),
+            description: "Run tests".to_string(),
+        }];
+        let ctx = make_ctx();
+        let result = render_hooks_section(&hooks, Some(&ctx));
+        assert!(result.contains("## Hooks"));
+        assert!(result.contains("npx vitest run"));
+        assert!(result.contains("Run tests"));
+    }
+
+    #[test]
+    fn test_render_hooks_section_without_context() {
+        let hooks = vec![TeamHookDef {
+            event: "PostToolUse".to_string(),
+            command: "{{testCommand}}".to_string(),
+            description: "Run tests".to_string(),
+        }];
+        let result = render_hooks_section(&hooks, None);
+        assert!(result.contains("{{testCommand}}"));
+    }
+
+    #[test]
+    fn test_generate_prompt_output_includes_context() {
+        let ctx = make_ctx();
+        let teammates = vec![TeammateDef {
+            role: "Dev".to_string(),
+            description: "Developer".to_string(),
+            spawn_prompt: "Use the project's testing framework (detect from config)".to_string(),
+        }];
+        let tasks: Vec<TeamTaskDef> = vec![];
+        let hooks: Vec<TeamHookDef> = vec![];
+        let output = generate_prompt_output(
+            "Test Team", "Build things", "leader",
+            &teammates, &tasks, &hooks, "Lead it", Some(&ctx),
+        );
+        assert!(output.contains("## Project Context"));
+        assert!(output.contains("**Language:** TypeScript"));
+        assert!(output.contains("Use **Vitest** for testing"));
+    }
+
+    #[test]
+    fn test_generate_prompt_output_without_context() {
+        let teammates = vec![TeammateDef {
+            role: "Dev".to_string(),
+            description: "Developer".to_string(),
+            spawn_prompt: "Use the project's testing framework (detect from config)".to_string(),
+        }];
+        let tasks: Vec<TeamTaskDef> = vec![];
+        let hooks: Vec<TeamHookDef> = vec![];
+        let output = generate_prompt_output(
+            "Test Team", "Build things", "leader",
+            &teammates, &tasks, &hooks, "Lead it", None,
+        );
+        assert!(!output.contains("## Project Context"));
+        assert!(output.contains("Use the project's testing framework"));
+    }
 }

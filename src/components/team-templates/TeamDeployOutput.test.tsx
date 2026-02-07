@@ -9,10 +9,13 @@
  * - Verify generated output shows in code block
  * - Verify copy button copies to clipboard
  * - Verify back button calls onBack
+ * - Verify projectContext is forwarded to onGenerate
+ * - Verify personalization badge shows when context has name
+ * - Verify personalization badge is absent without context
  *
  * DEPENDENCIES:
  * - @/components/team-templates/TeamDeployOutput - Component under test
- * - @/types/team-template - LibraryTeamTemplate type
+ * - @/types/team-template - LibraryTeamTemplate, ProjectContext types
  *
  * EXPORTS:
  * - None (test file)
@@ -31,7 +34,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { TeamDeployOutput } from "./TeamDeployOutput";
-import type { LibraryTeamTemplate } from "@/types/team-template";
+import type { LibraryTeamTemplate, ProjectContext } from "@/types/team-template";
 
 const mockTemplate: LibraryTeamTemplate = {
   slug: "test-team",
@@ -91,7 +94,7 @@ describe("TeamDeployOutput", () => {
     );
 
     await waitFor(() => {
-      expect(onGenerate).toHaveBeenCalledWith(mockTemplate, "prompt");
+      expect(onGenerate).toHaveBeenCalledWith(mockTemplate, "prompt", undefined);
     });
   });
 
@@ -120,14 +123,14 @@ describe("TeamDeployOutput", () => {
 
     // Wait for initial generation
     await waitFor(() => {
-      expect(onGenerate).toHaveBeenCalledWith(mockTemplate, "prompt");
+      expect(onGenerate).toHaveBeenCalledWith(mockTemplate, "prompt", undefined);
     });
 
     // Change to script format
     fireEvent.click(screen.getByText("Shell Script"));
 
     await waitFor(() => {
-      expect(onGenerate).toHaveBeenCalledWith(mockTemplate, "script");
+      expect(onGenerate).toHaveBeenCalledWith(mockTemplate, "script", undefined);
     });
   });
 
@@ -219,5 +222,65 @@ describe("TeamDeployOutput", () => {
     );
 
     expect(screen.getByText("Generating...")).toBeInTheDocument();
+  });
+
+  it("forwards projectContext to onGenerate", async () => {
+    const context: ProjectContext = {
+      name: "My App",
+      language: "TypeScript",
+      framework: "React",
+      testFramework: "Vitest",
+      buildTool: "Vite",
+      styling: "Tailwind CSS",
+      database: null,
+    };
+
+    render(
+      <TeamDeployOutput
+        template={mockTemplate}
+        projectContext={context}
+        onGenerate={onGenerate}
+        onBack={onBack}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onGenerate).toHaveBeenCalledWith(mockTemplate, "prompt", context);
+    });
+  });
+
+  it("shows personalization badge when projectContext has name", async () => {
+    const context: ProjectContext = {
+      name: "My App",
+      language: "TypeScript",
+      framework: null,
+      testFramework: null,
+      buildTool: null,
+      styling: null,
+      database: null,
+    };
+
+    render(
+      <TeamDeployOutput
+        template={mockTemplate}
+        projectContext={context}
+        onGenerate={onGenerate}
+        onBack={onBack}
+      />,
+    );
+
+    expect(screen.getByText("Personalized for My App")).toBeInTheDocument();
+  });
+
+  it("does not show personalization badge without projectContext", async () => {
+    render(
+      <TeamDeployOutput
+        template={mockTemplate}
+        onGenerate={onGenerate}
+        onBack={onBack}
+      />,
+    );
+
+    expect(screen.queryByText(/Personalized for/)).not.toBeInTheDocument();
   });
 });

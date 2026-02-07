@@ -18,6 +18,7 @@
  * - TeamTemplate - A saved team template with database fields
  * - ScoredTeamTemplate - A LibraryTeamTemplate with relevance score
  * - TeamCategoryInfo - Metadata about a team category (label, description, icon)
+ * - ProjectContext - Active project tech stack context for personalizing deploy output
  *
  * PATTERNS:
  * - Types mirror Rust structs in models/team_template.rs
@@ -105,4 +106,14 @@ export interface TeamCategoryInfo {
   label: string;
   description: string;
   icon: string;
+}
+
+export interface ProjectContext {
+  name: string;
+  language: string | null;
+  framework: string | null;
+  testFramework: string | null;
+  buildTool: string | null;
+  styling: string | null;
+  database: string | null;
 }

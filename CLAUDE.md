@@ -592,7 +592,7 @@ export async function scanProject(path: string): Promise<DetectionResult> {
 
 - **macOS Notarization**: Configured and working with Apple credentials
 - **Windows/Linux Builds**: Not yet configured (platform config, not code)
-- **E2E Tests**: Would be nice but 694 unit tests (609 frontend + 85 Rust) provide good coverage
+- **E2E Tests**: Would be nice but 720 unit tests (700 frontend + 99 Rust) providing good coverage (note: Rust count includes 14 new context helper tests) provide good coverage
 
 ---
 
@@ -819,7 +819,7 @@ interface TestFrameworkInfo {
 - Use pnpm, not npm or yarn
 - Target macOS first, then Windows/Linux
 - Every file needs a documentation header (see above)
-- 694 unit tests (609 frontend + 85 Rust) provide good coverage
+- 720 unit tests (700 frontend + 99 Rust) providing good coverage (note: Rust count includes 14 new context helper tests) provide good coverage
 
 ### AI Integration
 - Anthropic API key stored encrypted in settings
@@ -875,7 +875,10 @@ interface TestFrameworkInfo {
 - **Deploy Output**: Three formats — lead prompt (paste-ready markdown), shell script, config directory
 - **Relevance Scoring**: Same formula as agents (30 base + 20/match, cap 60, +10 specificity), MAX_RECOMMENDED = 3
 - **No AI Required**: Deploy output is pure string templating in Rust backend
-- **UI Tabs**: My Teams (CRUD list + editor), Library (browsable catalog), Deploy (output generation)
+- **Project Context**: Deploy output is personalized with active project's tech stack (language, framework, test framework, etc.)
+- **Context Substitutions**: Generic phrases like "detect from config" are replaced with specific tech names (e.g., "Use **Vitest** for testing")
+- **Hooks Rendering**: Test templates include PostToolUse hooks that render as settings.json snippets with resolved test commands
+- **UI Tabs**: My Teams (CRUD list + editor), Library (browsable catalog), Deploy (output generation with personalization badge)
 
 ### Claude Code Hooks
 - **Location**: `.claude/hooks/` directory with shell scripts
@@ -918,6 +921,7 @@ The full product specification is in `project-jumpstart-spec.md`. Key sections:
 
 | Date | Change |
 |------|--------|
+| Feb 7, 2026 | Deploy output personalization: inject active project's tech stack into team deploy output (ProjectContext), add PostToolUse hooks to test templates, render hooks as settings.json snippets, 20 new tests (14 Rust + 6 frontend). |
 | Feb 7, 2026 | Added Team Templates library: 8 pre-built team templates, relevance scoring, CRUD, deploy output (prompt/script/config), 7 UI components, 73 new tests. |
 | Feb 3, 2026 | Added TDD Workflow & Test Plans feature: test framework detection, plan/case management, TDD red-green-refactor workflow, AI-powered test suggestions, subagent/hooks generation. |
 | Jan 31, 2026 | Added enforcement settings sync between Settings and Enforcement tabs. Four modes: off, warn, block, auto-update. API key exported to settings.json for auto-update hook. |

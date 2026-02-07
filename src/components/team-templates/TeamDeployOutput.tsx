@@ -9,8 +9,8 @@
  * - Support three formats: prompt (paste-ready), script (shell), config (directory)
  *
  * DEPENDENCIES:
- * - react (useState) - Local state for format selection and preview
- * - @/types/team-template - TeamTemplate, LibraryTeamTemplate types
+ * - react (useState, useEffect) - Local state for format selection and preview
+ * - @/types/team-template - TeamTemplate, LibraryTeamTemplate, ProjectContext types
  *
  * EXPORTS:
  * - TeamDeployOutput - Deploy output panel component
@@ -26,14 +26,17 @@
  * - "script" format generates a shell script
  * - "config" format generates a .claude/teams/ directory structure
  * - Output is generated via backend Tauri command (pure string templating)
+ * - When projectContext is provided, output is personalized with project tech stack
+ * - Shows "Personalized for {name}" badge when context is present
  */
 
 import { useState, useEffect } from "react";
-import type { TeamTemplate, LibraryTeamTemplate } from "@/types/team-template";
+import type { TeamTemplate, LibraryTeamTemplate, ProjectContext } from "@/types/team-template";
 
 interface TeamDeployOutputProps {
   template: TeamTemplate | LibraryTeamTemplate;
-  onGenerate: (template: TeamTemplate | LibraryTeamTemplate, format: string) => Promise<string | null>;
+  projectContext?: ProjectContext;
+  onGenerate: (template: TeamTemplate | LibraryTeamTemplate, format: string, projectContext?: ProjectContext) => Promise<string | null>;
   onBack: () => void;
 }
 
@@ -59,6 +62,7 @@ const FORMAT_OPTIONS: { id: OutputFormat; label: string; description: string }[]
 
 export function TeamDeployOutput({
   template,
+  projectContext,
   onGenerate,
   onBack,
 }: TeamDeployOutputProps) {
@@ -71,12 +75,12 @@ export function TeamDeployOutput({
     const generate = async () => {
       setGenerating(true);
       setOutput(null);
-      const result = await onGenerate(template, format);
+      const result = await onGenerate(template, format, projectContext);
       setOutput(result);
       setGenerating(false);
     };
     generate();
-  }, [template, format, onGenerate]);
+  }, [template, format, projectContext, onGenerate]);
 
   const handleCopy = async () => {
     if (!output) return;
@@ -105,9 +109,16 @@ export function TeamDeployOutput({
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-medium text-neutral-200">
-            Deploy: {template.name}
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-medium text-neutral-200">
+              Deploy: {template.name}
+            </h3>
+            {projectContext?.name && (
+              <span className="rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-400 ring-1 ring-green-500/20">
+                Personalized for {projectContext.name}
+              </span>
+            )}
+          </div>
           <p className="mt-0.5 text-xs text-neutral-500">
             Generate deployment output in your preferred format
           </p>
