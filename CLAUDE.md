@@ -49,7 +49,8 @@ project-jumpstart/
 │   │   │   ├── activity.rs         # Activity logging
 │   │   │   ├── watcher.rs          # File watcher control
 │   │   │   ├── kickstart.rs        # Project kickstart prompts
-│   │   │   └── test_plans.rs       # TDD workflow & test plans
+│   │   │   ├── test_plans.rs       # TDD workflow & test plans
+│   │   │   └── team_templates.rs   # Team template CRUD & deploy output
 │   │   ├── core/                   # Business logic
 │   │   │   ├── mod.rs
 │   │   │   ├── scanner.rs          # Project detection
@@ -70,7 +71,8 @@ project-jumpstart/
 │   │   │   ├── ralph.rs
 │   │   │   ├── context.rs
 │   │   │   ├── enforcement.rs
-│   │   │   └── test_plan.rs        # Test plan, case, run, TDD session models
+│   │   │   ├── test_plan.rs        # Test plan, case, run, TDD session models
+│   │   │   └── team_template.rs    # Team template model (serde structs)
 │   │   └── db/                     # Database layer
 │   │       ├── mod.rs              # Connection, AppState
 │   │       └── schema.rs           # SQLite migrations
@@ -123,6 +125,15 @@ project-jumpstart/
 │   │   │   ├── AgentLibraryCard.tsx
 │   │   │   ├── AgentLibraryDetail.tsx
 │   │   │   └── AgentCategoryFilter.tsx
+│   │   ├── team-templates/         # Team Templates library
+│   │   │   ├── TeamCategoryFilter.tsx  # Pattern + category filter pills
+│   │   │   ├── TeamTemplateCard.tsx    # Template card with pattern badge
+│   │   │   ├── TeamTemplateDetail.tsx  # Detail panel with composition
+│   │   │   ├── TeamTemplateLibrary.tsx # Library orchestrator
+│   │   │   ├── TeamTemplatesList.tsx   # Saved templates list
+│   │   │   ├── TeamTemplateEditor.tsx  # Create/edit form
+│   │   │   ├── TeamDeployOutput.tsx    # Deploy output (prompt/script/config)
+│   │   │   └── index.ts               # Barrel exports
 │   │   ├── test-plans/             # TDD workflow & test plans
 │   │   │   ├── TestPlansList.tsx   # Test plans list with status
 │   │   │   ├── TestPlanEditor.tsx  # Plan create/edit form
@@ -166,7 +177,8 @@ project-jumpstart/
 │   │   ├── useRefreshDocs.ts
 │   │   ├── useSectionCompletion.ts
 │   │   ├── useTestPlans.ts         # Test plan CRUD & execution
-│   │   └── useTDDWorkflow.ts       # TDD session state management
+│   │   ├── useTDDWorkflow.ts       # TDD session state management
+│   │   └── useTeamTemplates.ts     # Team template CRUD & deploy output
 │   ├── stores/                     # Zustand stores
 │   │   ├── projectStore.ts
 │   │   ├── onboardingStore.ts
@@ -176,6 +188,8 @@ project-jumpstart/
 │   │   ├── skillCategories.ts
 │   │   ├── agentLibrary.ts         # Curated agent definitions
 │   │   ├── agentCategories.ts
+│   │   ├── teamTemplateLibrary.ts  # 8 pre-built team templates
+│   │   ├── teamCategories.ts       # 7 team categories
 │   │   ├── stackTemplates.ts       # Tech stack templates
 │   │   └── pageHelpContent.ts      # Per-page contextual help content
 │   ├── types/                      # TypeScript types
@@ -188,12 +202,14 @@ project-jumpstart/
 │   │   ├── ralph.ts
 │   │   ├── enforcement.ts
 │   │   ├── kickstart.ts
-│   │   └── test-plan.ts            # Test plan, case, run, TDD types
+│   │   ├── test-plan.ts            # Test plan, case, run, TDD types
+│   │   └── team-template.ts        # Team template, teammate, task, hook types
 │   ├── lib/                        # Utilities
-│   │   ├── tauri.ts                # Tauri IPC wrapper (50+ commands)
+│   │   ├── tauri.ts                # Tauri IPC wrapper (56+ commands)
 │   │   ├── utils.ts                # General utilities
 │   │   ├── skillRelevance.ts       # Skill recommendation logic
-│   │   └── agentRelevance.ts       # Agent recommendation logic
+│   │   ├── agentRelevance.ts       # Agent recommendation logic
+│   │   └── teamRelevance.ts        # Team template recommendation logic
 │   ├── test/                       # Test setup
 │   │   └── setup.ts
 │   ├── App.tsx                     # Root component
@@ -563,6 +579,7 @@ export async function scanProject(path: string): Promise<DetectionResult> {
 | Project Kickstart | ✅ Complete | Empty project bootstrapping with AI prompts |
 | Skills Workshop | ✅ Complete | CRUD, pattern detection, skill library |
 | Agents Management | ✅ Complete | CRUD, library, AI-enhanced instructions |
+| Team Templates | ✅ Complete | Library (8 templates), CRUD, deploy output (prompt/script/config) |
 | Test Plans & TDD | ✅ Complete | Test plans CRUD, TDD workflow, framework detection, AI suggestions |
 | RALPH Command Center | ✅ Complete | Prompt analysis (heuristic + AI), loop monitoring |
 | Context Health | ✅ Complete | Token breakdown, MCP status, checkpoints |
@@ -575,7 +592,7 @@ export async function scanProject(path: string): Promise<DetectionResult> {
 
 - **macOS Notarization**: Configured and working with Apple credentials
 - **Windows/Linux Builds**: Not yet configured (platform config, not code)
-- **E2E Tests**: Would be nice but 581 unit tests (502 frontend + 79 Rust) provide good coverage
+- **E2E Tests**: Would be nice but 694 unit tests (609 frontend + 85 Rust) provide good coverage
 
 ---
 
@@ -758,6 +775,32 @@ interface TDDSession {
   completedAt: string | null;
 }
 
+// Team Templates
+type OrchestrationPattern = 'leader' | 'pipeline' | 'parallel' | 'swarm' | 'council';
+type TeamCategory = 'feature-development' | 'testing' | 'code-review' | 'refactoring' | 'migration' | 'documentation' | 'devops';
+
+interface TeamTemplate {
+  id: string;
+  projectId: string | null;
+  name: string;
+  description: string;
+  orchestrationPattern: OrchestrationPattern;
+  category: TeamCategory;
+  teammates: TeammateDef[];
+  tasks: TeamTaskDef[];
+  hooks: TeamHookDef[];
+  leadSpawnInstructions: string;
+  usageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface TeammateDef {
+  role: string;
+  description: string;
+  spawnPrompt: string;
+}
+
 interface TestFrameworkInfo {
   name: string;
   command: string;
@@ -776,7 +819,7 @@ interface TestFrameworkInfo {
 - Use pnpm, not npm or yarn
 - Target macOS first, then Windows/Linux
 - Every file needs a documentation header (see above)
-- 581 unit tests (502 frontend + 79 Rust) provide good coverage
+- 694 unit tests (609 frontend + 85 Rust) provide good coverage
 
 ### AI Integration
 - Anthropic API key stored encrypted in settings
@@ -804,7 +847,7 @@ interface TestFrameworkInfo {
 - Settings JSON for hooks: `~/.project-jumpstart/settings.json` (auto-generated, 0600 permissions)
 - Use migrations for schema changes
 - All timestamps in UTC
-- Full schema includes: projects, skills, agents, activities, checkpoints, ralph_loops, settings, test_plans, test_cases, test_runs, test_case_results, tdd_sessions
+- Full schema includes: projects, skills, agents, activities, checkpoints, ralph_loops, settings, test_plans, test_cases, test_runs, test_case_results, tdd_sessions, team_templates
 
 ### File Paths
 - Use forward slashes even on Windows (Tauri normalizes)
@@ -825,6 +868,14 @@ interface TestFrameworkInfo {
 - **AI Suggestions**: Generate test suggestions from code analysis via Claude API
 - **Subagent Configs**: Generate Claude Code subagent markdown for automated TDD
 - **PostToolUse Hooks**: Generate hooks JSON to auto-run tests after code changes
+
+### Team Templates Feature
+- **Library**: 8 pre-built team templates across 7 categories (feature-dev, testing, code-review, refactoring, migration, documentation, devops)
+- **Orchestration Patterns**: leader, pipeline, parallel, swarm, council (color-coded badges)
+- **Deploy Output**: Three formats — lead prompt (paste-ready markdown), shell script, config directory
+- **Relevance Scoring**: Same formula as agents (30 base + 20/match, cap 60, +10 specificity), MAX_RECOMMENDED = 3
+- **No AI Required**: Deploy output is pure string templating in Rust backend
+- **UI Tabs**: My Teams (CRUD list + editor), Library (browsable catalog), Deploy (output generation)
 
 ### Claude Code Hooks
 - **Location**: `.claude/hooks/` directory with shell scripts
@@ -867,6 +918,7 @@ The full product specification is in `project-jumpstart-spec.md`. Key sections:
 
 | Date | Change |
 |------|--------|
+| Feb 7, 2026 | Added Team Templates library: 8 pre-built team templates, relevance scoring, CRUD, deploy output (prompt/script/config), 7 UI components, 73 new tests. |
 | Feb 3, 2026 | Added TDD Workflow & Test Plans feature: test framework detection, plan/case management, TDD red-green-refactor workflow, AI-powered test suggestions, subagent/hooks generation. |
 | Jan 31, 2026 | Added enforcement settings sync between Settings and Enforcement tabs. Four modes: off, warn, block, auto-update. API key exported to settings.json for auto-update hook. |
 | Jan 31, 2026 | Added auto-update enforcement mode with AI-powered doc generation at commit time. |

@@ -29,6 +29,13 @@ When working with Claude Code, context gets lost after ~30 minutes of conversati
 - **Agents Library** - Reusable agent configurations for specialized tasks
 - **RALPH Loops** - Prompt optimization with Auto-Enhance for complex tasks
 
+### Team Templates (New!)
+- **8 Pre-Built Teams** - Full Stack Feature, TDD Pipeline, Code Review Council, and more
+- **5 Orchestration Patterns** - Leader, Pipeline, Parallel, Swarm, Council
+- **Deploy Output** - Generate paste-ready lead prompts, shell scripts, or config directories
+- **Relevance Scoring** - Teams ranked by match with your project's tech stack
+- **Customizable** - Save templates to your project and edit teammates, tasks, and hooks
+
 ### TDD Workflow & Test Plans
 - **AI Test Generation** - One-click "Generate Tests" button analyzes your code and creates test cases
 - **Test Cases Manager** - Filterable list with search, type, priority, and status filters
@@ -54,13 +61,15 @@ When working with Claude Code, context gets lost after ~30 minutes of conversati
 
 Download the latest release for macOS:
 
-**[Project Jumpstart v0.1.0-beta.20](https://github.com/jmckinley/project-jumpstart/releases/latest)** (11 MB, Apple Silicon)
+**[Latest Release](https://github.com/jmckinley/project-jumpstart/releases/latest)** (macOS, Apple Silicon, signed and notarized)
 
 ### Installation
 
 1. Download the DMG file
 2. Open the DMG and drag "Project Jumpstart" to Applications
 3. Launch the app (signed and notarized, no Gatekeeper issues)
+
+For detailed usage of every feature, see the **[User Guide](docs/user-guide.md)**.
 
 ### Requirements
 
@@ -133,22 +142,30 @@ pnpm tauri build
 ```
 project-jumpstart/
 ├── src/                    # React frontend
-│   ├── components/         # UI components (including test-plans/)
+│   ├── components/         # UI components by feature
+│   │   ├── agents/         # Agent management & library
+│   │   ├── team-templates/ # Team template library & deploy
+│   │   ├── test-plans/     # TDD workflow & test management
+│   │   ├── skills/         # Skills workshop & library
+│   │   └── ...             # dashboard, claude-md, modules, etc.
 │   ├── stores/             # Zustand state
-│   ├── hooks/              # Custom hooks (including useTestPlans, useTDDWorkflow)
-│   ├── lib/                # Utilities
-│   └── data/               # Skills/agents library
+│   ├── hooks/              # Custom hooks (all call Tauri backend)
+│   ├── lib/                # Utilities & relevance scoring
+│   ├── data/               # Static library data (skills, agents, teams)
+│   └── types/              # TypeScript type definitions
 ├── src-tauri/              # Rust backend
 │   ├── src/
-│   │   ├── commands/       # IPC handlers (including test_plans.rs)
-│   │   ├── core/           # Business logic (including test_runner.rs)
-│   │   ├── models/         # Data structures
-│   │   └── db/             # SQLite database
+│   │   ├── commands/       # IPC handlers (15 modules)
+│   │   ├── core/           # Business logic (scanner, AI, test runner)
+│   │   ├── models/         # Data structures (serde)
+│   │   └── db/             # SQLite schema & migrations
 │   └── Cargo.toml
 ├── .claude/                # Claude Code configuration
 │   ├── hooks/              # Session lifecycle hooks
 │   │   └── extract-learnings.sh  # Auto-extract session learnings
 │   └── settings.json       # Hook registrations
+├── docs/                   # Documentation
+│   └── user-guide.md       # User guide
 ├── CLAUDE.md               # Project documentation (team-shared)
 └── CLAUDE.local.md         # Personal learnings (gitignored)
 ```
