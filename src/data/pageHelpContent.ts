@@ -172,6 +172,32 @@ export const PAGE_HELP: Record<string, PageHelpContent> = {
     ],
   },
 
+  "team-templates": {
+    title: "Team Templates",
+    description:
+      "Browse and deploy pre-configured multi-agent team compositions for complex tasks like feature development, testing, and refactoring.",
+    concepts: [
+      {
+        term: "Agent Team",
+        definition: "Multiple Claude Code instances coordinating via shared task lists and peer messaging.",
+      },
+      {
+        term: "Orchestration Pattern",
+        definition: "How teammates are organized: leader-led, pipeline, parallel, swarm, or council.",
+      },
+      {
+        term: "Lead Prompt",
+        definition: "A paste-ready markdown document that sets up the entire team in a Claude Code session.",
+      },
+    ],
+    tips: [
+      "Browse the library for pre-built team compositions",
+      "Use 'Deploy' to generate a paste-ready prompt for Claude Code",
+      "Customize templates by saving them to your project first",
+      "Teams are expensive — start with 2-3 teammates for best results",
+    ],
+  },
+
   ralph: {
     title: "RALPH Command Center",
     description:

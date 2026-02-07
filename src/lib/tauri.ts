@@ -739,6 +739,7 @@ export async function generateHooksConfig(
 // Session Analysis Commands
 // =============================================================================
 
+import type { TeamTemplate } from "@/types/team-template";
 import type { SessionAnalysis } from "@/types/session-analysis";
 
 /**
@@ -758,6 +759,74 @@ export async function analyzeSession(
     projectLanguage: projectLanguage ?? null,
     projectFramework: projectFramework ?? null,
   });
+}
+
+// =============================================================================
+// Team Template Commands
+// =============================================================================
+
+export async function listTeamTemplates(projectId?: string): Promise<TeamTemplate[]> {
+  return invoke<TeamTemplate[]>("list_team_templates", { projectId: projectId ?? null });
+}
+
+export async function createTeamTemplate(
+  name: string,
+  description: string,
+  orchestrationPattern: string,
+  category: string,
+  teammatesJson: string,
+  tasksJson: string,
+  hooksJson: string,
+  leadSpawnInstructions: string,
+  projectId?: string,
+): Promise<TeamTemplate> {
+  return invoke<TeamTemplate>("create_team_template", {
+    name,
+    description,
+    orchestrationPattern,
+    category,
+    teammatesJson,
+    tasksJson,
+    hooksJson,
+    leadSpawnInstructions,
+    projectId: projectId ?? null,
+  });
+}
+
+export async function updateTeamTemplate(
+  id: string,
+  name: string,
+  description: string,
+  orchestrationPattern: string,
+  category: string,
+  teammatesJson: string,
+  tasksJson: string,
+  hooksJson: string,
+  leadSpawnInstructions: string,
+): Promise<TeamTemplate> {
+  return invoke<TeamTemplate>("update_team_template", {
+    id,
+    name,
+    description,
+    orchestrationPattern,
+    category,
+    teammatesJson,
+    tasksJson,
+    hooksJson,
+    leadSpawnInstructions,
+  });
+}
+
+export async function deleteTeamTemplate(id: string): Promise<void> {
+  return invoke<void>("delete_team_template", { id });
+}
+
+export async function incrementTeamTemplateUsage(id: string): Promise<number> {
+  return invoke<number>("increment_team_template_usage", { id });
+}
+
+export async function generateTeamDeployOutput(templateJson: string, format: string): Promise<string> {
+  return invoke<string>("generate_team_deploy_output", { templateJson, format });
 }
 
 /**

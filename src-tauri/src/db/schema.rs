@@ -309,6 +309,25 @@ pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
         CREATE INDEX IF NOT EXISTS idx_test_runs_plan ON test_runs(plan_id);
         CREATE INDEX IF NOT EXISTS idx_test_case_results_run ON test_case_results(run_id);
         CREATE INDEX IF NOT EXISTS idx_tdd_sessions_project ON tdd_sessions(project_id);
+
+        -- Team Templates table
+        CREATE TABLE IF NOT EXISTS team_templates (
+            id                      TEXT PRIMARY KEY,
+            project_id              TEXT,
+            name                    TEXT NOT NULL,
+            description             TEXT NOT NULL DEFAULT '',
+            orchestration_pattern   TEXT NOT NULL DEFAULT 'leader',
+            category                TEXT NOT NULL DEFAULT 'feature-development',
+            teammates               TEXT NOT NULL DEFAULT '[]',
+            tasks                   TEXT NOT NULL DEFAULT '[]',
+            hooks                   TEXT NOT NULL DEFAULT '[]',
+            lead_spawn_instructions TEXT NOT NULL DEFAULT '',
+            usage_count             INTEGER NOT NULL DEFAULT 0,
+            created_at              TEXT NOT NULL,
+            updated_at              TEXT NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_team_templates_project ON team_templates(project_id);
         ",
     )?;
 

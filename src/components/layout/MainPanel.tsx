@@ -38,8 +38,10 @@
  * - @/components/enforcement/CISetup - CI integration templates
  * - @/components/settings/SettingsView - User settings and app info panel
  * - @/components/test-plans/* - Test plan management components
+ * - @/components/team-templates/* - Team template management components
  * - @/hooks/useTestPlans - Test plan CRUD and execution actions
  * - @/hooks/useTDDWorkflow - TDD workflow session management
+ * - @/hooks/useTeamTemplates - Team template CRUD and deploy output actions
  * - @/hooks/useHealth - Health score data and refresh action
  * - @/hooks/useModules - Module scanning and generation actions
  * - @/hooks/useSkills - Skills CRUD and pattern detection actions
@@ -61,6 +63,7 @@
  * - "modules" section renders file tree, doc preview, and batch generator (or ProjectKickstart for empty projects)
  * - "test-plans" section renders test plans list, TDD workflow, and tools (subagent/hooks generators)
  * - "skills" section renders skills list, skill editor, and pattern detector
+ * - "team-templates" section renders team templates list, library, editor, and deploy output (tabs: My Teams / Library / Deploy)
  * - "ralph" section renders command center, prompt analyzer, and loop monitor
  * - "context" section renders health monitor, token breakdown, and MCP optimizer
  * - "enforcement" section renders git hook setup and CI integration templates
@@ -85,6 +88,7 @@
  * - SkillsView manages selectedSkill and editing state locally
  * - SkillsView uses a 2-column grid (SkillsList left, SkillEditor right) with PatternDetector below
  * - AgentsView follows same pattern as SkillsView with library tab support
+ * - TeamTemplatesView follows same pattern as AgentsView with library + deploy tabs
  * - RalphView uses a 2-column grid (CommandCenter left, PromptAnalyzer right) with LoopMonitor below
  * - ContextView uses a 2-column grid (HealthMonitor left, TokenBreakdown right) with McpOptimizer below
  * - EnforcementView uses a 2-column grid (GitHookSetup left, CISetup right)
@@ -158,6 +162,14 @@ import {
   FrameworkInstaller,
 } from "@/components/test-plans";
 import type { TestPlan, TestCase, TestPlanStatus } from "@/types/test-plan";
+import {
+  TeamTemplateLibrary,
+  TeamTemplatesList,
+  TeamTemplateEditor,
+  TeamDeployOutput,
+} from "@/components/team-templates";
+import { useTeamTemplates } from "@/hooks/useTeamTemplates";
+import type { TeamTemplate, LibraryTeamTemplate, TeammateDef, TeamTaskDef, TeamHookDef } from "@/types/team-template";
 
 interface MainPanelProps {
   activeSection: string;
@@ -1605,6 +1617,193 @@ function TestPlansView() {
   );
 }
 
+function TeamTemplatesView({ onTeamTemplatesChange }: { onTeamTemplatesChange?: () => void }) {
+  const {
+    templates,
+    loading,
+    error,
+    loadTemplates,
+    addTemplate,
+    editTemplate,
+    removeTemplate,
+    addFromLibrary,
+    generateOutput,
+  } = useTeamTemplates();
+
+  const [selectedTemplate, setSelectedTemplate] = useState<TeamTemplate | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState<"my-teams" | "library" | "deploy">("library");
+  const [deployTemplate, setDeployTemplate] = useState<TeamTemplate | LibraryTeamTemplate | null>(null);
+
+  useEffect(() => {
+    loadTemplates();
+  }, [loadTemplates]);
+
+  const handleSelect = useCallback((template: TeamTemplate) => {
+    setSelectedTemplate(template);
+    setEditing(true);
+  }, []);
+
+  const handleCreateNew = useCallback(() => {
+    setSelectedTemplate(null);
+    setEditing(true);
+  }, []);
+
+  const handleSave = useCallback(
+    async (
+      name: string,
+      description: string,
+      orchestrationPattern: string,
+      category: string,
+      teammates: TeammateDef[],
+      tasks: TeamTaskDef[],
+      hooks: TeamHookDef[],
+      leadSpawnInstructions: string,
+    ) => {
+      if (selectedTemplate && selectedTemplate.id !== "") {
+        await editTemplate(selectedTemplate.id, name, description, orchestrationPattern, category, teammates, tasks, hooks, leadSpawnInstructions);
+      } else {
+        await addTemplate(name, description, orchestrationPattern, category, teammates, tasks, hooks, leadSpawnInstructions);
+        onTeamTemplatesChange?.();
+      }
+      setSelectedTemplate(null);
+      setEditing(false);
+    },
+    [selectedTemplate, editTemplate, addTemplate, onTeamTemplatesChange],
+  );
+
+  const handleCancel = useCallback(() => {
+    setSelectedTemplate(null);
+    setEditing(false);
+  }, []);
+
+  const handleDelete = useCallback(
+    async (id: string) => {
+      await removeTemplate(id);
+      if (selectedTemplate?.id === id) {
+        setSelectedTemplate(null);
+        setEditing(false);
+      }
+    },
+    [removeTemplate, selectedTemplate],
+  );
+
+  const handleAddFromLibrary = useCallback(
+    async (libraryTemplate: LibraryTeamTemplate) => {
+      await addFromLibrary(libraryTemplate);
+      onTeamTemplatesChange?.();
+    },
+    [addFromLibrary, onTeamTemplatesChange],
+  );
+
+  const handleDeploy = useCallback((template: TeamTemplate | LibraryTeamTemplate) => {
+    setDeployTemplate(template);
+    setActiveTab("deploy");
+  }, []);
+
+  if (loading && templates.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center text-neutral-500">
+        <p>Loading team templates...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className="rounded-md border border-red-900 bg-red-950/50 px-4 py-3 text-sm text-red-400">
+          {error}
+        </div>
+      )}
+
+      {/* Tab Navigation */}
+      <div className="flex gap-1 border-b border-neutral-800">
+        <button
+          onClick={() => setActiveTab("my-teams")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "my-teams"
+              ? "border-b-2 border-blue-500 text-blue-400"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          My Teams ({templates.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("library")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "library"
+              ? "border-b-2 border-blue-500 text-blue-400"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          Team Library
+        </button>
+        <button
+          onClick={() => setActiveTab("deploy")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "deploy"
+              ? "border-b-2 border-blue-500 text-blue-400"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          Deploy
+        </button>
+      </div>
+
+      {activeTab === "my-teams" ? (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-1">
+            <TeamTemplatesList
+              templates={templates}
+              selectedId={selectedTemplate?.id ?? null}
+              onSelect={handleSelect}
+              onCreateNew={handleCreateNew}
+              onDelete={handleDelete}
+            />
+          </div>
+          <div className="lg:col-span-2">
+            {editing ? (
+              <TeamTemplateEditor
+                template={selectedTemplate}
+                onSave={handleSave}
+                onCancel={handleCancel}
+              />
+            ) : (
+              <div className="flex h-full min-h-[300px] items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-500">
+                <p className="text-sm">
+                  Select a team template to edit or click "New Template" to create one.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : activeTab === "library" ? (
+        <TeamTemplateLibrary
+          existingTemplateNames={templates.map((t) => t.name)}
+          onAddTemplate={handleAddFromLibrary}
+          onDeploy={handleDeploy}
+        />
+      ) : activeTab === "deploy" ? (
+        deployTemplate ? (
+          <TeamDeployOutput
+            template={deployTemplate}
+            onGenerate={generateOutput}
+            onBack={() => {
+              setDeployTemplate(null);
+              setActiveTab("library");
+            }}
+          />
+        ) : (
+          <div className="flex h-64 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-500">
+            <p className="text-sm">Select a template from the library and click "Deploy" to generate output.</p>
+          </div>
+        )
+      ) : null}
+    </div>
+  );
+}
+
 function renderSection(
   section: string,
   onNavigate?: (section: string) => void,
@@ -1627,6 +1826,8 @@ function renderSection(
       return <SkillsView onSkillsChange={onCompletionChange} />;
     case "agents":
       return <AgentsView onAgentsChange={onCompletionChange} />;
+    case "team-templates":
+      return <TeamTemplatesView onTeamTemplatesChange={onCompletionChange} />;
     case "ralph":
       return <RalphView onLoopStarted={onCompletionChange} />;
     case "context":

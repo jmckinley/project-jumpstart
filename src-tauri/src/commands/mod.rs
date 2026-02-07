@@ -46,3 +46,4 @@ pub mod watcher;
 pub mod kickstart;
 pub mod test_plans;
 pub mod session_analysis;
+pub mod team_templates;

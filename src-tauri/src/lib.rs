@@ -71,6 +71,10 @@ use commands::test_plans::{
     generate_subagent_config, generate_hooks_config,
 };
 use commands::session_analysis::{analyze_session, get_session_transcript};
+use commands::team_templates::{
+    list_team_templates, create_team_template, update_team_template, delete_team_template,
+    increment_team_template_usage, generate_team_deploy_output,
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -173,6 +177,13 @@ pub fn run() {
             // Session Analysis commands
             analyze_session,
             get_session_transcript,
+            // Team Template commands
+            list_team_templates,
+            create_team_template,
+            update_team_template,
+            delete_team_template,
+            increment_team_template_usage,
+            generate_team_deploy_output,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
