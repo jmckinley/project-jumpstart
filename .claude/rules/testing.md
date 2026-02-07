@@ -92,7 +92,7 @@ When doing TDD, follow **Red → Green → Refactor**:
 
 - **Target**: 80% code coverage
 - **Priority**: Critical paths > edge cases > error handling
-- **Current**: 799 tests (700 frontend + 99 Rust)
+- **Current**: 801 tests (700 frontend + 101 Rust)
 
 ## Running Tests
 

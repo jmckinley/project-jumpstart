@@ -592,7 +592,7 @@ export async function scanProject(path: string): Promise<DetectionResult> {
 
 - **macOS Notarization**: Configured and working with Apple credentials
 - **Windows/Linux Builds**: Not yet configured (platform config, not code)
-- **E2E Tests**: Would be nice but 720 unit tests (700 frontend + 99 Rust) providing good coverage (note: Rust count includes 14 new context helper tests) provide good coverage
+- **E2E Tests**: Would be nice but 801 unit tests (700 frontend + 101 Rust) provide good coverage
 
 ---
 
@@ -819,7 +819,7 @@ interface TestFrameworkInfo {
 - Use pnpm, not npm or yarn
 - Target macOS first, then Windows/Linux
 - Every file needs a documentation header (see above)
-- 720 unit tests (700 frontend + 99 Rust) providing good coverage (note: Rust count includes 14 new context helper tests) provide good coverage
+- 801 unit tests (700 frontend + 101 Rust) provide good coverage
 
 ### AI Integration
 - Anthropic API key stored encrypted in settings
@@ -921,6 +921,7 @@ The full product specification is in `project-jumpstart-spec.md`. Key sections:
 
 | Date | Change |
 |------|--------|
+| Feb 7, 2026 | Resilient auto-update hook: never blocks commits (all errors → warnings + exit 0), model ID from settings.json with fallback, total timeout (120s), per-file resilience, `call_api()` model fallback, HOOK_VERSION 3.0.0. Consolidated MODEL constant in `core::ai`. 2 new Rust tests (101 total). |
 | Feb 7, 2026 | Deploy output personalization: inject active project's tech stack into team deploy output (ProjectContext), add PostToolUse hooks to test templates, render hooks as settings.json snippets, 20 new tests (14 Rust + 6 frontend). |
 | Feb 7, 2026 | Added Team Templates library: 8 pre-built team templates, relevance scoring, CRUD, deploy output (prompt/script/config), 7 UI components, 73 new tests. |
 | Feb 3, 2026 | Added TDD Workflow & Test Plans feature: test framework detection, plan/case management, TDD red-green-refactor workflow, AI-powered test suggestions, subagent/hooks generation. |
