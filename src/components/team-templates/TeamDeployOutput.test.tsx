@@ -25,7 +25,7 @@
  * CLAUDE NOTES:
  * - Component calls onGenerate in useEffect on mount and on format change
  * - Output is async and controlled by onGenerate return value
- * - Three formats: prompt (Lead Prompt), script (Shell Script), config (Config Directory)
+ * - Three formats: prompt (Lead Prompt), script (Shell Script), config (Setup Files)
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -78,7 +78,7 @@ describe("TeamDeployOutput", () => {
 
     expect(screen.getByText("Lead Prompt")).toBeInTheDocument();
     expect(screen.getByText("Shell Script")).toBeInTheDocument();
-    expect(screen.getByText("Config Directory")).toBeInTheDocument();
+    expect(screen.getByText("Setup Files")).toBeInTheDocument();
   });
 
   it("default format is 'prompt' (Lead Prompt selected)", async () => {

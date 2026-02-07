@@ -26,10 +26,15 @@
 //! - Templates are scoped to a project_id (or global if None)
 //! - JSON fields (teammates, tasks, hooks) are serialized/deserialized
 //! - generate_team_deploy_output uses pure string templating, no AI
+//! - Deploy output matches real Claude Code Agent Teams behavior (natural language prompts)
 //!
 //! CLAUDE NOTES:
 //! - Mirrors agents.rs command pattern exactly
 //! - Timestamps use chrono::Utc::now() in RFC 3339 format
+//! - Agent Teams are started via natural language — no CLI flags like --team-spawn
+//! - The lead agent uses TeammateTool.spawnTeam internally to create teammates
+//! - Tasks use TaskCreate/TaskUpdate with addBlockedBy for dependencies
+//! - Communication: write (to one teammate), broadcast (to all)
 
 use chrono::Utc;
 use tauri::State;
@@ -283,174 +288,363 @@ pub async fn generate_team_deploy_output(
 
     match format.as_str() {
         "prompt" => Ok(generate_prompt_output(&template.name, &template.description, &template.orchestration_pattern, &template.teammates, &template.tasks, &template.hooks, &template.lead_spawn_instructions)),
-        "script" => Ok(generate_script_output(&template.name, &template.teammates, &template.tasks)),
-        "config" => Ok(generate_config_output(&template.name, &template.teammates, &template.lead_spawn_instructions)),
+        "script" => Ok(generate_script_output(&template.name, &template.description, &template.orchestration_pattern, &template.teammates, &template.tasks, &template.hooks, &template.lead_spawn_instructions)),
+        "config" => Ok(generate_config_output(&template.name, &template.description, &template.orchestration_pattern, &template.teammates, &template.tasks, &template.lead_spawn_instructions)),
         _ => Err(format!("Unknown format: {}", format)),
     }
 }
 
 // ---------------------------------------------------------------------------
 // Output generators (pure string templating)
+//
+// These generate output that matches real Claude Code Agent Teams behavior.
+// Agent Teams are started via natural language prompts — the lead agent uses
+// TeammateTool.spawnTeam internally to create teammates, and TaskCreate/
+// TaskUpdate for task management. There are no CLI flags like --team-spawn.
 // ---------------------------------------------------------------------------
 
+/// Resolve a task blocker ID to its human-readable title.
+fn resolve_blocker_title(blocker_id: &str, tasks: &[TeamTaskDef]) -> String {
+    tasks
+        .iter()
+        .find(|t| t.id == blocker_id)
+        .map(|t| t.title.clone())
+        .unwrap_or_else(|| blocker_id.to_string())
+}
+
+/// Describe an orchestration pattern in plain English.
+fn pattern_description(pattern: &str) -> &str {
+    match pattern {
+        "leader" => "one lead agent coordinates specialists",
+        "pipeline" => "agents work sequentially, each building on the previous",
+        "parallel" => "agents work simultaneously on independent tasks",
+        "swarm" => "agents self-organize around available work",
+        "council" => "agents provide independent assessments, then reconcile",
+        _ => "agents coordinate to complete the work",
+    }
+}
+
+/// Generate a paste-ready natural language prompt for Claude Code Agent Teams.
+///
+/// The user pastes this into an active Claude Code session (with Agent Teams
+/// enabled). Claude interprets the prompt and uses TeammateTool.spawnTeam to
+/// create teammates, TaskCreate for tasks, and addBlockedBy for dependencies.
 fn generate_prompt_output(
     name: &str,
     description: &str,
     pattern: &str,
     teammates: &[TeammateDef],
     tasks: &[TeamTaskDef],
-    hooks: &[TeamHookDef],
+    _hooks: &[TeamHookDef],
     lead_instructions: &str,
 ) -> String {
-    let mut output = String::new();
+    let mut out = String::new();
 
-    output.push_str(&format!("# {} Team\n\n", name));
-    output.push_str(&format!("{}\n\n", description));
-    output.push_str(&format!("**Orchestration Pattern:** {}\n\n", pattern));
-    output.push_str("---\n\n");
+    // Prerequisites
+    out.push_str("> **Setup:** Enable Agent Teams by adding `\"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS\": \"1\"` to the `env` section of `~/.claude/settings.json`, then start a new Claude Code session and paste this prompt.\n\n");
+    out.push_str("---\n\n");
 
-    // Lead instructions
-    if !lead_instructions.is_empty() {
-        output.push_str("## Lead Agent Instructions\n\n");
-        output.push_str(lead_instructions);
-        output.push_str("\n\n---\n\n");
-    }
+    // Core team request
+    out.push_str(&format!(
+        "Create an agent team called **{}**.\n\n",
+        name
+    ));
+    out.push_str(&format!(
+        "**Goal:** {}\n\n",
+        description
+    ));
+    out.push_str(&format!(
+        "**Pattern:** {} — {}\n\n",
+        pattern,
+        pattern_description(pattern)
+    ));
 
-    // Spawn teammates
-    output.push_str("## Step 1: Spawn Teammates\n\n");
+    // Teammates
+    out.push_str(&format!("## Spawn {} Teammates\n\n", teammates.len()));
     for (i, mate) in teammates.iter().enumerate() {
-        output.push_str(&format!("### Teammate {}: {} ({})\n\n", i + 1, mate.role, mate.description));
-        output.push_str("```\n");
-        output.push_str(&format!("TeamCreate: {}\n", mate.role));
-        output.push_str(&format!("Prompt: {}\n", mate.spawn_prompt));
-        output.push_str("```\n\n");
-    }
-
-    // Create tasks
-    if !tasks.is_empty() {
-        output.push_str("## Step 2: Create Tasks\n\n");
-        for task in tasks {
-            output.push_str(&format!("### Task: {}\n\n", task.title));
-            output.push_str(&format!("- **Assigned to:** {}\n", task.assigned_to));
-            if !task.blocked_by.is_empty() {
-                output.push_str(&format!("- **Blocked by:** {}\n", task.blocked_by.join(", ")));
-            }
-            output.push_str(&format!("- **Description:** {}\n\n", task.description));
-            output.push_str("```\n");
-            output.push_str(&format!("TaskCreate: {}\n", task.title));
-            output.push_str(&format!("Description: {}\n", task.description));
-            output.push_str(&format!("AssignTo: {}\n", task.assigned_to));
-            if !task.blocked_by.is_empty() {
-                output.push_str(&format!("BlockedBy: {}\n", task.blocked_by.join(", ")));
-            }
-            output.push_str("```\n\n");
-        }
-    }
-
-    // Setup hooks
-    if !hooks.is_empty() {
-        output.push_str("## Step 3: Configure Hooks\n\n");
-        for hook in hooks {
-            output.push_str(&format!("- **{}**: `{}` — {}\n", hook.event, hook.command, hook.description));
-        }
-        output.push_str("\n");
-    }
-
-    output
-}
-
-fn generate_script_output(
-    name: &str,
-    teammates: &[TeammateDef],
-    tasks: &[TeamTaskDef],
-) -> String {
-    let mut output = String::new();
-
-    output.push_str("#!/bin/bash\n");
-    output.push_str(&format!("# {} - Team Deployment Script\n", name));
-    output.push_str("# Generated by Project Jumpstart\n\n");
-    output.push_str("set -e\n\n");
-
-    output.push_str("echo \"Spawning teammates...\"\n\n");
-    for mate in teammates {
-        output.push_str(&format!("# Spawn: {}\n", mate.role));
-        output.push_str(&format!(
-            "claude --team-spawn \"{}\" --prompt \"{}\"\n\n",
+        out.push_str(&format!(
+            "### {}. {} — {}\n\n",
+            i + 1,
             mate.role,
-            mate.spawn_prompt.replace('"', "\\\"").replace('\n', " ")
+            mate.description
         ));
+        out.push_str("Spawn this teammate with the following prompt:\n\n");
+        for line in mate.spawn_prompt.lines() {
+            out.push_str(&format!("> {}\n", line));
+        }
+        out.push_str("\n");
     }
 
+    // Tasks
     if !tasks.is_empty() {
-        output.push_str("echo \"Creating tasks...\"\n\n");
-        for task in tasks {
-            output.push_str(&format!("# Task: {}\n", task.title));
-            output.push_str(&format!(
-                "claude --team-task \"{}\" --assign \"{}\"",
-                task.title, task.assigned_to
+        out.push_str("## Create Tasks\n\n");
+        out.push_str("Create these tasks with `TaskCreate`. Use `addBlockedBy` to set dependencies so tasks run in the correct order.\n\n");
+        for (i, task) in tasks.iter().enumerate() {
+            out.push_str(&format!(
+                "{}. **{}** — assign to **{}**\n",
+                i + 1,
+                task.title,
+                task.assigned_to
             ));
             if !task.blocked_by.is_empty() {
-                output.push_str(&format!(" --blocked-by \"{}\"", task.blocked_by.join(",")));
+                let blockers: Vec<String> = task
+                    .blocked_by
+                    .iter()
+                    .map(|b| format!("\"{}\"", resolve_blocker_title(b, tasks)))
+                    .collect();
+                out.push_str(&format!("   - Blocked by: {}\n", blockers.join(", ")));
             }
-            output.push_str("\n\n");
+            out.push_str(&format!("   - {}\n\n", task.description));
         }
     }
 
-    output.push_str("echo \"Team deployed successfully!\"\n");
-    output
-}
-
-fn generate_config_output(
-    name: &str,
-    teammates: &[TeammateDef],
-    lead_instructions: &str,
-) -> String {
-    let mut output = String::new();
-
-    output.push_str(&format!("# .claude/teams/{}/\n\n", name.to_lowercase().replace(' ', "-")));
-    output.push_str("## Directory Structure\n\n");
-    output.push_str("```\n");
-    output.push_str(&format!(".claude/teams/{}/\n", name.to_lowercase().replace(' ', "-")));
-    output.push_str("  team.json          # Team configuration\n");
-    for mate in teammates {
-        output.push_str(&format!(
-            "  {}.md     # {} spawn prompt\n",
-            mate.role.to_lowercase().replace(' ', "-"),
-            mate.role
-        ));
-    }
-    output.push_str("```\n\n");
-
-    // team.json
-    output.push_str("## team.json\n\n```json\n");
-    output.push_str("{\n");
-    output.push_str(&format!("  \"name\": \"{}\",\n", name));
-    output.push_str("  \"teammates\": [\n");
-    for (i, mate) in teammates.iter().enumerate() {
-        output.push_str(&format!(
-            "    {{ \"role\": \"{}\", \"promptFile\": \"{}.md\" }}{}",
-            mate.role,
-            mate.role.to_lowercase().replace(' ', "-"),
-            if i < teammates.len() - 1 { ",\n" } else { "\n" }
-        ));
-    }
-    output.push_str("  ]\n}\n```\n\n");
-
     // Lead instructions
     if !lead_instructions.is_empty() {
-        output.push_str("## lead.md\n\n```markdown\n");
-        output.push_str(lead_instructions);
-        output.push_str("\n```\n\n");
+        out.push_str("## Your Role as Lead\n\n");
+        out.push_str(lead_instructions);
+        out.push_str("\n\n");
     }
 
-    // Individual teammate prompts
+    // Tips
+    out.push_str("## Coordination Tips\n\n");
+    out.push_str("- Press **Shift+Tab** to enter Delegate mode (lead coordinates only, does not write code)\n");
+    out.push_str("- Monitor progress with `TaskList` to see which tasks are pending, in-progress, or complete\n");
+    out.push_str("- Send a message to one teammate with `write`, or all teammates with `broadcast`\n");
+    out.push_str("- When all tasks are done, use `requestShutdown` to wind down the team\n");
+
+    out
+}
+
+/// Generate a shell script that enables Agent Teams, saves the team prompt,
+/// copies it to clipboard, and launches Claude Code in interactive mode.
+fn generate_script_output(
+    name: &str,
+    description: &str,
+    pattern: &str,
+    teammates: &[TeammateDef],
+    tasks: &[TeamTaskDef],
+    _hooks: &[TeamHookDef],
+    lead_instructions: &str,
+) -> String {
+    let mut out = String::new();
+    let slug = name.to_lowercase().replace(' ', "-");
+
+    out.push_str("#!/bin/bash\n");
+    out.push_str(&format!("# {} — Agent Team Deployment Script\n", name));
+    out.push_str("# Generated by Project Jumpstart\n");
+    out.push_str("#\n");
+    out.push_str("# This script:\n");
+    out.push_str("#   1. Enables the Agent Teams experimental feature\n");
+    out.push_str("#   2. Saves the team prompt to a temp file\n");
+    out.push_str("#   3. Copies the prompt to your clipboard\n");
+    out.push_str("#   4. Launches Claude Code — paste the prompt to start the team\n");
+    out.push_str("\nset -e\n\n");
+
+    // Enable Agent Teams
+    out.push_str("# ── Enable Agent Teams ──────────────────────────────────────────────\n");
+    out.push_str("export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1\n\n");
+
+    // Build the prompt (without prerequisites since the script handles setup)
+    let mut prompt = String::new();
+    prompt.push_str(&format!("Create an agent team called **{}**.\n\n", name));
+    prompt.push_str(&format!("**Goal:** {}\n\n", description));
+    prompt.push_str(&format!(
+        "**Pattern:** {} — {}\n\n",
+        pattern,
+        pattern_description(pattern)
+    ));
+
+    prompt.push_str(&format!("## Spawn {} Teammates\n\n", teammates.len()));
+    for (i, mate) in teammates.iter().enumerate() {
+        prompt.push_str(&format!(
+            "### {}. {} — {}\n\nSpawn this teammate with the following prompt:\n\n",
+            i + 1,
+            mate.role,
+            mate.description
+        ));
+        for line in mate.spawn_prompt.lines() {
+            prompt.push_str(&format!("> {}\n", line));
+        }
+        prompt.push_str("\n");
+    }
+
+    if !tasks.is_empty() {
+        prompt.push_str("## Create Tasks\n\nCreate these tasks with `TaskCreate`. Use `addBlockedBy` for dependencies.\n\n");
+        for (i, task) in tasks.iter().enumerate() {
+            prompt.push_str(&format!(
+                "{}. **{}** — assign to **{}**\n",
+                i + 1,
+                task.title,
+                task.assigned_to
+            ));
+            if !task.blocked_by.is_empty() {
+                let blockers: Vec<String> = task
+                    .blocked_by
+                    .iter()
+                    .map(|b| format!("\"{}\"", resolve_blocker_title(b, tasks)))
+                    .collect();
+                prompt.push_str(&format!("   - Blocked by: {}\n", blockers.join(", ")));
+            }
+            prompt.push_str(&format!("   - {}\n\n", task.description));
+        }
+    }
+
+    if !lead_instructions.is_empty() {
+        prompt.push_str("## Your Role as Lead\n\n");
+        prompt.push_str(lead_instructions);
+        prompt.push_str("\n");
+    }
+
+    // Embed the prompt as a heredoc
+    out.push_str("# ── Save team prompt ───────────────────────────────────────────────\n");
+    out.push_str(&format!(
+        "PROMPT_FILE=\"/tmp/{}-team-prompt.md\"\n",
+        slug
+    ));
+    out.push_str("cat > \"$PROMPT_FILE\" <<'TEAM_PROMPT'\n");
+    out.push_str(&prompt);
+    out.push_str("TEAM_PROMPT\n\n");
+
+    // Copy to clipboard
+    out.push_str("# ── Copy prompt to clipboard ───────────────────────────────────────\n");
+    out.push_str("if command -v pbcopy &> /dev/null; then\n");
+    out.push_str("  cat \"$PROMPT_FILE\" | pbcopy\n");
+    out.push_str("  echo \"Team prompt copied to clipboard.\"\n");
+    out.push_str("elif command -v xclip &> /dev/null; then\n");
+    out.push_str("  cat \"$PROMPT_FILE\" | xclip -selection clipboard\n");
+    out.push_str("  echo \"Team prompt copied to clipboard.\"\n");
+    out.push_str("else\n");
+    out.push_str("  echo \"Team prompt saved to: $PROMPT_FILE\"\n");
+    out.push_str("  echo \"Copy it manually and paste into Claude Code.\"\n");
+    out.push_str("fi\n\n");
+
+    // Launch Claude Code
+    out.push_str("# ── Launch Claude Code ─────────────────────────────────────────────\n");
+    out.push_str("echo \"\"\n");
+    out.push_str(&format!(
+        "echo \"Starting Claude Code for {}...\"\n",
+        name
+    ));
+    out.push_str("echo \"Paste the prompt (Cmd+V / Ctrl+V) to deploy the team.\"\n");
+    out.push_str("echo \"Press Shift+Tab to enter Delegate mode (lead coordinates only).\"\n");
+    out.push_str("echo \"\"\n\n");
+    out.push_str("claude\n");
+
+    out
+}
+
+/// Generate reusable setup files: settings.json snippet, saved team prompt,
+/// and individual teammate spawn prompts for reference.
+fn generate_config_output(
+    name: &str,
+    description: &str,
+    pattern: &str,
+    teammates: &[TeammateDef],
+    tasks: &[TeamTaskDef],
+    lead_instructions: &str,
+) -> String {
+    let mut out = String::new();
+    let slug = name.to_lowercase().replace(' ', "-");
+
+    out.push_str(&format!("# {} — Setup Files\n\n", name));
+    out.push_str("Save these files to your project to reuse this team configuration.\n\n");
+    out.push_str("---\n\n");
+
+    // 1. Enable Agent Teams
+    out.push_str("## 1. Enable Agent Teams\n\n");
+    out.push_str("Add to `~/.claude/settings.json`:\n\n");
+    out.push_str("```json\n");
+    out.push_str("{\n");
+    out.push_str("  \"env\": {\n");
+    out.push_str("    \"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS\": \"1\"\n");
+    out.push_str("  }\n");
+    out.push_str("}\n");
+    out.push_str("```\n\n");
+
+    // 2. Team prompt file
+    out.push_str(&format!(
+        "## 2. Team Prompt — `team-prompts/{}.md`\n\n",
+        slug
+    ));
+    out.push_str("Save this file and paste its contents into Claude Code to deploy the team:\n\n");
+    out.push_str("```markdown\n");
+    out.push_str(&format!(
+        "Create an agent team called **{}**.\n\n",
+        name
+    ));
+    out.push_str(&format!("**Goal:** {}\n\n", description));
+    out.push_str(&format!(
+        "**Pattern:** {} — {}\n\n",
+        pattern,
+        pattern_description(pattern)
+    ));
+
+    out.push_str(&format!("Spawn {} teammates:\n\n", teammates.len()));
+    for (i, mate) in teammates.iter().enumerate() {
+        out.push_str(&format!(
+            "{}. **{}** — {}\n",
+            i + 1,
+            mate.role,
+            mate.description
+        ));
+    }
+    out.push_str("\n");
+
+    if !tasks.is_empty() {
+        out.push_str("Tasks:\n\n");
+        for (i, task) in tasks.iter().enumerate() {
+            out.push_str(&format!(
+                "{}. **{}** → {}",
+                i + 1,
+                task.title,
+                task.assigned_to
+            ));
+            if !task.blocked_by.is_empty() {
+                let blockers: Vec<String> = task
+                    .blocked_by
+                    .iter()
+                    .map(|b| resolve_blocker_title(b, tasks))
+                    .collect();
+                out.push_str(&format!(" (after: {})", blockers.join(", ")));
+            }
+            out.push_str("\n");
+        }
+        out.push_str("\n");
+    }
+
+    if !lead_instructions.is_empty() {
+        out.push_str(lead_instructions);
+        out.push_str("\n");
+    }
+    out.push_str("```\n\n");
+
+    // 3. Individual teammate spawn prompts
+    out.push_str("## 3. Teammate Spawn Prompts\n\n");
+    out.push_str("Reference prompts for each teammate (the lead uses these when spawning):\n\n");
     for mate in teammates {
-        output.push_str(&format!("## {}.md\n\n```markdown\n", mate.role.to_lowercase().replace(' ', "-")));
-        output.push_str(&mate.spawn_prompt);
-        output.push_str("\n```\n\n");
+        let mate_slug = mate.role.to_lowercase().replace(' ', "-");
+        out.push_str(&format!(
+            "### `team-prompts/{}/{}.md`\n\n",
+            slug, mate_slug
+        ));
+        out.push_str("```markdown\n");
+        out.push_str(&mate.spawn_prompt);
+        out.push_str("\n```\n\n");
     }
 
-    output
+    // Usage
+    out.push_str("---\n\n");
+    out.push_str("## Usage\n\n");
+    out.push_str(&format!(
+        "1. Copy the team prompt from `team-prompts/{}.md`\n",
+        slug
+    ));
+    out.push_str("2. Start a new Claude Code session in your project directory\n");
+    out.push_str("3. Paste the prompt — Claude will spawn the teammates and create tasks\n");
+    out.push_str("4. Press **Shift+Tab** to enter Delegate mode (lead coordinates only, does not write code)\n");
+    out.push_str("5. Monitor with `TaskList` and communicate with `write` / `broadcast`\n");
+
+    out
 }
 
 // ---------------------------------------------------------------------------

@@ -43,17 +43,17 @@ const FORMAT_OPTIONS: { id: OutputFormat; label: string; description: string }[]
   {
     id: "prompt",
     label: "Lead Prompt",
-    description: "Paste-ready markdown prompt for a Claude Code session",
+    description: "Paste into Claude Code to spawn the team via Agent Teams",
   },
   {
     id: "script",
     label: "Shell Script",
-    description: "Executable shell script for team deployment",
+    description: "Enables Agent Teams, copies prompt to clipboard, launches Claude Code",
   },
   {
     id: "config",
-    label: "Config Directory",
-    description: ".claude/teams/ directory structure",
+    label: "Setup Files",
+    description: "Reusable prompt files and settings.json snippet",
   },
 ];
 
@@ -178,17 +178,17 @@ export function TeamDeployOutput({
           </div>
           {format === "prompt" && (
             <p className="mt-2 text-xs text-neutral-600">
-              Paste this into a Claude Code session to deploy the team
+              Enable Agent Teams in <code className="text-neutral-400">~/.claude/settings.json</code>, then paste this into Claude Code
             </p>
           )}
           {format === "script" && (
             <p className="mt-2 text-xs text-neutral-600">
-              Save as a <code className="text-neutral-400">.sh</code> file and run with <code className="text-neutral-400">bash</code>
+              Save as <code className="text-neutral-400">.sh</code> and run — it sets up Agent Teams and launches Claude Code
             </p>
           )}
           {format === "config" && (
             <p className="mt-2 text-xs text-neutral-600">
-              Create these files in your project's <code className="text-neutral-400">.claude/teams/</code> directory
+              Save these files to your project for reuse — paste the team prompt to deploy
             </p>
           )}
         </div>
