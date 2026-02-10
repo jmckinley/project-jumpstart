@@ -77,9 +77,9 @@ pub fn scan_project_dir(path: &str) -> Result<DetectionResult, String> {
     let project_type = detect_project_type(project_path, &language, &framework);
 
     // Overall confidence is based on highest signal strength
-    let confidence = if language.as_ref().map_or(false, |l| l.confidence >= 0.9) {
+    let confidence = if language.as_ref().is_some_and(|l| l.confidence >= 0.9) {
         "high"
-    } else if language.as_ref().map_or(false, |l| l.confidence >= 0.5) {
+    } else if language.as_ref().is_some_and(|l| l.confidence >= 0.5) {
         "medium"
     } else if language.is_some() {
         "low"
@@ -932,10 +932,7 @@ fn detect_project_type(
     }
 
     // Language-based fallback
-    match lang {
-        "Swift" => return Some("Mobile".to_string()),
-        _ => {}
-    }
+    if lang == "Swift" { return Some("Mobile".to_string()) }
 
     // Check for CLI indicators
     if path.join("src/main.rs").exists() && fw.is_empty() && lang == "Rust" {

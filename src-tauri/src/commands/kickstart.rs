@@ -179,8 +179,8 @@ pub async fn generate_kickstart_prompt(
             .map_err(|_| "Anthropic API key not configured. Set it in Settings.".to_string())?;
 
         // Decrypt if encrypted
-        if encrypted.starts_with("enc:") {
-            crypto::decrypt(&encrypted[4..])
+        if let Some(stripped) = encrypted.strip_prefix("enc:") {
+            crypto::decrypt(stripped)
                 .map_err(|e| format!("Failed to decrypt API key: {}", e))?
         } else {
             encrypted
@@ -340,8 +340,8 @@ pub async fn generate_kickstart_claude_md(
             .map_err(|_| "Anthropic API key not configured. Set it in Settings.".to_string())?;
 
         // Decrypt if encrypted
-        if encrypted.starts_with("enc:") {
-            crypto::decrypt(&encrypted[4..])
+        if let Some(stripped) = encrypted.strip_prefix("enc:") {
+            crypto::decrypt(stripped)
                 .map_err(|e| format!("Failed to decrypt API key: {}", e))?
         } else {
             encrypted
@@ -471,8 +471,8 @@ pub async fn infer_tech_stack(
             )
             .map_err(|_| "Anthropic API key not configured. Set it in Settings.".to_string())?;
 
-        if encrypted.starts_with("enc:") {
-            crypto::decrypt(&encrypted[4..])
+        if let Some(stripped) = encrypted.strip_prefix("enc:") {
+            crypto::decrypt(stripped)
                 .map_err(|e| format!("Failed to decrypt API key: {}", e))?
         } else {
             encrypted

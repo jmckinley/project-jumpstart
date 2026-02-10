@@ -36,10 +36,18 @@ Download the latest release from [GitHub Releases](https://github.com/jmckinley/
 2. Open the DMG and drag **Project Jumpstart** to your Applications folder
 3. Launch the app — it is signed and notarized, so no Gatekeeper warnings
 
+### Windows
+
+1. Download the `.msi` or `.exe` installer
+2. Run the installer and follow the prompts
+3. Launch **Project Jumpstart** from the Start Menu
+
+> **Note:** Git Bash is recommended for git hook features (Enforcement tab). Standard Command Prompt and PowerShell work for all other features. WebView2 is required and is included in Windows 11; on Windows 10 it will be installed automatically.
+
 ### Requirements
 
-- macOS 11+ (Big Sur or later)
-- Apple Silicon (M1/M2/M3/M4)
+- **macOS**: macOS 11+ (Big Sur or later), Apple Silicon (M1/M2/M3/M4)
+- **Windows**: Windows 10+ with WebView2
 - Anthropic API key (for AI-powered features like doc generation and test suggestions)
 
 ---
@@ -454,6 +462,10 @@ Open `CLAUDE.local.md` in your project root to see accumulated learnings. This f
 The app is signed and notarized. If you still get a Gatekeeper warning:
 1. Right-click the app and select **Open**
 2. Click **Open** in the dialog
+
+### App won't open on Windows
+
+Ensure WebView2 is installed. Windows 11 includes it by default. On Windows 10, download the WebView2 runtime from [Microsoft](https://developer.microsoft.com/en-us/microsoft-edge/webview2/).
 
 ### AI features not working
 

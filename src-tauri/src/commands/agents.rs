@@ -78,6 +78,7 @@ pub async fn list_agents(
 
 /// Create a new agent and persist it to the database.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn create_agent(
     name: String,
     description: String,
@@ -152,6 +153,7 @@ pub async fn create_agent(
 
 /// Update an existing agent.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn update_agent(
     id: String,
     name: String,
@@ -273,6 +275,7 @@ pub async fn increment_agent_usage(id: String, state: State<'_, AppState>) -> Re
 /// Enhance an agent's instructions using AI.
 /// Optionally includes project context for more relevant enhancement.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn enhance_agent_instructions(
     name: String,
     description: String,

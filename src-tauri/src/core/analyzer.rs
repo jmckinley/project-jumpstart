@@ -474,7 +474,7 @@ fn extract_list_section(content: &str, section_name: &str) -> Vec<String> {
             } else if trimmed.is_empty() || trimmed == "*" || trimmed == "//!" {
                 // Empty line: might be between sections, continue looking
             } else if trimmed.ends_with(':')
-                && trimmed.chars().next().map_or(false, |c| c.is_uppercase())
+                && trimmed.chars().next().is_some_and(|c| c.is_uppercase())
             {
                 // Found another section header, stop
                 break;
@@ -627,7 +627,7 @@ pub fn detect_exports(content: &str, ext: &str) -> Vec<String> {
                         if let Some(paren_pos) = after.find('(') {
                             let name = &after[..paren_pos];
                             // Go exported functions start with uppercase
-                            if name.chars().next().map_or(false, |c| c.is_uppercase()) {
+                            if name.chars().next().is_some_and(|c| c.is_uppercase()) {
                                 exports.push(name.to_string());
                             }
                         }
@@ -636,7 +636,7 @@ pub fn detect_exports(content: &str, ext: &str) -> Vec<String> {
                 // type TypeName struct/interface
                 else if trimmed.starts_with("type ") {
                     if let Some(name) = extract_word_after(trimmed, "type ") {
-                        if name.chars().next().map_or(false, |c| c.is_uppercase()) {
+                        if name.chars().next().is_some_and(|c| c.is_uppercase()) {
                             exports.push(name);
                         }
                     }
@@ -831,8 +831,8 @@ pub fn detect_imports(content: &str, ext: &str) -> Vec<String> {
         "py" => {
             for line in content.lines() {
                 let trimmed = line.trim();
-                if trimmed.starts_with("from ") || trimmed.starts_with("import ") {
-                    if !trimmed.starts_with("from __future__") {
+                if (trimmed.starts_with("from ") || trimmed.starts_with("import "))
+                    && !trimmed.starts_with("from __future__") {
                         let module = trimmed
                             .trim_start_matches("from ")
                             .trim_start_matches("import ")
@@ -844,7 +844,6 @@ pub fn detect_imports(content: &str, ext: &str) -> Vec<String> {
                             imports.push(module);
                         }
                     }
-                }
             }
         }
         "go" => {
@@ -1422,12 +1421,11 @@ fn infer_description(rel_path: &str, exports: &[String], content: &str) -> Strin
     }
 
     // Check content for clues
-    if content.contains("async fn") || content.contains("async function") {
-        if content.contains("Result<") || content.contains("Promise<") {
-            if exports.len() == 1 {
-                return format!("Async {} operations", camel_to_words(&exports[0]));
-            }
-        }
+    if (content.contains("async fn") || content.contains("async function"))
+        && (content.contains("Result<") || content.contains("Promise<"))
+        && exports.len() == 1
+    {
+        return format!("Async {} operations", camel_to_words(&exports[0]));
     }
 
     // Fallback based on exports
@@ -1768,7 +1766,7 @@ fn infer_export_description(export_name: &str, rel_path: &str) -> String {
     }
 
     // Check if it's likely a component (PascalCase in components folder)
-    if rel_path.contains("/components/") && export_name.chars().next().map_or(false, |c| c.is_uppercase()) {
+    if rel_path.contains("/components/") && export_name.chars().next().is_some_and(|c| c.is_uppercase()) {
         return format!("{} - React component", export_name);
     }
 

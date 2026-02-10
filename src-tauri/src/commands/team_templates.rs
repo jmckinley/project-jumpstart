@@ -85,6 +85,7 @@ pub async fn list_team_templates(
 
 /// Create a new team template.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn create_team_template(
     name: String,
     description: String,
@@ -156,6 +157,7 @@ pub async fn create_team_template(
 
 /// Update an existing team template.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn update_team_template(
     id: String,
     name: String,
@@ -452,7 +454,7 @@ fn render_hooks_section(hooks: &[TeamHookDef], ctx: Option<&ProjectContext>) -> 
                 hook.command.clone()
             };
             out.push_str("      {\n");
-            out.push_str(&format!("        \"matcher\": \"Edit|Write\",\n"));
+            out.push_str("        \"matcher\": \"Edit|Write\",\n");
             out.push_str(&format!("        \"command\": \"{}\"\n", cmd));
             if hidx + 1 < event_hooks.len() {
                 out.push_str("      },\n");
@@ -475,7 +477,7 @@ fn render_hooks_section(hooks: &[TeamHookDef], ctx: Option<&ProjectContext>) -> 
     for hook in hooks {
         out.push_str(&format!("- **{}**: {}\n", hook.event, hook.description));
     }
-    out.push_str("\n");
+    out.push('\n');
 
     out
 }
@@ -485,6 +487,7 @@ fn render_hooks_section(hooks: &[TeamHookDef], ctx: Option<&ProjectContext>) -> 
 /// The user pastes this into an active Claude Code session (with Agent Teams
 /// enabled). Claude interprets the prompt and uses TeammateTool.spawnTeam to
 /// create teammates, TaskCreate for tasks, and addBlockedBy for dependencies.
+#[allow(clippy::too_many_arguments)]
 fn generate_prompt_output(
     name: &str,
     description: &str,
@@ -542,7 +545,7 @@ fn generate_prompt_output(
         for line in prompt.lines() {
             out.push_str(&format!("> {}\n", line));
         }
-        out.push_str("\n");
+        out.push('\n');
     }
 
     // Tasks
@@ -593,6 +596,7 @@ fn generate_prompt_output(
 
 /// Generate a shell script that enables Agent Teams, saves the team prompt,
 /// copies it to clipboard, and launches Claude Code in interactive mode.
+#[allow(clippy::too_many_arguments)]
 fn generate_script_output(
     name: &str,
     description: &str,
@@ -655,7 +659,7 @@ fn generate_script_output(
         for line in spawn.lines() {
             prompt.push_str(&format!("> {}\n", line));
         }
-        prompt.push_str("\n");
+        prompt.push('\n');
     }
 
     if !tasks.is_empty() {
@@ -688,7 +692,7 @@ fn generate_script_output(
     if !lead_instructions.is_empty() {
         prompt.push_str("## Your Role as Lead\n\n");
         prompt.push_str(lead_instructions);
-        prompt.push_str("\n");
+        prompt.push('\n');
     }
 
     // Embed the prompt as a heredoc
@@ -731,6 +735,7 @@ fn generate_script_output(
 
 /// Generate reusable setup files: settings.json snippet, saved team prompt,
 /// and individual teammate spawn prompts for reference.
+#[allow(clippy::too_many_arguments)]
 fn generate_config_output(
     name: &str,
     description: &str,
@@ -794,7 +799,7 @@ fn generate_config_output(
             mate.description
         ));
     }
-    out.push_str("\n");
+    out.push('\n');
 
     if !tasks.is_empty() {
         out.push_str("Tasks:\n\n");
@@ -813,20 +818,20 @@ fn generate_config_output(
                     .collect();
                 out.push_str(&format!(" (after: {})", blockers.join(", ")));
             }
-            out.push_str("\n");
+            out.push('\n');
         }
-        out.push_str("\n");
+        out.push('\n');
     }
 
     if !lead_instructions.is_empty() {
         out.push_str(lead_instructions);
-        out.push_str("\n");
+        out.push('\n');
     }
     out.push_str("```\n\n");
 
     // 3. Individual teammate spawn prompts
     let section_num = if !hooks.is_empty() { 4 } else { 3 };
-    out.push_str(&format!("## 3. Teammate Spawn Prompts\n\n"));
+    out.push_str("## 3. Teammate Spawn Prompts\n\n");
     out.push_str("Reference prompts for each teammate (the lead uses these when spawning):\n\n");
     for mate in teammates {
         let mate_slug = mate.role.to_lowercase().replace(' ', "-");

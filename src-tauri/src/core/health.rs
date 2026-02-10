@@ -538,6 +538,7 @@ fn has_claude_code_hooks(project_path: &Path) -> bool {
 }
 
 /// Generate quick win suggestions based on current scores.
+#[allow(clippy::too_many_arguments)]
 fn generate_quick_wins(
     project_path: &Path,
     claude_md: u32,

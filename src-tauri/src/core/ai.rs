@@ -99,8 +99,8 @@ pub fn get_api_key(db: &Connection) -> Result<String, String> {
         .map_err(|_| "Anthropic API key not configured. Set it in Settings.".to_string())?;
 
     // Decrypt if encrypted (prefixed with "enc:")
-    if value.starts_with("enc:") {
-        crate::core::crypto::decrypt(&value[4..])
+    if let Some(stripped) = value.strip_prefix("enc:") {
+        crate::core::crypto::decrypt(stripped)
             .map_err(|e| format!("Failed to decrypt API key: {}", e))
     } else {
         Ok(value)

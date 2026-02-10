@@ -748,7 +748,7 @@ async fn execute_ralph_loop_prd(
         }
 
         // Build prompt for this story
-        let story_prompt = build_story_prompt(&story, &prd);
+        let story_prompt = build_story_prompt(story, &prd);
 
         // Execute Claude with fresh context for this story
         let mut story_iterations = 0;
@@ -848,10 +848,8 @@ async fn execute_ralph_loop_prd(
     }
 
     // Final outcome
-    let final_status = if completed_count == total_stories {
+    let final_status = if completed_count > 0 {
         "completed"
-    } else if completed_count > 0 {
-        "completed" // Partial success is still "completed"
     } else {
         "failed"
     };
@@ -1735,6 +1733,7 @@ const MAX_MISTAKES_PER_PROJECT: i64 = 50;
 /// Record a mistake from a RALPH loop for future learning.
 /// Automatically prunes old mistakes to keep only the most recent 50 per project.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn record_ralph_mistake(
     project_id: String,
     loop_id: Option<String>,
