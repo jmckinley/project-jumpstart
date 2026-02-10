@@ -811,11 +811,10 @@ fn extract_coverage(project_path: &str, _framework_name: &str) -> Option<f64> {
 
     for coverage_file in &coverage_files {
         let coverage_path = path.join(coverage_file);
-        if coverage_path.exists() {
-            if coverage_file.ends_with(".info") || coverage_file.ends_with(".lcov") {
+        if coverage_path.exists()
+            && (coverage_file.ends_with(".info") || coverage_file.ends_with(".lcov")) {
                 return parse_coverage_lcov(&coverage_path);
             }
-        }
     }
 
     // Check for coverage in JSON format (common for JS tools)
@@ -845,12 +844,12 @@ pub fn parse_coverage_lcov(path: &Path) -> Option<f64> {
     let mut lines_hit = 0u64;
 
     for line in content.lines() {
-        if line.starts_with("LF:") {
-            if let Ok(count) = line[3..].parse::<u64>() {
+        if let Some(stripped) = line.strip_prefix("LF:") {
+            if let Ok(count) = stripped.parse::<u64>() {
                 lines_found += count;
             }
-        } else if line.starts_with("LH:") {
-            if let Ok(count) = line[3..].parse::<u64>() {
+        } else if let Some(stripped) = line.strip_prefix("LH:") {
+            if let Ok(count) = stripped.parse::<u64>() {
                 lines_hit += count;
             }
         }

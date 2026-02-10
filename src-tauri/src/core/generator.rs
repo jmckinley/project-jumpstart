@@ -33,17 +33,17 @@ use crate::models::project::Project;
 /// Generate a complete CLAUDE.md file from project configuration data.
 /// Returns the full markdown content as a string.
 pub fn generate_claude_md_content(project: &Project) -> String {
-    let mut sections: Vec<String> = Vec::new();
-
-    sections.push(generate_header(project));
-    sections.push(generate_tech_stack(project));
-    sections.push(generate_project_structure(project));
-    sections.push(generate_commands(project));
-    sections.push(generate_documentation_format(project));
-    sections.push(generate_patterns(project));
-    sections.push(generate_current_focus());
-    sections.push(generate_decisions(project));
-    sections.push(generate_notes(project));
+    let sections: Vec<String> = vec![
+        generate_header(project),
+        generate_tech_stack(project),
+        generate_project_structure(project),
+        generate_commands(project),
+        generate_documentation_format(project),
+        generate_patterns(project),
+        generate_current_focus(),
+        generate_decisions(project),
+        generate_notes(project),
+    ];
 
     sections.join("\n---\n\n")
 }
@@ -958,11 +958,9 @@ fn generate_notes(project: &Project) -> String {
     }
 
     // File conventions
-    let file_notes = vec![
-        "- Update CLAUDE.md when project conventions change",
+    let file_notes = ["- Update CLAUDE.md when project conventions change",
         "- Keep documentation headers current in all source files",
-        "- Use forward slashes in paths (even on Windows)",
-    ];
+        "- Use forward slashes in paths (even on Windows)"];
     sections.push(format!("### Files & Documentation\n{}", file_notes.join("\n")));
 
     format!(

@@ -47,17 +47,14 @@ use serde::{Deserialize, Serialize};
 /// Status of a test plan
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum TestPlanStatus {
+    #[default]
     Draft,
     Active,
     Archived,
 }
 
-impl Default for TestPlanStatus {
-    fn default() -> Self {
-        TestPlanStatus::Draft
-    }
-}
 
 impl std::fmt::Display for TestPlanStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -98,17 +95,14 @@ pub struct TestPlan {
 /// Type of test case
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum TestType {
+    #[default]
     Unit,
     Integration,
     E2e,
 }
 
-impl Default for TestType {
-    fn default() -> Self {
-        TestType::Unit
-    }
-}
 
 impl std::fmt::Display for TestType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -135,18 +129,15 @@ impl std::str::FromStr for TestType {
 /// Priority level for test cases
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum TestPriority {
     Low,
+    #[default]
     Medium,
     High,
     Critical,
 }
 
-impl Default for TestPriority {
-    fn default() -> Self {
-        TestPriority::Medium
-    }
-}
 
 impl std::fmt::Display for TestPriority {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -175,18 +166,15 @@ impl std::str::FromStr for TestPriority {
 /// Status of a test case
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum TestCaseStatus {
+    #[default]
     Pending,
     Passing,
     Failing,
     Skipped,
 }
 
-impl Default for TestCaseStatus {
-    fn default() -> Self {
-        TestCaseStatus::Pending
-    }
-}
 
 impl std::fmt::Display for TestCaseStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -232,18 +220,15 @@ pub struct TestCase {
 /// Status of a test run
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum TestRunStatus {
+    #[default]
     Running,
     Passed,
     Failed,
     Cancelled,
 }
 
-impl Default for TestRunStatus {
-    fn default() -> Self {
-        TestRunStatus::Running
-    }
-}
 
 impl std::fmt::Display for TestRunStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -320,17 +305,14 @@ pub struct TestPlanSummary {
 /// TDD workflow phase
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum TDDPhase {
+    #[default]
     Red,
     Green,
     Refactor,
 }
 
-impl Default for TDDPhase {
-    fn default() -> Self {
-        TDDPhase::Red
-    }
-}
 
 impl std::fmt::Display for TDDPhase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -357,18 +339,15 @@ impl std::str::FromStr for TDDPhase {
 /// Status of a TDD phase
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum TDDPhaseStatus {
+    #[default]
     Pending,
     Active,
     Complete,
     Failed,
 }
 
-impl Default for TDDPhaseStatus {
-    fn default() -> Self {
-        TDDPhaseStatus::Pending
-    }
-}
 
 impl std::fmt::Display for TDDPhaseStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

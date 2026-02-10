@@ -385,6 +385,7 @@ pub async fn create_test_case(
 
 /// Update an existing test case.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn update_test_case(
     id: String,
     name: Option<String>,

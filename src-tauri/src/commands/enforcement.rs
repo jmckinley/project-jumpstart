@@ -102,8 +102,8 @@ fn export_api_key_for_hook(db: &rusqlite::Connection) -> Result<(), String> {
         .map_err(|_| "No API key configured. Please add your Anthropic API key in Settings.")?;
 
     // Decrypt the API key
-    let api_key = if encrypted_value.starts_with("enc:") {
-        crypto::decrypt(&encrypted_value[4..])
+    let api_key = if let Some(stripped) = encrypted_value.strip_prefix("enc:") {
+        crypto::decrypt(stripped)
             .map_err(|e| format!("Failed to decrypt API key: {}", e))?
     } else {
         encrypted_value

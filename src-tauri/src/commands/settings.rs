@@ -63,8 +63,8 @@ pub async fn get_setting(
     match result {
         Ok(value) => {
             // Check if value is encrypted (prefixed with "enc:")
-            if value.starts_with("enc:") {
-                let decrypted = crypto::decrypt(&value[4..])
+            if let Some(stripped) = value.strip_prefix("enc:") {
+                let decrypted = crypto::decrypt(stripped)
                     .map_err(|e| format!("Failed to decrypt setting '{}': {}", key, e))?;
                 Ok(Some(decrypted))
             } else {
@@ -129,19 +129,17 @@ pub async fn get_all_settings(
         .map_err(|e| format!("Failed to read settings: {}", e))?;
 
     let mut settings = HashMap::new();
-    for row_result in rows {
-        if let Ok((key, value)) = row_result {
-            // Decrypt encrypted values
-            let decrypted_value = if value.starts_with("enc:") {
-                crypto::decrypt(&value[4..]).unwrap_or_else(|_| {
-                    // If decryption fails, return empty string (key may have changed)
-                    String::new()
-                })
-            } else {
-                value
-            };
-            settings.insert(key, decrypted_value);
-        }
+    for (key, value) in rows.flatten() {
+        // Decrypt encrypted values
+        let decrypted_value = if let Some(stripped) = value.strip_prefix("enc:") {
+            crypto::decrypt(stripped).unwrap_or_else(|_| {
+                // If decryption fails, return empty string (key may have changed)
+                String::new()
+            })
+        } else {
+            value
+        };
+        settings.insert(key, decrypted_value);
     }
 
     Ok(settings)
