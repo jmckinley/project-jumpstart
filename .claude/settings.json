@@ -2,9 +2,15 @@
   "hooks": {
     "SessionEnd": [
       {
-        "command": ".claude/hooks/extract-learnings.sh",
-        "description": "Extract learnings from session transcript",
-        "timeout": 30000
+        "matcher": {},
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/extract-learnings.sh",
+            "description": "Extract learnings from session transcript",
+            "timeout": 30000
+          }
+        ]
       }
     ]
   }
