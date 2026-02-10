@@ -2,7 +2,7 @@
   "hooks": {
     "SessionEnd": [
       {
-        "matcher": {},
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
