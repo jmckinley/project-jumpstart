@@ -1017,15 +1017,25 @@ mod tests {
 
     #[test]
     fn test_chrome_extension_detection() {
-        // Test the Chrome Extension detection with the test project
-        let result = scan_project_dir("/Users/johnmckinley/test-chrome-extension");
-        assert!(result.is_ok(), "Failed to scan test-chrome-extension");
-        let det = result.unwrap();
+        // Test Chrome Extension detection using a temp fixture
+        let dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let manifest = serde_json::json!({
+            "manifest_version": 3,
+            "name": "Test Extension",
+            "version": "1.0",
+            "description": "A test Chrome extension",
+            "permissions": ["storage"],
+            "action": { "default_popup": "popup.html" }
+        });
+        std::fs::write(dir.path().join("manifest.json"), manifest.to_string())
+            .expect("Failed to write manifest.json");
+        // Need a JS file so language detection picks up JavaScript/TypeScript
+        std::fs::write(dir.path().join("popup.js"), "console.log('hello');")
+            .expect("Failed to write popup.js");
 
-        println!("Detection result:");
-        println!("  Language: {:?}", det.language);
-        println!("  Framework: {:?}", det.framework);
-        println!("  Project Type: {:?}", det.project_type);
+        let result = scan_project_dir(dir.path().to_str().unwrap());
+        assert!(result.is_ok(), "Failed to scan chrome extension fixture");
+        let det = result.unwrap();
 
         // Should detect Chrome Extension framework
         assert!(det.framework.is_some(), "Framework not detected");
