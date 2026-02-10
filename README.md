@@ -3,6 +3,7 @@
 A desktop application that automatically applies and enforces Claude Code best practices. Built with Tauri 2.0, React, and Rust — prevent **context rot** through persistent documentation.
 
 ![macOS](https://img.shields.io/badge/macOS-11%2B-blue)
+![Windows](https://img.shields.io/badge/Windows-10%2B-blue)
 ![Tauri](https://img.shields.io/badge/Tauri-2.0-orange)
 
 ## What is Context Rot?
@@ -31,20 +32,28 @@ When working with Claude Code, context gets lost after ~30 minutes of conversati
 
 ## Download
 
-Download the latest release for macOS:
+Download the latest release:
 
-**[Latest Release](https://github.com/jmckinley/project-jumpstart/releases/latest)** (macOS, Apple Silicon, signed and notarized)
+**[Latest Release](https://github.com/jmckinley/project-jumpstart/releases/latest)**
 
-### Installation
+### macOS Installation
 
 1. Download the `.dmg` file from the latest release
 2. Open the DMG and drag **Project Jumpstart** to your Applications folder
 3. Launch the app — it's signed and notarized, so no Gatekeeper warnings
 
+### Windows Installation
+
+1. Download the `.msi` or `.exe` installer from the latest release
+2. Run the installer and follow the prompts
+3. Launch **Project Jumpstart** from the Start Menu
+
+> **Note:** Git Bash is recommended for git hook features (Enforcement tab). Standard Command Prompt and PowerShell work for all other features.
+
 ### Requirements
 
-- macOS 11+ (Big Sur or later)
-- Apple Silicon (M1/M2/M3/M4)
+- **macOS**: macOS 11+ (Big Sur or later), Apple Silicon (M1/M2/M3/M4)
+- **Windows**: Windows 10+ with WebView2 (included in Windows 11; auto-installed on Windows 10)
 - Anthropic API key (for AI-powered features)
 
 ## Getting Started
