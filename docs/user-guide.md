@@ -11,15 +11,16 @@ A complete guide to using Project Jumpstart for Claude Code best practices.
 3. [Dashboard](#dashboard)
 4. [CLAUDE.md Editor](#claudemd-editor)
 5. [Module Documentation](#module-documentation)
-6. [Skills Workshop](#skills-workshop)
-7. [Agents](#agents)
-8. [Team Templates](#team-templates)
-9. [Test Plans & TDD](#test-plans--tdd)
-10. [RALPH Command Center](#ralph-command-center)
-11. [Context Health](#context-health)
-12. [Enforcement](#enforcement)
-13. [Settings](#settings)
-14. [Session Learning Hooks](#session-learning-hooks)
+6. [Project Kickstart](#project-kickstart)
+7. [Skills Workshop](#skills-workshop)
+8. [Agents](#agents)
+9. [Team Templates](#team-templates)
+10. [Test Plans & TDD](#test-plans--tdd)
+11. [RALPH Command Center](#ralph-command-center)
+12. [Context Health](#context-health)
+13. [Enforcement](#enforcement)
+14. [Settings](#settings)
+15. [Session Learning Hooks](#session-learning-hooks)
 
 ---
 
@@ -141,6 +142,39 @@ Select multiple files and click **Generate Selected** to document them all at on
 ### Coverage Stats
 
 The coverage bar at the top shows how many files have documentation. Aim for 80%+.
+
+---
+
+## Project Kickstart
+
+For brand-new or undocumented projects, **Project Kickstart** generates everything you need to make Claude Code productive from the very first session.
+
+### When to Use
+
+- Starting a new project from scratch
+- Onboarding an existing project that has no CLAUDE.md
+- Bootstrapping documentation for a project you just inherited
+
+### How to Use
+
+1. Navigate to the **Modules** tab
+2. If your project has no CLAUDE.md, you'll see the Kickstart interface
+3. Fill in your project details:
+   - Project name and description
+   - Language and framework
+   - Key goals and constraints
+4. Click **Generate** to create a complete starter prompt
+5. Review the generated output — edit if needed
+6. Click **Copy** to copy the prompt
+7. Paste it into Claude Code to bootstrap your project
+
+### What Gets Generated
+
+- A comprehensive CLAUDE.md tailored to your tech stack
+- Module documentation templates for your file structure
+- Recommended skills and agents for your project type
+- Project structure guidance and conventions
+- Token usage estimate for the generated context
 
 ---
 

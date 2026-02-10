@@ -1,10 +1,9 @@
 # Project Jumpstart
 
-A desktop application that helps you apply Claude Code best practices to your projects in minutes. Prevent context rot with persistent documentation.
+A desktop application that automatically applies and enforces Claude Code best practices. Built with Tauri 2.0, React, and Rust — prevent **context rot** through persistent documentation.
 
 ![macOS](https://img.shields.io/badge/macOS-11%2B-blue)
 ![Tauri](https://img.shields.io/badge/Tauri-2.0-orange)
-![License](https://img.shields.io/badge/license-MIT-green)
 
 ## What is Context Rot?
 
@@ -38,25 +37,25 @@ Download the latest release for macOS:
 
 ### Installation
 
-1. Download the DMG file
-2. Open the DMG and drag "Project Jumpstart" to Applications
-3. Launch the app (signed and notarized, no Gatekeeper issues)
-
-For detailed usage of every feature, see the **[User Guide](docs/user-guide.md)**.
+1. Download the `.dmg` file from the latest release
+2. Open the DMG and drag **Project Jumpstart** to your Applications folder
+3. Launch the app — it's signed and notarized, so no Gatekeeper warnings
 
 ### Requirements
 
 - macOS 11+ (Big Sur or later)
-- Apple Silicon Mac (M1/M2/M3)
-- Anthropic API key (required for AI-powered features)
+- Apple Silicon (M1/M2/M3/M4)
+- Anthropic API key (for AI-powered features)
 
 ## Getting Started
 
-1. Launch the app - you'll see a welcome screen
+1. Launch the app — you'll see a welcome screen
 2. Enter your Anthropic API key (strongly recommended)
-3. Click "Get Started" and select a project folder
+3. Click **Get Started** and select a project folder
 4. Follow the onboarding wizard to detect your tech stack
 5. Generate your CLAUDE.md and module documentation
+
+For detailed usage of every feature, see the **[User Guide](docs/user-guide.md)**.
 
 ## Tech Stack Detection
 
@@ -75,15 +74,15 @@ Project Jumpstart automatically detects:
 
 50+ pre-built skills organized by category:
 
-- **Code Review** - Grill Me on Changes, Two-Claude Review, Skeptical Review
-- **Prompting Patterns** - Fresh Start Pattern, Prove It Works
-- **Language Patterns** - TypeScript, Python, Rust, Go, Java, Kotlin, Swift idioms
-- **UI/UX** - Accessibility, responsive design, loading states, form UX
-- **Testing** - TDD workflow, unit/integration/E2E tests, framework detection, AI suggestions
-- **Documentation** - Module headers, API docs, README generation
-- **Database** - Supabase, Firebase, Prisma, Drizzle, MongoDB patterns
+- **Code Review** — Grill Me on Changes, Two-Claude Review, Skeptical Review
+- **Prompting Patterns** — Fresh Start Pattern, Prove It Works
+- **Language Patterns** — TypeScript, Python, Rust, Go, Java, Kotlin, Swift idioms
+- **UI/UX** — Accessibility, responsive design, loading states, form UX
+- **Testing** — TDD workflow, unit/integration/E2E tests, framework detection, AI suggestions
+- **Documentation** — Module headers, API docs, README generation
+- **Database** — Supabase, Firebase, Prisma, Drizzle, MongoDB patterns
 
-Skills are scored by relevance to your project's detected tech stack. Create custom skills from detected patterns with comprehensive templates.
+Skills are scored by relevance to your project's detected tech stack.
 
 ## Development
 
@@ -105,6 +104,10 @@ pnpm install
 
 # Run in development mode
 pnpm tauri dev
+
+# Run tests
+pnpm test          # Frontend (Vitest, 700 tests)
+cargo test         # Backend (Rust, 101 tests) — run from src-tauri/
 
 # Build for production
 pnpm tauri build
@@ -135,10 +138,7 @@ project-jumpstart/
 │   └── Cargo.toml
 ├── .claude/                # Claude Code configuration
 │   ├── hooks/              # Session lifecycle hooks
-│   │   └── extract-learnings.sh  # Auto-extract session learnings
 │   └── settings.json       # Hook registrations
-├── docs/                   # Documentation
-│   └── user-guide.md       # User guide
 ├── CLAUDE.md               # Project documentation (team-shared)
 └── CLAUDE.local.md         # Personal learnings (gitignored)
 ```
@@ -153,16 +153,9 @@ project-jumpstart/
 | State | Zustand |
 | Backend | Rust |
 | Database | SQLite (rusqlite) |
+| Code Parsing | tree-sitter |
 | AI | Anthropic Claude API |
-
-## Contributing
-
-Contributions are welcome! Please read the CLAUDE.md file for coding conventions and documentation requirements.
-
-## License
-
-MIT License - see LICENSE file for details.
 
 ## Feedback
 
-Please report issues at: https://github.com/jmckinley/project-jumpstart-feedback/issues
+Please report issues at: https://github.com/jmckinley/project-jumpstart/issues
