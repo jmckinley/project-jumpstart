@@ -12,50 +12,23 @@ When working with Claude Code, context gets lost after ~30 minutes of conversati
 
 **Project Jumpstart solves this** by generating persistent documentation that Claude reads every time it opens a file.
 
-## Features
+## Key Features
 
-### Documentation
-- **Auto-generate CLAUDE.md** - Project-level documentation that survives context loss
-- **Module Documentation** - File headers with PURPOSE, EXPORTS, PATTERNS, and CLAUDE NOTES
-- **Freshness Tracking** - Know when documentation is stale and needs updating
+- **CLAUDE.md Generation & Editing** — Automatically generates a comprehensive CLAUDE.md file tailored to your project's tech stack, with a live editor, markdown preview, and AI-powered section suggestions to keep your project memory sharp.
 
-### One-Click Solutions
-- **Skills from Patterns** - Detect code patterns and create comprehensive skills with one click
-- **Suggested Agents** - Context-aware agent recommendations based on your tech stack
-- **Git Enforcement** - One-click git init + auto-update hooks for doc enforcement
+- **Project Kickstart** — Bootstraps brand-new or undocumented projects from scratch, generating foundational documentation, folder structure guidance, and starter prompts so Claude Code is productive from the very first session.
 
-### AI-Powered Tools
-- **Skills Library** - 50+ pre-built prompts for common tasks, scored by relevance
-- **Agents Library** - Reusable agent configurations for specialized tasks
-- **RALPH Loops** - Prompt optimization with Auto-Enhance for complex tasks
+- **Context Rot Prevention** — Continuously monitors documentation freshness with staleness detection, health scoring, and context rot alerts so your project docs never silently drift out of date.
 
-### Team Templates (New!)
-- **8 Pre-Built Teams** - Full Stack Feature, TDD Pipeline, Code Review Council, and more
-- **5 Orchestration Patterns** - Leader, Pipeline, Parallel, Swarm, Council
-- **Deploy Output** - Generate paste-ready lead prompts, shell scripts, or config directories
-- **Relevance Scoring** - Teams ranked by match with your project's tech stack
-- **Customizable** - Save templates to your project and edit teammates, tasks, and hooks
+- **Module Documentation Engine** — Scans your codebase with tree-sitter AST analysis, identifies undocumented files, and batch-generates standardized documentation headers that survive context compaction across long sessions.
 
-### TDD Workflow & Test Plans
-- **AI Test Generation** - One-click "Generate Tests" button analyzes your code and creates test cases
-- **Test Cases Manager** - Filterable list with search, type, priority, and status filters
-- **Framework Detection** - Auto-detects Vitest, Jest, Pytest, Cargo, Playwright, Mocha, Cypress
-- **TDD Workflow** - Guided Red → Green → Refactor cycle with auto-generated prompts
-- **Claude Code Integration** - Generate subagent configs and PostToolUse hooks for automated testing
+- **Skills & Agents Workshop** — Create, manage, and discover reusable Skills (repeatable prompts) and Agents (specialized personas) from curated libraries, with relevance scoring that recommends the right tools for your project.
 
-### Claude Code Hooks
-- **Session Learning Extraction** - Auto-extract preferences, solutions, patterns from conversations
-- **CLAUDE.local.md** - Personal learnings accumulate over time (gitignored)
-- **Deduplication** - Intelligent filtering to avoid duplicate learnings
-- **Categorized Insights** - [Preference], [Solution], [Pattern], [Gotcha] tags
+- **Team Templates & Deploy** — Choose from 8 pre-built multi-agent team configurations (leader, pipeline, parallel, swarm, council patterns) and deploy them as paste-ready prompts, shell scripts, or config directories personalized to your tech stack.
 
-### User Experience
-- **Per-Page Help** - Contextual ? icon on each page with concepts and tips
-- **Auto-opens on first visit** - Learn features as you explore, stays closed after
+- **TDD Workflow & Test Plans** — Organize test plans with coverage goals, manage individual test cases by priority and type, and follow a guided Red-Green-Refactor workflow with auto-detected test frameworks and AI-generated test suggestions.
 
-### Monitoring
-- **Context Health** - Track token usage and identify context bloat
-- **Enforcement** - Git hooks (warn/block/auto-update) and CI snippets
+- **Enforcement & Git Hooks** — Install git hooks that enforce documentation standards at commit time, with four modes from gentle warnings to fully automatic AI-powered doc generation, ensuring every commit keeps your project context intact.
 
 ## Download
 
