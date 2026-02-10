@@ -30,4 +30,16 @@ dist-ssr
 
 # Rust build artifacts
 target/
+
+# Build output
+*.dmg
+*.zip
+*.app
+
+# Test artifacts
+coverage/
+playwright-report/
+test-results/
+
+# Personal learnings (auto-populated by session hook)
 CLAUDE.local.md
