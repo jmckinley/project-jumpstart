@@ -140,9 +140,9 @@ Claude Code works better because your context never rots.
 ### Body
 Project Jumpstart is free during the beta period. We're building this for developers who want to get the most out of Claude Code.
 
-[Download Beta for macOS]
+[Download Beta for macOS] &nbsp; [Download Beta for Windows]
 
-*Windows and Linux coming soon.*
+*Linux coming soon.*
 
 ---
 

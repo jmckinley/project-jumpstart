@@ -591,7 +591,8 @@ export async function scanProject(path: string): Promise<DetectionResult> {
 ### What's NOT Code (Platform/Deployment)
 
 - **macOS Notarization**: Configured and working with Apple credentials
-- **Windows/Linux Builds**: Not yet configured (platform config, not code)
+- **Windows Builds**: Configured in release workflow (NSIS .exe + .msi, unsigned beta)
+- **Linux Builds**: Not yet configured
 - **E2E Tests**: Would be nice but 801 unit tests (700 frontend + 101 Rust) provide good coverage
 
 ---
@@ -817,7 +818,7 @@ interface TestFrameworkInfo {
 - **App is feature-complete** — all sections fully implemented
 - Always read the spec file for detailed requirements
 - Use pnpm, not npm or yarn
-- Target macOS first, then Windows/Linux
+- macOS and Windows releases supported; Linux not yet configured
 - Every file needs a documentation header (see above)
 - 801 unit tests (700 frontend + 101 Rust) provide good coverage
 
@@ -921,6 +922,7 @@ The full product specification is in `project-jumpstart-spec.md`. Key sections:
 
 | Date | Change |
 |------|--------|
+| Feb 10, 2026 | Added Windows build to release workflow: parallel `release-windows` job produces NSIS .exe and .msi installers alongside macOS DMG. Fixed `dtolnay/rust-action` typo. |
 | Feb 7, 2026 | Resilient auto-update hook: never blocks commits (all errors → warnings + exit 0), model ID from settings.json with fallback, total timeout (120s), per-file resilience, `call_api()` model fallback, HOOK_VERSION 3.0.0. Consolidated MODEL constant in `core::ai`. 2 new Rust tests (101 total). |
 | Feb 7, 2026 | Deploy output personalization: inject active project's tech stack into team deploy output (ProjectContext), add PostToolUse hooks to test templates, render hooks as settings.json snippets, 20 new tests (14 Rust + 6 frontend). |
 | Feb 7, 2026 | Added Team Templates library: 8 pre-built team templates, relevance scoring, CRUD, deploy output (prompt/script/config), 7 UI components, 73 new tests. |
