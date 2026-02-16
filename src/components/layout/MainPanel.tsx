@@ -42,6 +42,7 @@
  * - @/hooks/useTestPlans - Test plan CRUD and execution actions
  * - @/hooks/useTDDWorkflow - TDD workflow session management
  * - @/hooks/useTeamTemplates - Team template CRUD and deploy output actions
+ * - @/hooks/useMemory - Memory management operations
  * - @/hooks/useHealth - Health score data and refresh action
  * - @/hooks/useModules - Module scanning and generation actions
  * - @/hooks/useSkills - Skills CRUD and pattern detection actions
@@ -66,6 +67,7 @@
  * - "team-templates" section renders team templates list, library, editor, and deploy output (tabs: My Teams / Library / Deploy)
  * - "ralph" section renders command center, prompt analyzer, and loop monitor
  * - "context" section renders health monitor, token breakdown, and MCP optimizer
+ * - "memory" section renders memory dashboard, learning browser, and CLAUDE.md analyzer (tabs: Dashboard / Learnings / Analyzer)
  * - "enforcement" section renders git hook setup and CI integration templates
  * - "settings" section renders SettingsView for preferences and app info
  * - Other sections show a placeholder message
@@ -91,6 +93,7 @@
  * - TeamTemplatesView follows same pattern as AgentsView with library + deploy tabs
  * - RalphView uses a 2-column grid (CommandCenter left, PromptAnalyzer right) with LoopMonitor below
  * - ContextView uses a 2-column grid (HealthMonitor left, TokenBreakdown right) with McpOptimizer below
+ * - MemoryView uses 3 tabs: Dashboard, Learnings, Analyzer with useMemory hook
  * - EnforcementView uses a 2-column grid (GitHookSetup left, CISetup right)
  * - KickstartView renders ProjectKickstart for empty projects
  */
@@ -170,6 +173,12 @@ import {
 } from "@/components/team-templates";
 import { useTeamTemplates } from "@/hooks/useTeamTemplates";
 import type { TeamTemplate, LibraryTeamTemplate, TeammateDef, TeamTaskDef, TeamHookDef, ProjectContext } from "@/types/team-template";
+import {
+  MemoryDashboard,
+  LearningBrowser,
+  ClaudeMdAnalyzer,
+} from "@/components/memory";
+import { useMemory } from "@/hooks/useMemory";
 
 interface MainPanelProps {
   activeSection: string;
@@ -1817,6 +1826,97 @@ function TeamTemplatesView({ onTeamTemplatesChange }: { onTeamTemplatesChange?: 
   );
 }
 
+function MemoryView() {
+  const {
+    sources,
+    learnings,
+    health,
+    analysis,
+    loading,
+    analyzing,
+    error,
+    runAnalysis,
+    updateStatus,
+    promote,
+    refresh,
+  } = useMemory();
+
+  const [activeTab, setActiveTab] = useState<"dashboard" | "learnings" | "analyzer">("dashboard");
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className="rounded-md border border-red-900 bg-red-950/50 px-4 py-3 text-sm text-red-400">
+          {error}
+        </div>
+      )}
+
+      {/* Tab Navigation */}
+      <div className="flex gap-1 border-b border-neutral-800">
+        <button
+          onClick={() => setActiveTab("dashboard")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "dashboard"
+              ? "border-b-2 border-blue-500 text-blue-400"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          Dashboard
+        </button>
+        <button
+          onClick={() => setActiveTab("learnings")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "learnings"
+              ? "border-b-2 border-blue-500 text-blue-400"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          Learnings ({learnings.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("analyzer")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "analyzer"
+              ? "border-b-2 border-blue-500 text-blue-400"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          Analyzer
+        </button>
+      </div>
+
+      {activeTab === "dashboard" && (
+        <MemoryDashboard
+          health={health}
+          sources={sources}
+          loading={loading}
+          onRefresh={refresh}
+        />
+      )}
+
+      {activeTab === "learnings" && (
+        <LearningBrowser
+          learnings={learnings}
+          onUpdateStatus={updateStatus}
+          onPromote={promote}
+        />
+      )}
+
+      {activeTab === "analyzer" && (
+        <ClaudeMdAnalyzer
+          analysis={analysis}
+          analyzing={analyzing}
+          onAnalyze={runAnalysis}
+        />
+      )}
+    </div>
+  );
+}
+
 function renderSection(
   section: string,
   onNavigate?: (section: string) => void,
@@ -1845,6 +1945,8 @@ function renderSection(
       return <RalphView onLoopStarted={onCompletionChange} />;
     case "context":
       return <ContextView />;
+    case "memory":
+      return <MemoryView />;
     case "enforcement":
       return <EnforcementView onHooksInstalled={onCompletionChange} />;
     case "settings":

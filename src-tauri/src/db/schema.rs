@@ -23,7 +23,8 @@
 //! - Tables: projects, module_docs, freshness_history (Phase 5), skills, patterns, agents,
 //!   ralph_loops (Phase 7), checkpoints (Phase 8), enforcement_events (Phase 9), settings,
 //!   activities (Phase 10), ralph_mistakes (for learning from loop errors),
-//!   test_plans, test_cases, test_runs, test_case_results, tdd_sessions (Test Plan Manager)
+//!   test_plans, test_cases, test_runs, test_case_results, tdd_sessions (Test Plan Manager),
+//!   learnings (Memory Management)
 //! - freshness_history stores per-file freshness snapshots for trend analysis
 //! - ralph_loops tracks RALPH loop execution with status (idle/running/paused/completed/failed)
 //! - ralph_loops.mode: "iterative" (default, accumulated context) or "prd" (fresh context per story)
@@ -328,6 +329,24 @@ pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
             FOREIGN KEY (project_id) REFERENCES projects(id)
         );
         CREATE INDEX IF NOT EXISTS idx_team_templates_project ON team_templates(project_id);
+
+        -- Learnings table (Memory Management)
+        CREATE TABLE IF NOT EXISTS learnings (
+            id              TEXT PRIMARY KEY,
+            project_id      TEXT,
+            session_id      TEXT NOT NULL DEFAULT '',
+            category        TEXT NOT NULL DEFAULT 'Pattern',
+            content         TEXT NOT NULL,
+            topic           TEXT,
+            confidence      TEXT NOT NULL DEFAULT 'medium',
+            status          TEXT NOT NULL DEFAULT 'active',
+            source_file     TEXT NOT NULL DEFAULT '',
+            created_at      TEXT NOT NULL,
+            updated_at      TEXT NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_learnings_project ON learnings(project_id);
+        CREATE INDEX IF NOT EXISTS idx_learnings_status ON learnings(status);
         ",
     )?;
 

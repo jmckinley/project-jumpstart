@@ -11,7 +11,7 @@
 //! - tauri::Manager - Trait for app.manage() state injection
 //! - tauri_plugin_opener - System URL/file opener
 //! - tauri_plugin_dialog - Native file/folder dialogs
-//! - commands - IPC command handlers (onboarding, project, claude_md, modules, freshness, skills, ralph, context, enforcement, settings, test_plans)
+//! - commands - IPC command handlers (onboarding, project, claude_md, modules, freshness, skills, ralph, context, enforcement, settings, test_plans, memory)
 //! - core - Business logic modules (scanner, generator, health, analyzer, freshness, test_runner)
 //! - models - Data structures
 //! - db - Database layer and AppState
@@ -74,6 +74,10 @@ use commands::session_analysis::{analyze_session, get_session_transcript};
 use commands::team_templates::{
     list_team_templates, create_team_template, update_team_template, delete_team_template,
     increment_team_template_usage, generate_team_deploy_output,
+};
+use commands::memory::{
+    list_memory_sources, list_learnings, update_learning_status, analyze_claude_md,
+    get_memory_health, promote_learning,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -184,6 +188,13 @@ pub fn run() {
             delete_team_template,
             increment_team_template_usage,
             generate_team_deploy_output,
+            // Memory Management commands
+            list_memory_sources,
+            list_learnings,
+            update_learning_status,
+            analyze_claude_md,
+            get_memory_health,
+            promote_learning,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -14,6 +14,7 @@
  * - All types from ralph.ts
  * - All types from test-plan.ts
  * - All types from session-analysis.ts
+ * - All types from memory.ts
  *
  * PATTERNS:
  * - Import from '@/types' for commonly used types
@@ -67,3 +68,15 @@ export type {
   SessionRecommendationType,
   SessionAnalysis,
 } from "./session-analysis";
+export type {
+  MemorySource,
+  Learning,
+  MemoryHealth,
+  ClaudeMdAnalysis,
+  AnalysisSuggestion,
+  LearningCategory,
+  LearningTopic,
+  LearningStatus,
+  ConfidenceLevel,
+  HealthRating,
+} from "./memory";

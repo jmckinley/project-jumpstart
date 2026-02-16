@@ -159,6 +159,121 @@ export const mockActivities = [
   },
 ];
 
+export const mockMemorySources = [
+  {
+    path: "/Users/test/test-project/CLAUDE.md",
+    sourceType: "claude-md",
+    name: "CLAUDE.md",
+    lineCount: 112,
+    sizeBytes: 4500,
+    lastModified: new Date().toISOString(),
+    description: "Project memory file",
+  },
+  {
+    path: "/Users/test/test-project/.claude/rules/testing.md",
+    sourceType: "rules",
+    name: "testing.md",
+    lineCount: 80,
+    sizeBytes: 2200,
+    lastModified: new Date().toISOString(),
+    description: "Testing rules",
+  },
+  {
+    path: "/Users/test/test-project/.claude/skills/tdd-workflow/SKILL.md",
+    sourceType: "skills",
+    name: "tdd-workflow",
+    lineCount: 45,
+    sizeBytes: 1200,
+    lastModified: new Date().toISOString(),
+    description: "TDD workflow skill",
+  },
+  {
+    path: "/Users/test/test-project/CLAUDE.local.md",
+    sourceType: "local-md",
+    name: "CLAUDE.local.md",
+    lineCount: 30,
+    sizeBytes: 900,
+    lastModified: new Date().toISOString(),
+    description: "Personal learnings",
+  },
+];
+
+export const mockLearnings = [
+  {
+    id: "learn-1",
+    sessionId: "session-abc",
+    category: "Preference",
+    content: "User prefers terse responses without excessive explanation",
+    topic: "workflow",
+    confidence: "medium",
+    status: "active",
+    sourceFile: "CLAUDE.local.md",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "learn-2",
+    sessionId: "session-abc",
+    category: "Solution",
+    content: "SQLite database locked error: ensure db.lock() is released before next call",
+    topic: "debugging",
+    confidence: "high",
+    status: "verified",
+    sourceFile: "CLAUDE.local.md",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "learn-3",
+    sessionId: "session-def",
+    category: "Pattern",
+    content: "Always run tests after modifying Rust files",
+    topic: "patterns",
+    confidence: "high",
+    status: "active",
+    sourceFile: "CLAUDE.local.md",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+
+export const mockMemoryHealth = {
+  totalSources: 4,
+  totalLines: 267,
+  totalLearnings: 3,
+  activeLearnings: 2,
+  claudeMdLines: 112,
+  claudeMdScore: 85,
+  rulesFileCount: 1,
+  skillsCount: 1,
+  estimatedTokenUsage: 15000,
+  healthRating: "excellent",
+};
+
+export const mockClaudeMdAnalysis = {
+  totalLines: 112,
+  estimatedTokens: 4500,
+  score: 85,
+  sections: ["Overview", "Tech Stack", "Commands", "Status"],
+  suggestions: [
+    {
+      suggestionType: "move",
+      message: "Move documentation format to .claude/rules/documentation.md",
+      lineRange: [50, 80],
+      target: ".claude/rules/documentation.md",
+    },
+  ],
+  linesToRemove: [],
+  linesToMove: [
+    {
+      lineRange: [50, 80],
+      contentPreview: "### TypeScript/React Documentation Format...",
+      targetFile: ".claude/rules/documentation.md",
+      reason: "Path-specific content belongs in rules file",
+    },
+  ],
+};
+
 export const mockSettings: Record<string, string> = {
   anthropic_api_key: "sk-ant-test-key-12345",
   has_seen_welcome: "true",
@@ -334,6 +449,32 @@ export async function setupTauriMocks(page: Page, options: {
             createdAt: new Date().toISOString(),
           };
 
+        case "list_memory_sources":
+          return mocks.memorySources;
+
+        case "list_learnings":
+          return mocks.learnings;
+
+        case "get_memory_health":
+          return mocks.memoryHealth;
+
+        case "analyze_claude_md":
+          await new Promise(r => setTimeout(r, 300));
+          return mocks.claudeMdAnalysis;
+
+        case "update_learning_status":
+          const learning = mocks.learnings.find((l: { id: string }) => l.id === args?.id);
+          if (learning) {
+            return { ...learning, status: args?.status };
+          }
+          return null;
+
+        case "promote_learning":
+          return null;
+
+        case "list_team_templates":
+          return [];
+
         default:
           console.warn(`[Mock] Unhandled command: ${cmd}`);
           return null;
@@ -393,6 +534,10 @@ export async function setupTauriMocks(page: Page, options: {
       agents: mockAgents,
       activities: mockActivities,
       settings: mockSettings,
+      memorySources: mockMemorySources,
+      learnings: mockLearnings,
+      memoryHealth: mockMemoryHealth,
+      claudeMdAnalysis: mockClaudeMdAnalysis,
     },
   });
 }

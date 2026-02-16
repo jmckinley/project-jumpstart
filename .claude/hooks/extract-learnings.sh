@@ -4,7 +4,14 @@
 #
 # This hook runs at SessionEnd and analyzes the conversation transcript to
 # extract user preferences, solutions to recurring problems, and patterns.
-# Learnings are appended to CLAUDE.local.md (personal, not git-tracked).
+# Learnings are appended to CLAUDE.local.md (personal, not git-tracked)
+# and routed to topic-specific files in auto-memory.
+#
+# Features:
+# - Semantic deduplication (sends existing learnings to avoid duplicates)
+# - Topic routing (routes to auto-memory topic files)
+# - Lifecycle markers ([Verified], [Deprecated])
+# - Structured JSON extraction with confidence scoring
 #
 # Requirements:
 # - jq (for JSON parsing)
@@ -25,6 +32,7 @@ set -euo pipefail
 MEMORY_FILE="CLAUDE.local.md"
 MIN_TURNS=5  # Minimum conversation turns to analyze (skip short sessions)
 MAX_TRANSCRIPT_CHARS=50000  # Truncate very long transcripts
+SETTINGS_FILE="$HOME/.project-jumpstart/settings.json"
 
 # Read hook input from stdin
 INPUT=$(cat)
@@ -43,9 +51,7 @@ fi
 
 # Get API key (try env var first, then settings file)
 if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
-    SETTINGS_FILE="$HOME/.project-jumpstart/settings.json"
     if [[ -f "$SETTINGS_FILE" ]]; then
-        # Use correct key name: anthropic_api_key
         ANTHROPIC_API_KEY=$(jq -r '.anthropic_api_key // empty' "$SETTINGS_FILE" 2>/dev/null || true)
     fi
 fi
@@ -65,18 +71,36 @@ fi
 # Read and truncate transcript if needed
 TRANSCRIPT=$(head -c "$MAX_TRANSCRIPT_CHARS" "$TRANSCRIPT_PATH")
 
-# Read existing learnings to avoid duplicates
+# Read existing learnings to avoid duplicates (semantic dedup)
 MEMORY_PATH="$CWD/$MEMORY_FILE"
 EXISTING_LEARNINGS=""
 if [[ -f "$MEMORY_PATH" ]]; then
     EXISTING_LEARNINGS=$(cat "$MEMORY_PATH")
 fi
 
-# Prepare the extraction prompt
+# Also read auto-memory files for broader dedup context
+AUTO_MEMORY_CONTEXT=""
+MEMORY_DIR="$HOME/.claude/projects"
+for dir in "$MEMORY_DIR"/*/memory/; do
+    if [[ -d "$dir" ]]; then
+        for f in "$dir"*.md; do
+            if [[ -f "$f" ]]; then
+                AUTO_MEMORY_CONTEXT+=$(head -c 5000 "$f" 2>/dev/null || true)
+                AUTO_MEMORY_CONTEXT+=$'\n---\n'
+            fi
+        done
+        break  # Only check first matching project
+    fi
+done
+
+# Prepare the extraction prompt with semantic dedup
 EXTRACTION_PROMPT="Analyze this Claude Code conversation transcript and extract learnings worth remembering for future sessions.
 
-EXISTING LEARNINGS (avoid duplicates):
+EXISTING LEARNINGS (avoid duplicates - check semantically, not just exact text):
 $EXISTING_LEARNINGS
+
+AUTO-MEMORY CONTEXT (also avoid duplicating these):
+$AUTO_MEMORY_CONTEXT
 
 ---
 
@@ -85,25 +109,32 @@ $TRANSCRIPT
 
 ---
 
-Extract and return ONLY new, non-duplicate learnings in these categories:
+Extract and return ONLY new, non-duplicate learnings. Use semantic deduplication: if an existing learning already captures the same insight (even with different wording), skip it.
 
-1. **User Preferences** - Coding style, communication preferences, tool choices
-2. **Solutions** - Fixes for specific errors or problems that might recur
-3. **Patterns** - Recurring workflows or approaches the user likes
-4. **Gotchas** - Project-specific pitfalls or things to remember
+Format each learning as a structured line:
+- [Category] Learning text | topic:TOPIC_NAME | confidence:HIGH|MEDIUM|LOW
+
+Categories: [Preference], [Solution], [Pattern], [Gotcha]
+
+Topic names (for routing to auto-memory files):
+- debugging - Bug fixes, error solutions, troubleshooting
+- patterns - Code patterns, conventions, architectural decisions
+- tools - Tool preferences, CLI commands, build commands
+- project - Project-specific facts, file locations, feature status
+- workflow - Development workflow, git practices, review process
 
 Rules:
-- Return ONLY bullet points, no explanations
+- Return ONLY formatted bullet points, no explanations
 - Skip if nothing new or significant to add
 - Be concise (one line per learning)
-- Start each with the category in brackets: [Preference], [Solution], [Pattern], [Gotcha]
+- Include confidence level (HIGH = confirmed across multiple interactions, MEDIUM = observed once clearly, LOW = inferred)
 - Return 'NONE' if no new learnings worth saving
 
 Example output:
-- [Preference] User prefers terse responses without excessive explanation
-- [Solution] SQLite \"database locked\" error: ensure db.lock() is released before next call
-- [Pattern] Always run tests after modifying Rust files
-- [Gotcha] The legacy API endpoint /v1/users is deprecated, use /v2/users"
+- [Preference] User prefers terse responses without excessive explanation | topic:workflow | confidence:MEDIUM
+- [Solution] SQLite \"database locked\" error: ensure db.lock() is released before next call | topic:debugging | confidence:HIGH
+- [Pattern] Always run tests after modifying Rust files | topic:patterns | confidence:HIGH
+- [Gotcha] The legacy API endpoint /v1/users is deprecated, use /v2/users | topic:project | confidence:MEDIUM"
 
 # Read model from settings.json (with fallback)
 CLAUDE_MODEL=$(jq -r '.claude_model // empty' "$SETTINGS_FILE" 2>/dev/null || true)
@@ -133,7 +164,7 @@ if [[ -z "$LEARNINGS" || "$LEARNINGS" == "NONE" || "$LEARNINGS" == "null" ]]; th
     exit 0
 fi
 
-# Append learnings to memory file
+# Append learnings to CLAUDE.local.md (primary storage)
 {
     if [[ ! -f "$MEMORY_PATH" ]]; then
         echo "# Session Learnings"
@@ -148,5 +179,47 @@ fi
     echo ""
     echo "$LEARNINGS"
 } >> "$MEMORY_PATH"
+
+# Route learnings to topic-specific auto-memory files
+route_to_topic() {
+    local topic="$1"
+    local learning="$2"
+    local topic_file=""
+
+    # Find auto-memory directory for this project
+    for dir in "$MEMORY_DIR"/*/memory/; do
+        if [[ -d "$dir" ]]; then
+            topic_file="${dir}${topic}.md"
+            break
+        fi
+    done
+
+    if [[ -n "$topic_file" ]]; then
+        if [[ ! -f "$topic_file" ]]; then
+            echo "# ${topic^} Notes" > "$topic_file"
+            echo "" >> "$topic_file"
+            echo "Auto-routed learnings from session extraction." >> "$topic_file"
+            echo "" >> "$topic_file"
+        fi
+        echo "- $learning" >> "$topic_file"
+    fi
+}
+
+# Parse learnings and route to topic files
+while IFS= read -r line; do
+    # Skip empty lines
+    [[ -z "$line" ]] && continue
+    # Skip lines that don't start with -
+    [[ "$line" != -* ]] && continue
+
+    # Extract topic from the learning line
+    TOPIC=$(echo "$line" | grep -oP 'topic:\K\w+' 2>/dev/null || true)
+    # Extract the learning text (before | topic:)
+    LEARNING_TEXT=$(echo "$line" | sed 's/ | topic:.*//' | sed 's/^- //')
+
+    if [[ -n "$TOPIC" && -n "$LEARNING_TEXT" ]]; then
+        route_to_topic "$TOPIC" "$LEARNING_TEXT"
+    fi
+done <<< "$LEARNINGS"
 
 exit 0

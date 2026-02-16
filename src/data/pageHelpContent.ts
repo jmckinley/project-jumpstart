@@ -298,6 +298,32 @@ export const PAGE_HELP: Record<string, PageHelpContent> = {
     ],
   },
 
+  memory: {
+    title: "Memory Management",
+    description:
+      "Monitor and manage Claude Code's memory system -- CLAUDE.md, rules files, learnings, and skills that persist across sessions.",
+    concepts: [
+      {
+        term: "Memory Source",
+        definition: "Any file that contributes to Claude's persistent memory (CLAUDE.md, rules, skills, etc.).",
+      },
+      {
+        term: "Learning",
+        definition: "An auto-extracted insight from a Claude Code session (preferences, solutions, patterns, gotchas).",
+      },
+      {
+        term: "Memory Health",
+        definition: "Overall quality metric based on CLAUDE.md score, learnings count, and token usage.",
+      },
+    ],
+    tips: [
+      "Use the Dashboard tab for an overview of all memory sources",
+      "Review and verify learnings regularly to keep them accurate",
+      "Promote valuable learnings to CLAUDE.md or rules files",
+      "Run the Analyzer to find improvements for your CLAUDE.md",
+    ],
+  },
+
   kickstart: {
     title: "Project Kickstart",
     description:

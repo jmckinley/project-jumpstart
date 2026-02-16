@@ -1,5 +1,18 @@
 {
   "hooks": {
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/pre-compact.sh",
+            "description": "Save critical context before compaction",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
     "SessionEnd": [
       {
         "matcher": "",

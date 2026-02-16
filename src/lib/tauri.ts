@@ -126,6 +126,14 @@
  * - analyzeSession - AI-powered analysis of session transcript for recommendations
  * - getSessionTranscript - Get raw transcript content for debugging
  *
+ * Memory Management:
+ * - listMemorySources - List all memory source files for a project
+ * - listLearnings - List extracted learnings for a project
+ * - updateLearningStatus - Update a learning's status (verify, deprecate, archive)
+ * - analyzeClaudeMd - Run quality analysis on CLAUDE.md
+ * - getMemoryHealth - Get overall memory health metrics
+ * - promoteLearning - Promote a learning to CLAUDE.md or rules file
+ *
  * PATTERNS:
  * - Each function wraps a single Tauri command
  * - Functions are async and return typed promises
@@ -849,4 +857,39 @@ export async function getSessionTranscript(
     projectPath,
     maxMessages: maxMessages ?? null,
   });
+}
+
+// =============================================================================
+// Memory Management Commands
+// =============================================================================
+
+import type {
+  MemorySource,
+  Learning,
+  MemoryHealth,
+  ClaudeMdAnalysis,
+} from "@/types/memory";
+
+export async function listMemorySources(projectPath: string): Promise<MemorySource[]> {
+  return invoke<MemorySource[]>("list_memory_sources", { projectPath });
+}
+
+export async function listLearnings(projectPath: string): Promise<Learning[]> {
+  return invoke<Learning[]>("list_learnings", { projectPath });
+}
+
+export async function updateLearningStatus(id: string, status: string): Promise<Learning> {
+  return invoke<Learning>("update_learning_status", { id, status });
+}
+
+export async function analyzeClaudeMd(projectPath: string): Promise<ClaudeMdAnalysis> {
+  return invoke<ClaudeMdAnalysis>("analyze_claude_md", { projectPath });
+}
+
+export async function getMemoryHealth(projectPath: string): Promise<MemoryHealth> {
+  return invoke<MemoryHealth>("get_memory_health", { projectPath });
+}
+
+export async function promoteLearning(id: string, target: string, projectPath: string): Promise<void> {
+  return invoke<void>("promote_learning", { id, target, projectPath });
 }

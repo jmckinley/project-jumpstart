@@ -21,6 +21,7 @@
 //! - kickstart - Project kickstart prompt generation
 //! - test_plans - Test plan management and TDD workflow commands
 //! - session_analysis - AI-powered session transcript analysis
+//! - memory - Memory management commands (sources, learnings, health, analysis)
 //!
 //! PATTERNS:
 //! - Each submodule contains #[tauri::command] functions
@@ -47,3 +48,4 @@ pub mod kickstart;
 pub mod test_plans;
 pub mod session_analysis;
 pub mod team_templates;
+pub mod memory;

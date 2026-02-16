@@ -15,6 +15,7 @@
 //! - context - ContextHealth, TokenBreakdown, McpServerStatus, Checkpoint types
 //! - enforcement - EnforcementEvent, HookStatus, CiSnippet types
 //! - test_plan - TestPlan, TestCase, TestRun, TestCaseResult, TDDSession types
+//! - memory - MemorySource, Learning, MemoryHealth, ClaudeMdAnalysis types
 //!
 //! PATTERNS:
 //! - All models derive Serialize, Deserialize for Tauri IPC
@@ -34,3 +35,4 @@ pub mod context;
 pub mod enforcement;
 pub mod test_plan;
 pub mod team_template;
+pub mod memory;
