@@ -27,7 +27,7 @@
  * - Renders nothing when toasts array is empty
  */
 
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { useToastStore } from "@/stores/toastStore";
 import type { Toast } from "@/stores/toastStore";
 
@@ -63,7 +63,7 @@ function InfoIcon() {
   );
 }
 
-const TYPE_ICONS: Record<Toast["type"], () => JSX.Element> = {
+const TYPE_ICONS: Record<Toast["type"], () => React.ReactElement> = {
   success: CheckCircleIcon,
   error: XCircleIcon,
   info: InfoIcon,

@@ -1220,9 +1220,6 @@ function TestPlansView() {
     acceptSuggestion,
     clearError: clearTestPlansError,
     refreshFramework,
-    stalenessReport,
-    checkingStaleness,
-    checkStaleness,
   } = useTestPlans();
 
   const {
