@@ -30,6 +30,7 @@
 
 import { useState, useCallback } from "react";
 import { useProjectStore } from "@/stores/projectStore";
+import { useToastStore } from "@/stores/toastStore";
 import {
   listMemorySources,
   listLearnings,
@@ -42,6 +43,7 @@ import type { MemorySource, Learning, MemoryHealth, ClaudeMdAnalysis } from "@/t
 
 export function useMemory() {
   const activeProject = useProjectStore((s) => s.activeProject);
+  const addToast = useToastStore((s) => s.addToast);
   const [sources, setSources] = useState<MemorySource[]>([]);
   const [learnings, setLearnings] = useState<Learning[]>([]);
   const [health, setHealth] = useState<MemoryHealth | null>(null);
@@ -112,6 +114,7 @@ export function useMemory() {
       // Reload learnings after promotion
       const data = await listLearnings(activeProject.path);
       setLearnings(data);
+      addToast({ message: "Learning promoted", type: "success" });
     } catch (e) {
       setError(String(e));
     }

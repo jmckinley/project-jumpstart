@@ -32,6 +32,7 @@
 
 import { useCallback, useState } from "react";
 import { useProjectStore } from "@/stores/projectStore";
+import { useToastStore } from "@/stores/toastStore";
 import {
   listTeamTemplates,
   createTeamTemplate,
@@ -50,6 +51,7 @@ interface TeamTemplatesState {
 
 export function useTeamTemplates() {
   const activeProject = useProjectStore((s) => s.activeProject);
+  const addToast = useToastStore((s) => s.addToast);
 
   const [state, setState] = useState<TeamTemplatesState>({
     templates: [],
@@ -96,6 +98,7 @@ export function useTeamTemplates() {
         );
         const templates = await listTeamTemplates(activeProject?.id);
         setState((s) => ({ ...s, templates, error: null }));
+        addToast({ message: "Template created", type: "success" });
       } catch (err) {
         setState((s) => ({
           ...s,

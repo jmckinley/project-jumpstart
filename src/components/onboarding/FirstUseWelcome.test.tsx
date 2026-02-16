@@ -3,10 +3,10 @@
  * @description Unit tests for FirstUseWelcome component
  *
  * PURPOSE:
- * - Test mandatory API key validation flow
+ * - Test optional API key flow (skip without key, or enter and validate)
  * - Test format validation feedback
  * - Test button states during validation/save
- * - Test successful completion flow
+ * - Test successful completion flow with and without API key
  *
  * DEPENDENCIES:
  * - vitest - Test framework
@@ -24,7 +24,7 @@
  *
  * CLAUDE NOTES:
  * - API key format: must start with "sk-ant-" and be 20+ chars
- * - No skip button - API key is mandatory
+ * - API key is optional — user can skip and add later in Settings
  * - validating state shows during API call
  * - saving state shows during settings persistence
  */
@@ -73,25 +73,59 @@ describe("FirstUseWelcome", () => {
       expect(screen.getByText("Use RALPH to work behind the scenes")).toBeInTheDocument();
     });
 
-    it("should render API key input with '(required)' label", () => {
+    it("should render API key input with '(optional' label", () => {
       render(<FirstUseWelcome onComplete={mockOnComplete} />);
 
       expect(screen.getByText("Anthropic API Key")).toBeInTheDocument();
-      expect(screen.getByText("(required)")).toBeInTheDocument();
+      expect(screen.getByText(/optional — add later in Settings/)).toBeInTheDocument();
       expect(screen.getByPlaceholderText("sk-ant-...")).toBeInTheDocument();
     });
 
-    it("should render disabled Get Started button when input is empty", () => {
+    it("should render enabled Get Started button when input is empty", () => {
       render(<FirstUseWelcome onComplete={mockOnComplete} />);
 
       const button = screen.getByRole("button", { name: /get started/i });
-      expect(button).toBeDisabled();
+      expect(button).toBeEnabled();
     });
+  });
 
-    it("should NOT render a Skip button", () => {
+  describe("Skip Without Key", () => {
+    it("should call saveSetting for has_seen_welcome and onComplete when skipping", async () => {
+      const user = userEvent.setup();
       render(<FirstUseWelcome onComplete={mockOnComplete} />);
 
-      expect(screen.queryByRole("button", { name: /skip/i })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: /get started/i }));
+
+      await waitFor(() => {
+        expect(mockSaveSetting).toHaveBeenCalledWith("has_seen_welcome", "true");
+      });
+      await waitFor(() => {
+        expect(mockOnComplete).toHaveBeenCalled();
+      });
+    });
+
+    it("should NOT save an API key when skipping", async () => {
+      const user = userEvent.setup();
+      render(<FirstUseWelcome onComplete={mockOnComplete} />);
+
+      await user.click(screen.getByRole("button", { name: /get started/i }));
+
+      await waitFor(() => {
+        expect(mockSaveSetting).toHaveBeenCalledWith("has_seen_welcome", "true");
+      });
+      expect(mockSaveSetting).not.toHaveBeenCalledWith("anthropic_api_key", expect.anything());
+    });
+
+    it("should NOT call setHasApiKey when skipping", async () => {
+      const user = userEvent.setup();
+      render(<FirstUseWelcome onComplete={mockOnComplete} />);
+
+      await user.click(screen.getByRole("button", { name: /get started/i }));
+
+      await waitFor(() => {
+        expect(mockOnComplete).toHaveBeenCalled();
+      });
+      expect(mockSetHasApiKey).not.toHaveBeenCalled();
     });
   });
 
@@ -142,21 +176,19 @@ describe("FirstUseWelcome", () => {
 
       expect(input).toHaveClass("border-green-500");
     });
-  });
 
-  describe("Button States", () => {
-    it("should enable Get Started button only when format is valid", async () => {
+    it("should show error when submitting an invalid partial key", async () => {
       const user = userEvent.setup();
       render(<FirstUseWelcome onComplete={mockOnComplete} />);
 
-      const button = screen.getByRole("button", { name: /get started/i });
-      expect(button).toBeDisabled();
+      await user.type(screen.getByPlaceholderText("sk-ant-..."), "sk-ant-short");
+      await user.click(screen.getByRole("button", { name: /get started/i }));
 
-      await user.type(screen.getByPlaceholderText("sk-ant-..."), "sk-ant-validkey123456789");
-
-      expect(button).toBeEnabled();
+      expect(screen.getByText("Please enter a valid API key")).toBeInTheDocument();
     });
+  });
 
+  describe("Button States", () => {
     it("should show 'Validating...' during API validation", async () => {
       const user = userEvent.setup();
       // Make validation take time
@@ -222,7 +254,7 @@ describe("FirstUseWelcome", () => {
   });
 
   describe("Validation Flow", () => {
-    it("should call validateApiKey when Get Started is clicked", async () => {
+    it("should call validateApiKey when Get Started is clicked with a valid key", async () => {
       const user = userEvent.setup();
       render(<FirstUseWelcome onComplete={mockOnComplete} />);
 

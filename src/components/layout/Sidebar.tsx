@@ -1,11 +1,11 @@
 /**
  * @module components/layout/Sidebar
- * @description Navigation sidebar with project selector, section links, and completion checkmarks
+ * @description Navigation sidebar with project selector, grouped section links, and completion checkmarks
  *
  * PURPOSE:
  * - Display clickable app logo and branding at top (navigates to dashboard)
  * - Display project selector dropdown for switching between projects
- * - Render navigation links for all main sections
+ * - Render navigation links grouped into collapsible categories (Core, Development, Monitoring, Setup)
  * - Show active section highlighting
  * - Show checkmarks for completed sections (per-project)
  * - Provide "New Project" button to start onboarding
@@ -27,18 +27,21 @@
  * - Checkmarks are per-project - refresh automatically on project switch
  * - Kickstart shown when isEmptyProject=true AND CLAUDE.md not yet created
  * - Hooks Setup shown when showHooksSetup=true (test framework detected, no hooks configured)
+ * - Nav groups: Core (always expanded), Development/Monitoring/Setup (collapsible)
+ * - Active section's group auto-expands when navigating
  *
  * CLAUDE NOTES:
  * - Clicking the app logo/title at top navigates to dashboard
- * - Sections: Dashboard, CLAUDE.md, Modules, Test Plans, Skills, Agents, Team Templates, RALPH, Context Health, Memory, Enforcement, Settings
+ * - Sections: Dashboard, CLAUDE.md, Modules, Test Plans, Skills, Agents, Team Templates, RALPH, Context Health, Memory, Enforcement, Settings, Help
  * - Kickstart section is temporary - disappears after CLAUDE.md is created
  * - Hooks Setup section is temporary - disappears after hooks are configured
  * - Sections with completion tracking: claude-md, modules, skills, agents, ralph, enforcement
  * - Project selector is at the top of the sidebar
  * - Completion state is fetched per-project by useSectionCompletion hook
+ * - All section buttons remain inside <nav> elements so E2E selectors ("nav >> text=X") still work
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { SectionCompletion } from "@/hooks/useSectionCompletion";
 import type { Project } from "@/types/project";
 
@@ -55,21 +58,68 @@ interface SidebarProps {
   showHooksSetup?: boolean;
 }
 
-const sections = [
-  { id: "dashboard", label: "Dashboard" },
-  { id: "claude-md", label: "CLAUDE.md" },
-  { id: "modules", label: "Modules" },
-  { id: "test-plans", label: "Test Plans" },
-  { id: "skills", label: "Skills" },
-  { id: "agents", label: "Agents" },
-  { id: "team-templates", label: "Team Templates" },
-  { id: "ralph", label: "RALPH" },
-  { id: "context", label: "Context Health" },
-  { id: "memory", label: "Memory" },
-  { id: "enforcement", label: "Enforcement" },
-  { id: "settings", label: "Settings" },
-  { id: "help", label: "Help" },
+interface NavSection {
+  id: string;
+  label: string;
+}
+
+interface NavGroup {
+  id: string;
+  label: string;
+  alwaysExpanded?: boolean;
+  sections: NavSection[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    id: "core",
+    label: "Core",
+    alwaysExpanded: true,
+    sections: [
+      { id: "dashboard", label: "Dashboard" },
+      { id: "claude-md", label: "CLAUDE.md" },
+      { id: "modules", label: "Modules" },
+    ],
+  },
+  {
+    id: "development",
+    label: "Development",
+    sections: [
+      { id: "test-plans", label: "Test Plans" },
+      { id: "skills", label: "Skills" },
+      { id: "agents", label: "Agents" },
+      { id: "team-templates", label: "Team Templates" },
+    ],
+  },
+  {
+    id: "monitoring",
+    label: "Monitoring",
+    sections: [
+      { id: "ralph", label: "RALPH" },
+      { id: "context", label: "Context Health" },
+      { id: "memory", label: "Memory" },
+    ],
+  },
+  {
+    id: "setup",
+    label: "Setup",
+    sections: [
+      { id: "enforcement", label: "Enforcement" },
+      { id: "settings", label: "Settings" },
+      { id: "help", label: "Help" },
+    ],
+  },
 ];
+
+/** Find which group contains a given section ID */
+function findGroupForSection(sectionId: string): string | null {
+  for (const group of NAV_GROUPS) {
+    if (group.sections.some((s) => s.id === sectionId)) {
+      return group.id;
+    }
+  }
+  return null;
+}
 
 function CheckIcon() {
   return (
@@ -89,6 +139,20 @@ function ChevronDownIcon() {
   return (
     <svg
       className="h-4 w-4"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+    </svg>
+  );
+}
+
+function GroupChevron({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg
+      className={`h-3.5 w-3.5 transition-transform ${collapsed ? "-rotate-90" : ""}`}
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"
@@ -179,9 +243,25 @@ export function Sidebar({
   showHooksSetup = false,
 }: SidebarProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   // Show Kickstart when project is empty and CLAUDE.md hasn't been created yet
   const showKickstart = isEmptyProject && !completion["claude-md"];
+
+  // Auto-expand group containing the active section
+  useEffect(() => {
+    const groupId = findGroupForSection(activeSection);
+    if (groupId && collapsedGroups[groupId]) {
+      setCollapsedGroups((prev) => ({ ...prev, [groupId]: false }));
+    }
+  }, [activeSection]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleGroup = (groupId: string) => {
+    setCollapsedGroups((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }));
+  };
 
   const handleProjectSelect = (project: Project) => {
     onProjectChange?.(project);
@@ -298,28 +378,54 @@ export function Sidebar({
           </div>
         )}
 
-        <div className="mb-3 px-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
-          Navigation
-        </div>
-        <nav className="flex flex-col gap-1">
-          {sections.map((section) => {
-            const isComplete = completion[section.id as keyof SectionCompletion];
+        {/* Grouped Navigation */}
+        <div className="flex flex-col gap-3">
+          {NAV_GROUPS.map((group) => {
+            const isCollapsed = !group.alwaysExpanded && collapsedGroups[group.id];
+
             return (
-              <button
-                key={section.id}
-                onClick={() => onNavigate(section.id)}
-                className={`flex items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                  activeSection === section.id
-                    ? "bg-neutral-800 text-neutral-100"
-                    : "text-neutral-400 hover:bg-neutral-800/50 hover:text-neutral-200"
-                }`}
-              >
-                <span>{section.label}</span>
-                {isComplete && <CheckIcon />}
-              </button>
+              <div key={group.id}>
+                {/* Group Header */}
+                {group.alwaysExpanded ? (
+                  <div className="mb-1 px-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                    {group.label}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => toggleGroup(group.id)}
+                    className="mb-1 flex w-full items-center justify-between px-2 text-left text-xs font-semibold uppercase tracking-wider text-neutral-500 transition-colors hover:text-neutral-300"
+                  >
+                    <span>{group.label}</span>
+                    <GroupChevron collapsed={isCollapsed} />
+                  </button>
+                )}
+
+                {/* Section Items */}
+                {!isCollapsed && (
+                  <nav className="flex flex-col gap-1">
+                    {group.sections.map((section) => {
+                      const isComplete = completion[section.id as keyof SectionCompletion];
+                      return (
+                        <button
+                          key={section.id}
+                          onClick={() => onNavigate(section.id)}
+                          className={`flex items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                            activeSection === section.id
+                              ? "bg-neutral-800 text-neutral-100"
+                              : "text-neutral-400 hover:bg-neutral-800/50 hover:text-neutral-200"
+                          }`}
+                        >
+                          <span>{section.label}</span>
+                          {isComplete && <CheckIcon />}
+                        </button>
+                      );
+                    })}
+                  </nav>
+                )}
+              </div>
             );
           })}
-        </nav>
+        </div>
       </div>
     </aside>
   );

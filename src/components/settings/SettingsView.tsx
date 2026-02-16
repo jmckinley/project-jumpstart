@@ -43,6 +43,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { useToastStore } from "@/stores/toastStore";
 import { saveSetting, getAllSettings, getSetting, installGitHooks, getHookStatus } from "@/lib/tauri";
 import { useProjectStore } from "@/stores/projectStore";
 
@@ -65,6 +66,7 @@ export function SettingsView() {
   const setNotificationsEnabled = useSettingsStore((s) => s.setNotificationsEnabled);
   const setHasApiKey = useSettingsStore((s) => s.setHasApiKey);
   const activeProject = useProjectStore((s) => s.activeProject);
+  const addToast = useToastStore((s) => s.addToast);
 
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [apiKeyMask, setApiKeyMask] = useState<string | null>(null);
@@ -123,6 +125,7 @@ export function SettingsView() {
       setHasApiKey(true);
       setApiKeyMask(`sk-...${apiKeyInput.trim().slice(-4)}`);
       setApiKeyInput("");
+      addToast({ message: "API key saved", type: "success" });
     } catch {
       // Save failed
     } finally {
@@ -143,6 +146,7 @@ export function SettingsView() {
   async function handleEnforcementChange(level: "off" | "warn" | "block" | "auto-update") {
     setEnforcementLevel(level);
     await saveSetting("enforcementLevel", level);
+    addToast({ message: "Settings updated", type: "success" });
 
     // Sync with git hook if project is active
     if (activeProject && level !== "off") {

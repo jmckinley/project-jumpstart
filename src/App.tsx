@@ -54,6 +54,7 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useSectionCompletion } from "@/hooks/useSectionCompletion";
 import { useModules } from "@/hooks/useModules";
 import { listProjects, getSetting, saveSetting, checkHooksConfigured } from "@/lib/tauri";
+import { ToastContainer } from "@/components/ui/Toast";
 import type { Project } from "@/types/project";
 
 function App() {
@@ -248,6 +249,7 @@ function App() {
         />
       </div>
       <StatusBar />
+      <ToastContainer />
     </div>
   );
 }

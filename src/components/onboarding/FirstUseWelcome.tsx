@@ -1,11 +1,11 @@
 /**
  * @module components/onboarding/FirstUseWelcome
- * @description Welcome screen shown on first app launch with app introduction and mandatory API key setup
+ * @description Welcome screen shown on first app launch with app introduction and optional API key setup
  *
  * PURPOSE:
  * - Introduce users to Project Jumpstart on first launch
  * - Explain the app's purpose and key features
- * - Require API key entry before proceeding (mandatory for AI features)
+ * - Optionally collect API key (user can skip and add later in Settings)
  * - Transition user to main app or onboarding wizard
  *
  * DEPENDENCIES:
@@ -17,7 +17,8 @@
  *
  * PATTERNS:
  * - Displayed only when has_seen_welcome setting is false/null
- * - API key is mandatory - validates format and tests with API before proceeding
+ * - API key is optional - if entered, validates format and tests with API before proceeding
+ * - If skipped (empty key), just marks welcome as seen
  * - On completion, sets has_seen_welcome to "true"
  *
  * CLAUDE NOTES:
@@ -25,6 +26,7 @@
  * - API key is saved via the save_setting command (encrypted in backend)
  * - Format validation: must start with sk-ant- and be 20+ chars
  * - API validation: makes minimal API call to test key validity
+ * - Users can skip and add key later via Settings
  */
 
 import { useState, useMemo } from "react";
@@ -75,6 +77,22 @@ export function FirstUseWelcome({ onComplete }: FirstUseWelcomeProps) {
   };
 
   const handleComplete = async () => {
+    const trimmedKey = apiKey.trim();
+
+    // If no key entered, just mark welcome as seen and proceed
+    if (trimmedKey.length === 0) {
+      setSaving(true);
+      try {
+        await saveSetting("has_seen_welcome", "true");
+        onComplete();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to save");
+        setSaving(false);
+      }
+      return;
+    }
+
+    // Key was entered — validate format first
     if (!isValidFormat) {
       setError("Please enter a valid API key");
       return;
@@ -86,10 +104,10 @@ export function FirstUseWelcome({ onComplete }: FirstUseWelcomeProps) {
 
     try {
       // Validate API key with backend (format check + API call)
-      await validateApiKey(apiKey.trim());
+      await validateApiKey(trimmedKey);
 
       // Save API key
-      await saveSetting("anthropic_api_key", apiKey.trim());
+      await saveSetting("anthropic_api_key", trimmedKey);
       setHasApiKey(true);
 
       // Mark welcome as seen
@@ -154,7 +172,7 @@ export function FirstUseWelcome({ onComplete }: FirstUseWelcomeProps) {
         <div className="mb-6">
           <label className="mb-2 block text-sm font-medium text-neutral-300">
             Anthropic API Key{" "}
-            <span className="font-normal text-red-400">(required)</span>
+            <span className="font-normal text-neutral-500">(optional — add later in Settings)</span>
           </label>
           <input
             type="password"
@@ -175,7 +193,7 @@ export function FirstUseWelcome({ onComplete }: FirstUseWelcomeProps) {
             <p className="mt-2 text-sm text-green-400">Format looks good</p>
           ) : (
             <p className="mt-2 text-sm text-neutral-500">
-              An API key is required for AI-powered documentation generation.
+              Optional. Enables AI-powered features. You can add this later in Settings.
               Get one at{" "}
               <a
                 href="https://console.anthropic.com/account/keys"
@@ -200,7 +218,7 @@ export function FirstUseWelcome({ onComplete }: FirstUseWelcomeProps) {
         <div className="flex items-center justify-end">
           <button
             onClick={() => handleComplete()}
-            disabled={saving || !isValidFormat}
+            disabled={saving}
             className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {validating ? "Validating..." : saving ? "Saving..." : "Get Started"}

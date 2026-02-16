@@ -30,6 +30,7 @@
 
 import { useCallback, useState } from "react";
 import { useProjectStore } from "@/stores/projectStore";
+import { useToastStore } from "@/stores/toastStore";
 import {
   listAgents,
   createAgent,
@@ -47,6 +48,7 @@ interface AgentsState {
 
 export function useAgents() {
   const activeProject = useProjectStore((s) => s.activeProject);
+  const addToast = useToastStore((s) => s.addToast);
 
   const [state, setState] = useState<AgentsState>({
     agents: [],
@@ -94,6 +96,7 @@ export function useAgents() {
         // Refresh list
         const agents = await listAgents(activeProject?.id);
         setState((s) => ({ ...s, agents, error: null }));
+        addToast({ message: "Agent created", type: "success" });
       } catch (err) {
         setState((s) => ({
           ...s,
@@ -146,6 +149,7 @@ export function useAgents() {
         await deleteAgent(id);
         const agents = await listAgents(activeProject?.id);
         setState((s) => ({ ...s, agents, error: null }));
+        addToast({ message: "Agent deleted", type: "success" });
       } catch (err) {
         setState((s) => ({
           ...s,

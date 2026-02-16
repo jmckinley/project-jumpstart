@@ -43,6 +43,10 @@ vi.mock("@/stores/projectStore", () => ({
   useProjectStore: vi.fn(),
 }));
 
+vi.mock("@/stores/toastStore", () => ({
+  useToastStore: vi.fn((selector) => selector({ addToast: vi.fn(), removeToast: vi.fn(), toasts: [] })),
+}));
+
 const mockProject = {
   id: "test-project-id",
   name: "Test Project",

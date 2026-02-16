@@ -38,6 +38,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useClaudeMd } from "@/hooks/useClaudeMd";
 import { useProjectStore } from "@/stores/projectStore";
+import { useToastStore } from "@/stores/toastStore";
 import { Preview } from "./Preview";
 import { Suggestions } from "./Suggestions";
 
@@ -47,6 +48,7 @@ interface EditorProps {
 
 export function Editor({ onSave }: EditorProps) {
   const activeProject = useProjectStore((s) => s.activeProject);
+  const addToast = useToastStore((s) => s.addToast);
   const {
     exists,
     content,
@@ -90,6 +92,7 @@ export function Editor({ onSave }: EditorProps) {
       await saveContent(draft);
       setDirty(false);
       onSave?.();
+      addToast({ message: "CLAUDE.md saved", type: "success" });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to save";
       setSaveError(message);

@@ -40,6 +40,10 @@ vi.mock("@/stores/projectStore", () => ({
   ),
 }));
 
+vi.mock("@/stores/toastStore", () => ({
+  useToastStore: vi.fn((selector) => selector({ addToast: vi.fn(), removeToast: vi.fn(), toasts: [] })),
+}));
+
 // Mock child components
 vi.mock("./Preview", () => ({
   Preview: ({ content }: { content: string }) => (

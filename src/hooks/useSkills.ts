@@ -30,6 +30,7 @@
 
 import { useCallback, useState } from "react";
 import { useProjectStore } from "@/stores/projectStore";
+import { useToastStore } from "@/stores/toastStore";
 import {
   listSkills,
   createSkill,
@@ -50,6 +51,7 @@ interface SkillsState {
 
 export function useSkills() {
   const activeProject = useProjectStore((s) => s.activeProject);
+  const addToast = useToastStore((s) => s.addToast);
 
   const [state, setState] = useState<SkillsState>({
     skills: [],
@@ -80,6 +82,7 @@ export function useSkills() {
         // Refresh list
         const skills = await listSkills(activeProject?.id);
         setState((s) => ({ ...s, skills, error: null }));
+        addToast({ message: "Skill created", type: "success" });
       } catch (err) {
         setState((s) => ({
           ...s,
@@ -112,6 +115,7 @@ export function useSkills() {
         await deleteSkill(id);
         const skills = await listSkills(activeProject?.id);
         setState((s) => ({ ...s, skills, error: null }));
+        addToast({ message: "Skill deleted", type: "success" });
       } catch (err) {
         setState((s) => ({
           ...s,
