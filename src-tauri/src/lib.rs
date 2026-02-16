@@ -68,7 +68,7 @@ use commands::test_plans::{
     list_test_cases, create_test_case, update_test_case, delete_test_case,
     detect_project_test_framework, run_test_plan, get_test_runs, generate_test_suggestions,
     create_tdd_session, update_tdd_session, get_tdd_session, list_tdd_sessions,
-    generate_subagent_config, generate_hooks_config,
+    check_test_staleness, generate_subagent_config, generate_hooks_config,
 };
 use commands::session_analysis::{analyze_session, get_session_transcript};
 use commands::team_templates::{
@@ -176,6 +176,7 @@ pub fn run() {
             update_tdd_session,
             get_tdd_session,
             list_tdd_sessions,
+            check_test_staleness,
             generate_subagent_config,
             generate_hooks_config,
             // Session Analysis commands

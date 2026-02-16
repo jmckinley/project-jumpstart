@@ -151,6 +151,29 @@ test.describe("Memory Management", () => {
     });
   });
 
+  test.describe("Test Staleness Alert", () => {
+    test("shows Check Staleness button on dashboard", async ({ page }) => {
+      await expect(
+        page.locator("main").getByRole("button", { name: "Check Staleness" }),
+      ).toBeVisible({ timeout: 5000 });
+    });
+
+    test("shows placeholder before checking", async ({ page }) => {
+      await expect(
+        page.locator("main").getByText('Click "Check Staleness" to scan for stale tests.'),
+      ).toBeVisible({ timeout: 5000 });
+    });
+
+    test("displays staleness results after checking", async ({ page }) => {
+      const main = page.locator("main");
+      await main.getByRole("button", { name: "Check Staleness" }).click();
+
+      // Wait for results
+      await expect(main.getByText("1 stale")).toBeVisible({ timeout: 5000 });
+      await expect(main.getByText("src/components/App.tsx")).toBeVisible();
+    });
+  });
+
   test.describe("Analyzer Tab", () => {
     test.beforeEach(async ({ page }) => {
       await page.locator("main").getByText("Analyzer").click();

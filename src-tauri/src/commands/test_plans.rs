@@ -33,6 +33,7 @@
 //! - update_tdd_session - Update TDD session phase/status
 //! - get_tdd_session - Get current TDD session
 //! - list_tdd_sessions - List TDD sessions for a project
+//! - check_test_staleness - Detect stale tests by comparing source vs test modification
 //! - generate_subagent_config - Generate Claude Code subagent markdown
 //! - generate_hooks_config - Generate PostToolUse hooks JSON
 //!
@@ -58,7 +59,7 @@ use crate::core::test_runner::{self};
 use crate::models::test_plan::{
     GeneratedTestSuggestion, TDDPhase, TDDPhaseStatus, TDDSession, TestCase,
     TestCaseStatus, TestFrameworkInfo, TestPlan, TestPlanStatus, TestPlanSummary, TestPriority,
-    TestRun, TestRunStatus, TestType,
+    TestRun, TestRunStatus, TestStalenessReport, TestStalenessResult, TestType,
 };
 
 // =============================================================================
@@ -931,6 +932,206 @@ pub async fn list_tdd_sessions(
 }
 
 // =============================================================================
+// Test Staleness Detection
+// =============================================================================
+
+/// Check for stale tests by comparing recently changed source files against their test files.
+#[tauri::command]
+pub async fn check_test_staleness(
+    project_path: String,
+    lookback_commits: Option<u32>,
+) -> Result<TestStalenessReport, String> {
+    let lookback = lookback_commits.unwrap_or(10);
+    let now = Utc::now().to_rfc3339();
+
+    // Get recently changed files from git
+    let output = std::process::Command::new("git")
+        .args(["diff", "--name-only", &format!("HEAD~{}", lookback), "HEAD"])
+        .current_dir(&project_path)
+        .output()
+        .map_err(|e| format!("Failed to run git: {}", e))?;
+
+    if !output.status.success() {
+        // Might not have enough commits; return empty report
+        return Ok(TestStalenessReport {
+            checked_files: 0,
+            stale_count: 0,
+            results: vec![],
+            checked_at: now,
+        });
+    }
+
+    let changed_files: std::collections::HashSet<String> =
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(|s| s.to_string())
+            .collect();
+
+    // Filter to material source files
+    let source_files: Vec<String> = changed_files
+        .iter()
+        .filter(|f| is_material_source_file(f))
+        .cloned()
+        .collect();
+
+    let mut results = Vec::new();
+
+    for src in &source_files {
+        let test_file = find_corresponding_test_file(src, &project_path);
+
+        match test_file {
+            Some(ref tf) if tf == "__inline__" => {
+                // Rust inline tests: if source was modified, tests were too
+                results.push(TestStalenessResult {
+                    source_file: src.clone(),
+                    test_file: None,
+                    is_stale: false,
+                    reason: "Inline tests co-modified with source".to_string(),
+                });
+            }
+            Some(ref tf) => {
+                let is_stale = !changed_files.contains(tf);
+                let reason = if is_stale {
+                    format!("{} was modified but {} was not", src, tf)
+                } else {
+                    "Test file was also modified".to_string()
+                };
+                results.push(TestStalenessResult {
+                    source_file: src.clone(),
+                    test_file: Some(tf.clone()),
+                    is_stale,
+                    reason,
+                });
+            }
+            None => {
+                // No test file found — not stale, just untested
+                results.push(TestStalenessResult {
+                    source_file: src.clone(),
+                    test_file: None,
+                    is_stale: false,
+                    reason: "No corresponding test file found".to_string(),
+                });
+            }
+        }
+    }
+
+    let stale_count = results.iter().filter(|r| r.is_stale).count() as u32;
+
+    Ok(TestStalenessReport {
+        checked_files: source_files.len() as u32,
+        stale_count,
+        results,
+        checked_at: now,
+    })
+}
+
+/// Check if a file path is a material source file (not test, config, etc.)
+fn is_material_source_file(path: &str) -> bool {
+    let source_exts = [".ts", ".tsx", ".js", ".jsx", ".rs", ".py", ".go"];
+    let has_source_ext = source_exts.iter().any(|ext| path.ends_with(ext));
+    if !has_source_ext {
+        return false;
+    }
+
+    // Exclude test files
+    let test_patterns = [".test.", ".spec.", "_test.", "test_", "__tests__", ".stories."];
+    if test_patterns.iter().any(|pat| path.contains(pat)) {
+        return false;
+    }
+
+    // Exclude config and declaration files
+    let config_patterns = ["config.", ".config", ".d.ts", "mod.rs"];
+    if config_patterns.iter().any(|pat| path.contains(pat)) {
+        return false;
+    }
+
+    true
+}
+
+/// Find the corresponding test file for a given source file.
+/// Returns Some("__inline__") for Rust files with inline tests.
+fn find_corresponding_test_file(source: &str, project_path: &str) -> Option<String> {
+    let path = std::path::Path::new(source);
+    let dir = path.parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+    let file_name = path.file_name()?.to_string_lossy().to_string();
+    let ext = path.extension()?.to_string_lossy().to_string();
+    let stem = path.file_stem()?.to_string_lossy().to_string();
+
+    match ext.as_str() {
+        "ts" | "tsx" | "js" | "jsx" => {
+            // Check Name.test.ext, Name.spec.ext
+            for test_suffix in &["test", "spec"] {
+                let candidate = if dir.is_empty() {
+                    format!("{}.{}.{}", stem, test_suffix, ext)
+                } else {
+                    format!("{}/{}.{}.{}", dir, stem, test_suffix, ext)
+                };
+                let full = std::path::Path::new(project_path).join(&candidate);
+                if full.exists() {
+                    return Some(candidate);
+                }
+            }
+            // Check __tests__/ directory
+            let tests_candidate = if dir.is_empty() {
+                format!("__tests__/{}.test.{}", stem, ext)
+            } else {
+                format!("{}/__tests__/{}.test.{}", dir, stem, ext)
+            };
+            let full = std::path::Path::new(project_path).join(&tests_candidate);
+            if full.exists() {
+                return Some(tests_candidate);
+            }
+            None
+        }
+        "rs" => {
+            // Rust: check for inline #[cfg(test)] module
+            let full = std::path::Path::new(project_path).join(source);
+            if let Ok(content) = std::fs::read_to_string(&full) {
+                if content.contains("#[cfg(test)]") {
+                    return Some("__inline__".to_string());
+                }
+            }
+            None
+        }
+        "py" => {
+            // Python: test_name.py in same dir or tests/ dir
+            let candidate = if dir.is_empty() {
+                format!("test_{}", file_name)
+            } else {
+                format!("{}/test_{}", dir, file_name)
+            };
+            let full = std::path::Path::new(project_path).join(&candidate);
+            if full.exists() {
+                return Some(candidate);
+            }
+            let tests_candidate = if dir.is_empty() {
+                format!("tests/test_{}", file_name)
+            } else {
+                format!("{}/tests/test_{}", dir, file_name)
+            };
+            let full = std::path::Path::new(project_path).join(&tests_candidate);
+            if full.exists() {
+                return Some(tests_candidate);
+            }
+            None
+        }
+        "go" => {
+            let candidate = if dir.is_empty() {
+                format!("{}_test.go", stem)
+            } else {
+                format!("{}/{}_test.go", dir, stem)
+            };
+            let full = std::path::Path::new(project_path).join(&candidate);
+            if full.exists() {
+                return Some(candidate);
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+// =============================================================================
 // Subagent & Hooks Generation
 // =============================================================================
 
@@ -1284,6 +1485,185 @@ fn map_test_run_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TestRun> {
         started_at,
         completed_at,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // =========================================================================
+    // is_material_source_file tests
+    // =========================================================================
+
+    #[test]
+    fn test_material_source_ts_files() {
+        assert!(is_material_source_file("src/components/App.tsx"));
+        assert!(is_material_source_file("src/hooks/useHealth.ts"));
+        assert!(is_material_source_file("src/lib/utils.js"));
+        assert!(is_material_source_file("src/lib/helper.jsx"));
+    }
+
+    #[test]
+    fn test_material_source_rust_files() {
+        assert!(is_material_source_file("src-tauri/src/core/health.rs"));
+        assert!(is_material_source_file("src-tauri/src/commands/project.rs"));
+    }
+
+    #[test]
+    fn test_material_source_python_go_files() {
+        assert!(is_material_source_file("backend/models.py"));
+        assert!(is_material_source_file("cmd/server.go"));
+    }
+
+    #[test]
+    fn test_excludes_test_files() {
+        assert!(!is_material_source_file("src/App.test.tsx"));
+        assert!(!is_material_source_file("src/App.spec.tsx"));
+        assert!(!is_material_source_file("tests/test_main.py"));
+        assert!(!is_material_source_file("src/__tests__/App.tsx"));
+        assert!(!is_material_source_file("src/App.stories.tsx"));
+    }
+
+    #[test]
+    fn test_excludes_config_files() {
+        assert!(!is_material_source_file("vitest.config.ts"));
+        assert!(!is_material_source_file("tailwind.config.js"));
+        assert!(!is_material_source_file("src/types/global.d.ts"));
+        assert!(!is_material_source_file("src-tauri/src/commands/mod.rs"));
+    }
+
+    #[test]
+    fn test_excludes_non_source_files() {
+        assert!(!is_material_source_file("README.md"));
+        assert!(!is_material_source_file("package.json"));
+        assert!(!is_material_source_file("Cargo.toml"));
+        assert!(!is_material_source_file(".gitignore"));
+        assert!(!is_material_source_file("src/styles.css"));
+    }
+
+    // =========================================================================
+    // find_corresponding_test_file tests (using temp dirs)
+    // =========================================================================
+
+    #[test]
+    fn test_find_ts_test_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path();
+
+        // Create source and test files
+        std::fs::create_dir_all(project.join("src/components")).unwrap();
+        std::fs::write(project.join("src/components/App.tsx"), "export function App() {}").unwrap();
+        std::fs::write(
+            project.join("src/components/App.test.tsx"),
+            "describe('App', () => {})",
+        )
+        .unwrap();
+
+        let result = find_corresponding_test_file(
+            "src/components/App.tsx",
+            project.to_str().unwrap(),
+        );
+        assert_eq!(result, Some("src/components/App.test.tsx".to_string()));
+    }
+
+    #[test]
+    fn test_find_spec_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path();
+
+        std::fs::create_dir_all(project.join("src")).unwrap();
+        std::fs::write(project.join("src/utils.ts"), "export function foo() {}").unwrap();
+        std::fs::write(project.join("src/utils.spec.ts"), "describe('utils', () => {})").unwrap();
+
+        let result = find_corresponding_test_file("src/utils.ts", project.to_str().unwrap());
+        assert_eq!(result, Some("src/utils.spec.ts".to_string()));
+    }
+
+    #[test]
+    fn test_find_rust_inline_tests() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path();
+
+        std::fs::create_dir_all(project.join("src-tauri/src/core")).unwrap();
+        std::fs::write(
+            project.join("src-tauri/src/core/health.rs"),
+            "fn check() {}\n#[cfg(test)]\nmod tests { }",
+        )
+        .unwrap();
+
+        let result = find_corresponding_test_file(
+            "src-tauri/src/core/health.rs",
+            project.to_str().unwrap(),
+        );
+        assert_eq!(result, Some("__inline__".to_string()));
+    }
+
+    #[test]
+    fn test_find_python_test_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path();
+
+        std::fs::create_dir_all(project.join("backend")).unwrap();
+        std::fs::write(project.join("backend/models.py"), "class User: pass").unwrap();
+        std::fs::write(project.join("backend/test_models.py"), "def test_user(): pass").unwrap();
+
+        let result = find_corresponding_test_file("backend/models.py", project.to_str().unwrap());
+        assert_eq!(result, Some("backend/test_models.py".to_string()));
+    }
+
+    #[test]
+    fn test_find_go_test_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path();
+
+        std::fs::create_dir_all(project.join("cmd")).unwrap();
+        std::fs::write(project.join("cmd/server.go"), "package main").unwrap();
+        std::fs::write(project.join("cmd/server_test.go"), "package main").unwrap();
+
+        let result = find_corresponding_test_file("cmd/server.go", project.to_str().unwrap());
+        assert_eq!(result, Some("cmd/server_test.go".to_string()));
+    }
+
+    #[test]
+    fn test_no_test_file_found() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path();
+
+        std::fs::create_dir_all(project.join("src")).unwrap();
+        std::fs::write(project.join("src/orphan.ts"), "export const x = 1;").unwrap();
+
+        let result = find_corresponding_test_file("src/orphan.ts", project.to_str().unwrap());
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_staleness_report_serialization() {
+        let report = TestStalenessReport {
+            checked_files: 3,
+            stale_count: 1,
+            results: vec![
+                TestStalenessResult {
+                    source_file: "src/App.tsx".to_string(),
+                    test_file: Some("src/App.test.tsx".to_string()),
+                    is_stale: true,
+                    reason: "src/App.tsx was modified but src/App.test.tsx was not".to_string(),
+                },
+                TestStalenessResult {
+                    source_file: "src/utils.ts".to_string(),
+                    test_file: Some("src/utils.test.ts".to_string()),
+                    is_stale: false,
+                    reason: "Test file was also modified".to_string(),
+                },
+            ],
+            checked_at: "2026-02-16T00:00:00+00:00".to_string(),
+        };
+
+        let json = serde_json::to_string(&report).unwrap();
+        assert!(json.contains("\"checkedFiles\":3"));
+        assert!(json.contains("\"staleCount\":1"));
+        assert!(json.contains("\"isStale\":true"));
+        assert!(json.contains("\"sourceFile\":\"src/App.tsx\""));
+    }
 }
 
 fn map_tdd_session_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TDDSession> {

@@ -115,6 +115,7 @@
  * - runTestPlan - Execute tests for a plan
  * - getTestRuns - Get test run history
  * - generateTestSuggestions - AI-powered test suggestions
+ * - checkTestStaleness - Detect stale tests by comparing source vs test modification
  * - createTddSession - Start a new TDD workflow session
  * - updateTddSession - Update TDD session phase/status
  * - getTddSession - Get a TDD session
@@ -164,6 +165,7 @@ import type {
   TDDSession,
   GeneratedTestSuggestion,
   TestFrameworkInfo,
+  TestStalenessReport,
 } from "@/types/test-plan";
 
 export async function scanProject(path: string): Promise<DetectionResult> {
@@ -682,6 +684,20 @@ export async function generateTestSuggestions(
   return invoke<GeneratedTestSuggestion[]>("generate_test_suggestions", {
     projectPath,
     filePaths: filePaths ?? null,
+  });
+}
+
+// =============================================================================
+// Test Staleness Detection
+// =============================================================================
+
+export async function checkTestStaleness(
+  projectPath: string,
+  lookbackCommits?: number,
+): Promise<TestStalenessReport> {
+  return invoke<TestStalenessReport>("check_test_staleness", {
+    projectPath,
+    lookbackCommits: lookbackCommits ?? null,
   });
 }
 

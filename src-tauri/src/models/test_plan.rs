@@ -28,6 +28,8 @@
 //! - TDDPhase - Phase enum (red, green, refactor)
 //! - TDDPhaseStatus - Phase status enum (pending, active, complete, failed)
 //! - GeneratedTestSuggestion - AI-generated test case suggestion
+//! - TestStalenessResult - Per-file staleness detection result
+//! - TestStalenessReport - Aggregated staleness report for a project
 //!
 //! PATTERNS:
 //! - All models derive Serialize, Deserialize for Tauri IPC
@@ -414,4 +416,24 @@ pub struct TestFrameworkInfo {
     pub command: String,
     pub config_file: Option<String>,
     pub coverage_command: Option<String>,
+}
+
+/// A single source file and its corresponding test file staleness status
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TestStalenessResult {
+    pub source_file: String,
+    pub test_file: Option<String>,
+    pub is_stale: bool,
+    pub reason: String,
+}
+
+/// Aggregated staleness report for a project
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TestStalenessReport {
+    pub checked_files: u32,
+    pub stale_count: u32,
+    pub results: Vec<TestStalenessResult>,
+    pub checked_at: String,
 }

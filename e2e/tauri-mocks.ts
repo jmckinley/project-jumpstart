@@ -250,6 +250,32 @@ export const mockMemoryHealth = {
   healthRating: "excellent",
 };
 
+export const mockTestStalenessReport = {
+  checkedFiles: 3,
+  staleCount: 1,
+  results: [
+    {
+      sourceFile: "src/components/App.tsx",
+      testFile: "src/components/App.test.tsx",
+      isStale: true,
+      reason: "src/components/App.tsx was modified but src/components/App.test.tsx was not",
+    },
+    {
+      sourceFile: "src/hooks/useHealth.ts",
+      testFile: null,
+      isStale: false,
+      reason: "No corresponding test file found",
+    },
+    {
+      sourceFile: "src/lib/utils.ts",
+      testFile: "src/lib/utils.test.ts",
+      isStale: false,
+      reason: "Test file was also modified",
+    },
+  ],
+  checkedAt: new Date().toISOString(),
+};
+
 export const mockClaudeMdAnalysis = {
   totalLines: 112,
   estimatedTokens: 4500,
@@ -472,6 +498,10 @@ export async function setupTauriMocks(page: Page, options: {
         case "promote_learning":
           return null;
 
+        case "check_test_staleness":
+          await new Promise(r => setTimeout(r, 200));
+          return mocks.testStalenessReport;
+
         case "list_team_templates":
           return [];
 
@@ -537,6 +567,7 @@ export async function setupTauriMocks(page: Page, options: {
       memorySources: mockMemorySources,
       learnings: mockLearnings,
       memoryHealth: mockMemoryHealth,
+      testStalenessReport: mockTestStalenessReport,
       claudeMdAnalysis: mockClaudeMdAnalysis,
     },
   });

@@ -57,7 +57,7 @@ Detailed rules are in `.claude/rules/`:
 
 ## Current Status
 
-**Feature-Complete (Beta Ready)** | 801 tests (700 frontend + 101 Rust)
+**Feature-Complete (Beta Ready)** | 951+ tests (822 frontend + 129 Rust)
 
 All sections implemented: Onboarding, Dashboard, CLAUDE.md Editor, Modules, Test Plans & TDD, Skills, Agents, Team Templates, RALPH, Context Health, Enforcement, Settings, Memory Management.
 
@@ -93,6 +93,7 @@ All sections implemented: Onboarding, Dashboard, CLAUDE.md Editor, Modules, Test
 
 ### Memory Management
 - `.claude/hooks/extract-learnings.sh` - SessionEnd: extracts learnings with semantic dedup
+- `.claude/hooks/check-test-staleness.sh` - SessionEnd: detects stale tests after source changes
 - `.claude/hooks/pre-compact.sh` - PreCompact: saves context before compaction
 - `.claude/skills/` - On-demand context (tauri-patterns, tdd-workflow, team-templates, freshness-engine)
 - `.claude/rules/` - Always-loaded domain rules (documentation, testing, rust, react, database)
@@ -102,6 +103,7 @@ All sections implemented: Onboarding, Dashboard, CLAUDE.md Editor, Modules, Test
 
 | Date | Change |
 |------|--------|
+| Feb 16, 2026 | Test Staleness Detection: SessionEnd hook, Rust backend command, TestStalenessAlert UI in Memory Dashboard. Shell script + backend detect stale tests via git diff. |
 | Feb 16, 2026 | Added Memory Management feature: memory dashboard, learning browser, CLAUDE.md analyzer. Slimmed CLAUDE.md, added rules files, PreCompact hook, skills directory, upgraded learning extraction. |
 | Feb 10, 2026 | Added Windows build to release workflow |
 | Feb 7, 2026 | Deploy output personalization, team templates, resilient auto-update hook |

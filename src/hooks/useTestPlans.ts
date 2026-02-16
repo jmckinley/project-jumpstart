@@ -22,6 +22,7 @@
  * - Call runTests() to execute tests for a plan
  * - Call generateSuggestions() for AI-powered test recommendations
  * - Call refreshFramework() after user installs a new test framework
+ * - Call checkStaleness() to detect tests that may need updating
  *
  * CLAUDE NOTES:
  * - loadTestPlans fetches plans scoped to the active project
@@ -47,6 +48,7 @@ import {
   runTestPlan,
   getTestRuns,
   generateTestSuggestions,
+  checkTestStaleness,
 } from "@/lib/tauri";
 import type {
   TestPlan,
@@ -55,6 +57,7 @@ import type {
   TestRun,
   TestFrameworkInfo,
   GeneratedTestSuggestion,
+  TestStalenessReport,
 } from "@/types/test-plan";
 
 interface TestPlansState {
@@ -64,9 +67,11 @@ interface TestPlansState {
   runs: TestRun[];
   framework: TestFrameworkInfo | null;
   suggestions: GeneratedTestSuggestion[];
+  stalenessReport: TestStalenessReport | null;
   loading: boolean;
   running: boolean;
   generating: boolean;
+  checkingStaleness: boolean;
   error: string | null;
 }
 
@@ -80,9 +85,11 @@ export function useTestPlans() {
     runs: [],
     framework: null,
     suggestions: [],
+    stalenessReport: null,
     loading: false,
     running: false,
     generating: false,
+    checkingStaleness: false,
     error: null,
   });
 
@@ -393,6 +400,26 @@ export function useTestPlans() {
     }
   }, [activeProject]);
 
+  // Check for stale tests in the project
+  const checkStalenessAction = useCallback(
+    async (lookbackCommits?: number) => {
+      if (!activeProject) return;
+
+      setState((s) => ({ ...s, checkingStaleness: true, error: null }));
+      try {
+        const report = await checkTestStaleness(activeProject.path, lookbackCommits);
+        setState((s) => ({ ...s, stalenessReport: report, checkingStaleness: false }));
+      } catch (err) {
+        setState((s) => ({
+          ...s,
+          checkingStaleness: false,
+          error: err instanceof Error ? err.message : "Failed to check test staleness",
+        }));
+      }
+    },
+    [activeProject],
+  );
+
   return {
     ...state,
     loadTestPlans,
@@ -410,5 +437,6 @@ export function useTestPlans() {
     dismissSuggestion,
     clearError,
     refreshFramework,
+    checkStaleness: checkStalenessAction,
   };
 }

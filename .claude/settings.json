@@ -24,6 +24,17 @@
             "timeout": 30000
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/check-test-staleness.sh",
+            "description": "Detect stale tests after source file changes",
+            "timeout": 10000
+          }
+        ]
       }
     ]
   }

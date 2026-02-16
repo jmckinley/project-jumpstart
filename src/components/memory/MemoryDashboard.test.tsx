@@ -7,6 +7,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryDashboard } from "./MemoryDashboard";
 import type { MemoryHealth, MemorySource } from "@/types/memory";
+import type { TestStalenessReport } from "@/types/test-plan";
 
 const mockHealth: MemoryHealth = {
   totalSources: 5,
@@ -364,6 +365,65 @@ describe("MemoryDashboard", () => {
       );
 
       expect(screen.getByText("90% of context window")).toBeInTheDocument();
+    });
+  });
+
+  describe("test staleness integration", () => {
+    const mockStaleReport: TestStalenessReport = {
+      checkedFiles: 3,
+      staleCount: 1,
+      results: [
+        {
+          sourceFile: "src/App.tsx",
+          testFile: "src/App.test.tsx",
+          isStale: true,
+          reason: "src/App.tsx was modified but src/App.test.tsx was not",
+        },
+      ],
+      checkedAt: "2026-02-16T00:00:00Z",
+    };
+
+    it("should render Test Staleness section when onCheckStaleness provided", () => {
+      render(
+        <MemoryDashboard
+          health={mockHealth}
+          sources={[]}
+          loading={false}
+          onRefresh={vi.fn()}
+          onCheckStaleness={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Test Staleness")).toBeInTheDocument();
+    });
+
+    it("should NOT render Test Staleness section when onCheckStaleness not provided", () => {
+      render(
+        <MemoryDashboard
+          health={mockHealth}
+          sources={[]}
+          loading={false}
+          onRefresh={vi.fn()}
+        />,
+      );
+
+      expect(screen.queryByText("Test Staleness")).not.toBeInTheDocument();
+    });
+
+    it("should show stale count badge when report has stale items", () => {
+      render(
+        <MemoryDashboard
+          health={mockHealth}
+          sources={[]}
+          loading={false}
+          onRefresh={vi.fn()}
+          stalenessReport={mockStaleReport}
+          checkingStaleness={false}
+          onCheckStaleness={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("1 stale")).toBeInTheDocument();
     });
   });
 });

@@ -10,6 +10,8 @@
  *
  * DEPENDENCIES:
  * - @/types/memory - MemorySource, MemoryHealth types
+ * - @/types/test-plan - TestStalenessReport type
+ * - ./TestStalenessAlert - Test staleness alert card component
  *
  * EXPORTS:
  * - MemoryDashboard - Memory health overview component
@@ -28,12 +30,17 @@
  */
 
 import type { MemorySource, MemoryHealth } from "@/types/memory";
+import type { TestStalenessReport } from "@/types/test-plan";
+import { TestStalenessAlert } from "./TestStalenessAlert";
 
 interface MemoryDashboardProps {
   health: MemoryHealth | null;
   sources: MemorySource[];
   loading: boolean;
   onRefresh: () => void;
+  stalenessReport?: TestStalenessReport | null;
+  checkingStaleness?: boolean;
+  onCheckStaleness?: () => void;
 }
 
 const MAX_CONTEXT_TOKENS = 200_000;
@@ -112,7 +119,7 @@ function formatTokens(tokens: number): string {
   return tokens.toString();
 }
 
-export function MemoryDashboard({ health, sources, loading, onRefresh }: MemoryDashboardProps) {
+export function MemoryDashboard({ health, sources, loading, onRefresh, stalenessReport, checkingStaleness, onCheckStaleness }: MemoryDashboardProps) {
   const score = health?.claudeMdScore ?? 0;
   const circumference = 2 * Math.PI * 54;
   const offset = circumference * (1 - score / 100);
@@ -258,6 +265,15 @@ export function MemoryDashboard({ health, sources, loading, onRefresh }: MemoryD
           </p>
         </div>
       </div>
+
+      {/* Test Staleness Alert */}
+      {onCheckStaleness && (
+        <TestStalenessAlert
+          report={stalenessReport ?? null}
+          loading={checkingStaleness ?? false}
+          onCheck={onCheckStaleness}
+        />
+      )}
 
       {/* Memory Sources List */}
       <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-6">

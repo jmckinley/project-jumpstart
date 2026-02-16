@@ -1220,6 +1220,9 @@ function TestPlansView() {
     acceptSuggestion,
     clearError: clearTestPlansError,
     refreshFramework,
+    stalenessReport,
+    checkingStaleness,
+    checkStaleness,
   } = useTestPlans();
 
   const {
@@ -1895,6 +1898,9 @@ function MemoryView() {
           sources={sources}
           loading={loading}
           onRefresh={refresh}
+          stalenessReport={stalenessReport}
+          checkingStaleness={checkingStaleness}
+          onCheckStaleness={checkStaleness}
         />
       )}
 

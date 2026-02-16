@@ -25,6 +25,8 @@
  * - TDDSession - A TDD workflow session tracking phases
  * - GeneratedTestSuggestion - AI-generated test case suggestion
  * - TestFrameworkInfo - Detected test framework information
+ * - TestStalenessResult - Per-file staleness detection result
+ * - TestStalenessReport - Aggregated staleness report for a project
  *
  * PATTERNS:
  * - Types mirror Rust structs in models/test_plan.rs
@@ -146,6 +148,26 @@ export interface TestFrameworkInfo {
   command: string;
   configFile?: string;
   coverageCommand?: string;
+}
+
+/**
+ * A single source file and its test file staleness status
+ */
+export interface TestStalenessResult {
+  sourceFile: string;
+  testFile?: string;
+  isStale: boolean;
+  reason: string;
+}
+
+/**
+ * Aggregated staleness report for a project
+ */
+export interface TestStalenessReport {
+  checkedFiles: number;
+  staleCount: number;
+  results: TestStalenessResult[];
+  checkedAt: string;
 }
 
 /**
