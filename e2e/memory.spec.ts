@@ -170,7 +170,7 @@ test.describe("Memory Management", () => {
 
       // Wait for results
       await expect(main.getByText("1 stale")).toBeVisible({ timeout: 5000 });
-      await expect(main.getByText("src/components/App.tsx")).toBeVisible();
+      await expect(main.getByText("src/components/App.tsx", { exact: true })).toBeVisible();
     });
   });
 

@@ -1844,6 +1844,12 @@ function MemoryView() {
     refresh,
   } = useMemory();
 
+  const {
+    stalenessReport,
+    checkingStaleness,
+    checkStaleness,
+  } = useTestPlans();
+
   const [activeTab, setActiveTab] = useState<"dashboard" | "learnings" | "analyzer">("dashboard");
 
   useEffect(() => {
