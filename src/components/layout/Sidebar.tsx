@@ -89,13 +89,13 @@ const NAV_GROUPS: NavGroup[] = [
       { id: "skills", label: "Skills" },
       { id: "agents", label: "Agents" },
       { id: "team-templates", label: "Team Templates" },
+      { id: "ralph", label: "RALPH" },
     ],
   },
   {
     id: "monitoring",
     label: "Monitoring",
     sections: [
-      { id: "ralph", label: "RALPH" },
       { id: "context", label: "Context Health" },
       { id: "memory", label: "Memory" },
     ],
