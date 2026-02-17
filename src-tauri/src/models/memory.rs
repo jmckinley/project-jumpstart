@@ -24,6 +24,7 @@
 //!
 //! CLAUDE NOTES:
 //! - MemorySource.source_type values: "claude-md", "rules", "auto-memory", "local", "skills"
+//! - MemorySource.scope values: "project", "global"
 //! - Learning.category values: "Preference", "Solution", "Pattern", "Gotcha"
 //! - Learning.confidence values: "high", "medium", "low"
 //! - Learning.status values: "active", "verified", "deprecated", "archived"
@@ -37,6 +38,7 @@ pub struct MemorySource {
     pub path: String,
     pub source_type: String,
     pub name: String,
+    pub scope: String,
     pub line_count: u32,
     pub size_bytes: u64,
     pub last_modified: String,

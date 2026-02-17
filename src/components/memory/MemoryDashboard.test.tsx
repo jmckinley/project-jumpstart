@@ -27,6 +27,7 @@ const mockSources: MemorySource[] = [
     path: "/project/CLAUDE.md",
     sourceType: "claude-md",
     name: "CLAUDE.md",
+    scope: "project",
     lineCount: 112,
     sizeBytes: 4500,
     lastModified: "2026-02-16T00:00:00Z",
@@ -36,6 +37,7 @@ const mockSources: MemorySource[] = [
     path: "/project/.claude/rules/testing.md",
     sourceType: "rules",
     name: "testing.md",
+    scope: "project",
     lineCount: 80,
     sizeBytes: 2200,
     lastModified: "2026-02-16T00:00:00Z",
@@ -45,6 +47,7 @@ const mockSources: MemorySource[] = [
     path: "/project/.claude/skills/tdd-workflow/SKILL.md",
     sourceType: "skills",
     name: "tdd-workflow",
+    scope: "project",
     lineCount: 45,
     sizeBytes: 1200,
     lastModified: "2026-02-16T00:00:00Z",
@@ -270,6 +273,85 @@ describe("MemoryDashboard", () => {
     });
   });
 
+  describe("scope grouping", () => {
+    it("should render Project Sources heading when project sources exist", () => {
+      render(
+        <MemoryDashboard
+          health={mockHealth}
+          sources={mockSources}
+          loading={false}
+          onRefresh={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Project Sources")).toBeInTheDocument();
+    });
+
+    it("should render Global Sources heading when global sources exist", () => {
+      const globalSource: MemorySource = {
+        path: "/home/.claude/CLAUDE.md",
+        sourceType: "claude-md",
+        name: "~/.claude/CLAUDE.md",
+        scope: "global",
+        lineCount: 20,
+        sizeBytes: 600,
+        lastModified: "2026-02-17T00:00:00Z",
+        description: "Global Claude Code instructions",
+      };
+      render(
+        <MemoryDashboard
+          health={mockHealth}
+          sources={[...mockSources, globalSource]}
+          loading={false}
+          onRefresh={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Project Sources")).toBeInTheDocument();
+      expect(screen.getByText("Global Sources")).toBeInTheDocument();
+    });
+
+    it("should not render Global Sources heading when no global sources", () => {
+      render(
+        <MemoryDashboard
+          health={mockHealth}
+          sources={mockSources}
+          loading={false}
+          onRefresh={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Project Sources")).toBeInTheDocument();
+      expect(screen.queryByText("Global Sources")).not.toBeInTheDocument();
+    });
+
+    it("should not render Project Sources heading when no project sources", () => {
+      const globalOnly: MemorySource[] = [
+        {
+          path: "/home/.claude/CLAUDE.md",
+          sourceType: "claude-md",
+          name: "~/.claude/CLAUDE.md",
+          scope: "global",
+          lineCount: 20,
+          sizeBytes: 600,
+          lastModified: "2026-02-17T00:00:00Z",
+          description: "Global Claude Code instructions",
+        },
+      ];
+      render(
+        <MemoryDashboard
+          health={mockHealth}
+          sources={globalOnly}
+          loading={false}
+          onRefresh={vi.fn()}
+        />,
+      );
+
+      expect(screen.queryByText("Project Sources")).not.toBeInTheDocument();
+      expect(screen.getByText("Global Sources")).toBeInTheDocument();
+    });
+  });
+
   describe("null health state", () => {
     it("should render zero values when health is null", () => {
       render(
@@ -336,6 +418,7 @@ describe("MemoryDashboard", () => {
         path: "/test",
         sourceType: "rules",
         name: "test.md",
+        scope: "project",
         lineCount: 10,
         sizeBytes: 2200,
         lastModified: "2026-02-16T00:00:00Z",

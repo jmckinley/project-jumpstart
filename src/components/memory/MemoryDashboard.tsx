@@ -29,7 +29,7 @@
  * - When health is null, show placeholder / loading state
  */
 
-import type { MemorySource, MemoryHealth } from "@/types/memory";
+import type { MemorySource, MemoryHealth, MemoryScope } from "@/types/memory";
 import type { TestStalenessReport } from "@/types/test-plan";
 import { TestStalenessAlert } from "./TestStalenessAlert";
 
@@ -117,6 +117,69 @@ function formatTokens(tokens: number): string {
     return `${(tokens / 1000).toFixed(1)}k`;
   }
   return tokens.toString();
+}
+
+function SourceRow({ source }: { source: MemorySource }) {
+  return (
+    <div
+      className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-950 px-4 py-3 transition-colors hover:border-neutral-700"
+    >
+      <div
+        className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-xs font-bold ${getSourceIconColor(source.sourceType)}`}
+      >
+        {getSourceIcon(source.sourceType)}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="truncate text-sm font-medium text-neutral-200">
+            {source.name}
+          </p>
+          <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-xs text-neutral-500">
+            {source.sourceType}
+          </span>
+        </div>
+        <p className="truncate text-xs text-neutral-500">{source.description}</p>
+      </div>
+      <div className="flex flex-shrink-0 items-center gap-4 text-xs text-neutral-500">
+        <span>{source.lineCount} lines</span>
+        <span>{formatBytes(source.sizeBytes)}</span>
+      </div>
+    </div>
+  );
+}
+
+const SCOPE_LABELS: Record<MemoryScope, string> = {
+  project: "Project Sources",
+  global: "Global Sources",
+};
+
+const SCOPE_ORDER: MemoryScope[] = ["project", "global"];
+
+function SourceGroups({ sources }: { sources: MemorySource[] }) {
+  const grouped = SCOPE_ORDER
+    .map((scope) => ({
+      scope,
+      label: SCOPE_LABELS[scope],
+      items: sources.filter((s) => s.scope === scope),
+    }))
+    .filter((g) => g.items.length > 0);
+
+  return (
+    <div className="max-h-80 space-y-4 overflow-y-auto">
+      {grouped.map((group) => (
+        <div key={group.scope}>
+          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-neutral-500">
+            {group.label}
+          </p>
+          <div className="space-y-2">
+            {group.items.map((source) => (
+              <SourceRow key={source.path} source={source} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function MemoryDashboard({ health, sources, loading, onRefresh, stalenessReport, checkingStaleness, onCheckStaleness }: MemoryDashboardProps) {
@@ -286,40 +349,7 @@ export function MemoryDashboard({ health, sources, loading, onRefresh, staleness
             No memory sources found. Create a CLAUDE.md file to get started.
           </p>
         ) : (
-          <div className="max-h-80 space-y-2 overflow-y-auto">
-            {sources.map((source) => (
-              <div
-                key={source.path}
-                className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-950 px-4 py-3 transition-colors hover:border-neutral-700"
-              >
-                {/* Source type icon */}
-                <div
-                  className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-xs font-bold ${getSourceIconColor(source.sourceType)}`}
-                >
-                  {getSourceIcon(source.sourceType)}
-                </div>
-
-                {/* Source info */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-medium text-neutral-200">
-                      {source.name}
-                    </p>
-                    <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-xs text-neutral-500">
-                      {source.sourceType}
-                    </span>
-                  </div>
-                  <p className="truncate text-xs text-neutral-500">{source.description}</p>
-                </div>
-
-                {/* Stats */}
-                <div className="flex flex-shrink-0 items-center gap-4 text-xs text-neutral-500">
-                  <span>{source.lineCount} lines</span>
-                  <span>{formatBytes(source.sizeBytes)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          <SourceGroups sources={sources} />
         )}
       </div>
     </div>

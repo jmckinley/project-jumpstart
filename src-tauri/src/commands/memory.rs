@@ -83,13 +83,13 @@ pub async fn list_memory_sources(
 
     // 1. CLAUDE.md in project root
     let claude_md_path = project_dir.join("CLAUDE.md");
-    if let Some(source) = read_memory_source(&claude_md_path, "claude-md", "CLAUDE.md", "Root project memory file") {
+    if let Some(source) = read_memory_source(&claude_md_path, "claude-md", "CLAUDE.md", "Root project memory file", "project") {
         sources.push(source);
     }
 
     // 2. CLAUDE.local.md in project root
     let claude_local_path = project_dir.join("CLAUDE.local.md");
-    if let Some(source) = read_memory_source(&claude_local_path, "local", "CLAUDE.local.md", "Personal learnings (gitignored)") {
+    if let Some(source) = read_memory_source(&claude_local_path, "local", "CLAUDE.local.md", "Personal learnings (gitignored)", "project") {
         sources.push(source);
     }
 
@@ -106,7 +106,7 @@ pub async fn list_memory_sources(
                         .unwrap_or("unknown")
                         .to_string();
                     let desc = format!("Rule file: {}", &name);
-                    if let Some(source) = read_memory_source(&path, "rules", &name, &desc) {
+                    if let Some(source) = read_memory_source(&path, "rules", &name, &desc, "project") {
                         sources.push(source);
                     }
                 }
@@ -129,7 +129,7 @@ pub async fn list_memory_sources(
                             .unwrap_or("unknown");
                         let name = format!("{}/SKILL.md", dir_name);
                         let desc = format!("Skill definition: {}", dir_name);
-                        if let Some(source) = read_memory_source(&skill_md, "skills", &name, &desc) {
+                        if let Some(source) = read_memory_source(&skill_md, "skills", &name, &desc, "project") {
                             sources.push(source);
                         }
                     }
@@ -138,46 +138,59 @@ pub async fn list_memory_sources(
         }
     }
 
-    // 5. Auto-memory files in ~/.claude/projects/*/memory/
+    // 5. Auto-memory files in ~/.claude/projects/<encoded>/memory/
+    //    Claude Code encodes project paths by replacing / with - (and stripping leading -)
     if let Some(home) = dirs::home_dir() {
-        let claude_projects_dir = home.join(".claude").join("projects");
-        if claude_projects_dir.is_dir() {
-            if let Ok(project_entries) = fs::read_dir(&claude_projects_dir) {
-                for project_entry in project_entries.flatten() {
-                    let memory_dir = project_entry.path().join("memory");
-                    if memory_dir.is_dir() {
-                        if let Ok(mem_entries) = fs::read_dir(&memory_dir) {
-                            for mem_entry in mem_entries.flatten() {
-                                let mem_path = mem_entry.path();
-                                if mem_path.extension().and_then(|e| e.to_str()) == Some("md") {
-                                    let project_dir_name = project_entry
-                                        .path()
-                                        .file_name()
-                                        .and_then(|n| n.to_str())
-                                        .unwrap_or("unknown")
-                                        .to_string();
-                                    let file_name = mem_path
-                                        .file_name()
-                                        .and_then(|n| n.to_str())
-                                        .unwrap_or("unknown")
-                                        .to_string();
-                                    let name = format!("{}/{}", project_dir_name, file_name);
-                                    let desc = format!("Auto-memory: {}", &name);
-                                    if let Some(source) =
-                                        read_memory_source(&mem_path, "auto-memory", &name, &desc)
-                                    {
-                                        sources.push(source);
-                                    }
-                                }
-                            }
+        let encoded_path = encode_project_path(&project_path);
+        let memory_dir = home
+            .join(".claude")
+            .join("projects")
+            .join(&encoded_path)
+            .join("memory");
+
+        if memory_dir.is_dir() {
+            if let Ok(mem_entries) = fs::read_dir(&memory_dir) {
+                for mem_entry in mem_entries.flatten() {
+                    let mem_path = mem_entry.path();
+                    if mem_path.extension().and_then(|e| e.to_str()) == Some("md") {
+                        let file_name = mem_path
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("unknown")
+                            .to_string();
+                        let name = format!("{}/{}", encoded_path, file_name);
+                        let desc = format!("Auto-memory: {}", &file_name);
+                        if let Some(source) =
+                            read_memory_source(&mem_path, "auto-memory", &name, &desc, "project")
+                        {
+                            sources.push(source);
                         }
                     }
                 }
             }
         }
+
+        // 6. Global ~/.claude/CLAUDE.md
+        let global_claude_md = home.join(".claude").join("CLAUDE.md");
+        if let Some(source) = read_memory_source(
+            &global_claude_md,
+            "claude-md",
+            "~/.claude/CLAUDE.md",
+            "Global Claude Code instructions",
+            "global",
+        ) {
+            sources.push(source);
+        }
     }
 
     Ok(sources)
+}
+
+/// Encode a project path to match Claude Code's directory naming convention.
+/// Replaces `/` with `-` and strips the leading `-`.
+fn encode_project_path(path: &str) -> String {
+    let encoded = path.replace('/', "-");
+    encoded.strip_prefix('-').unwrap_or(&encoded).to_string()
 }
 
 /// Helper: read file metadata and create a MemorySource.
@@ -186,6 +199,7 @@ fn read_memory_source(
     source_type: &str,
     name: &str,
     description: &str,
+    scope: &str,
 ) -> Option<MemorySource> {
     if !path.exists() {
         return None;
@@ -208,6 +222,7 @@ fn read_memory_source(
         path: path.to_string_lossy().to_string(),
         source_type: source_type.to_string(),
         name: name.to_string(),
+        scope: scope.to_string(),
         line_count,
         size_bytes,
         last_modified,
@@ -1106,7 +1121,7 @@ mod tests {
     #[test]
     fn test_read_memory_source_nonexistent() {
         let path = PathBuf::from("/nonexistent/file.md");
-        let result = read_memory_source(&path, "test", "test.md", "test");
+        let result = read_memory_source(&path, "test", "test.md", "test", "project");
         assert!(result.is_none());
     }
 
@@ -1147,15 +1162,43 @@ mod tests {
         let file_path = dir.path().join("test.md");
         fs::write(&file_path, "line 1\nline 2\nline 3\n").unwrap();
 
-        let result = read_memory_source(&file_path, "rules", "test.md", "A test file");
+        let result = read_memory_source(&file_path, "rules", "test.md", "A test file", "project");
         assert!(result.is_some());
 
         let source = result.unwrap();
         assert_eq!(source.source_type, "rules");
         assert_eq!(source.name, "test.md");
+        assert_eq!(source.scope, "project");
         assert_eq!(source.line_count, 3);
         assert_eq!(source.description, "A test file");
         assert!(source.size_bytes > 0);
         assert!(!source.last_modified.is_empty());
+    }
+
+    #[test]
+    fn test_read_memory_source_global_scope() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("global.md");
+        fs::write(&file_path, "global config\n").unwrap();
+
+        let result = read_memory_source(&file_path, "claude-md", "~/.claude/CLAUDE.md", "Global instructions", "global");
+        assert!(result.is_some());
+
+        let source = result.unwrap();
+        assert_eq!(source.scope, "global");
+        assert_eq!(source.source_type, "claude-md");
+        assert_eq!(source.name, "~/.claude/CLAUDE.md");
+    }
+
+    #[test]
+    fn test_encode_project_path() {
+        assert_eq!(
+            encode_project_path("/Users/john/my-project"),
+            "Users-john-my-project"
+        );
+        assert_eq!(
+            encode_project_path("/home/dev/app"),
+            "home-dev-app"
+        );
     }
 }

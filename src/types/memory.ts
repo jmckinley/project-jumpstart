@@ -31,11 +31,13 @@ export type LearningTopic = 'debugging' | 'patterns' | 'tools' | 'project' | 'wo
 export type LearningStatus = 'active' | 'verified' | 'deprecated' | 'archived';
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
 export type HealthRating = 'excellent' | 'good' | 'needs-attention' | 'poor';
+export type MemoryScope = 'project' | 'global';
 
 export interface MemorySource {
   path: string;
   sourceType: string;
   name: string;
+  scope: MemoryScope;
   lineCount: number;
   sizeBytes: number;
   lastModified: string;
