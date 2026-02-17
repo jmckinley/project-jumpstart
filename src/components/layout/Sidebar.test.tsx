@@ -368,10 +368,11 @@ describe("Sidebar", () => {
       // Click Development header to collapse
       await user.click(screen.getByText("Development"));
 
-      // Skills should be hidden
+      // All Development items should be hidden
       expect(screen.queryByText("Skills")).not.toBeInTheDocument();
       expect(screen.queryByText("Agents")).not.toBeInTheDocument();
       expect(screen.queryByText("Team Templates")).not.toBeInTheDocument();
+      expect(screen.queryByText("RALPH")).not.toBeInTheDocument();
     });
 
     it("should expand a collapsed group when clicked again", async () => {
