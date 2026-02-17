@@ -9,7 +9,7 @@
  *
  * DEPENDENCIES:
  * - @/stores/projectStore - Active project for scoping operations
- * - @/lib/tauri - listMemorySources, listLearnings, updateLearningStatus, analyzeClaudeMd, getMemoryHealth, promoteLearning
+ * - @/lib/tauri - listMemorySources, listLearnings, updateLearningStatus, analyzeClaudeMd, getMemoryHealth, promoteLearning, readClaudeMd, writeClaudeMd, appendToProjectFile
  * - @/types/memory - MemorySource, Learning, MemoryHealth, ClaudeMdAnalysis types
  *
  * EXPORTS:
@@ -18,7 +18,7 @@
  * PATTERNS:
  * - Call refresh() when the memory section becomes active
  * - All operations require an active project
- * - Returns { sources, learnings, health, analysis, loading, analyzing, error, ... }
+ * - Returns { sources, learnings, health, analysis, loading, analyzing, error, applyRemoval, applyMove, ... }
  *
  * CLAUDE NOTES:
  * - loadSources, loadLearnings, loadHealth can be called independently
@@ -38,6 +38,9 @@ import {
   analyzeClaudeMd,
   getMemoryHealth,
   promoteLearning,
+  readClaudeMd,
+  writeClaudeMd,
+  appendToProjectFile,
 } from "@/lib/tauri";
 import type { MemorySource, Learning, MemoryHealth, ClaudeMdAnalysis } from "@/types/memory";
 
@@ -120,6 +123,40 @@ export function useMemory() {
     }
   }, [activeProject]);
 
+  const applyRemoval = useCallback(async (lineNumbers: number[]) => {
+    if (!activeProject) return;
+    try {
+      const info = await readClaudeMd(activeProject.path);
+      const lines = info.content.split("\n");
+      const toRemove = new Set(lineNumbers);
+      const filtered = lines.filter((_, i) => !toRemove.has(i + 1));
+      await writeClaudeMd(activeProject.path, filtered.join("\n"));
+      addToast({ message: `Removed ${lineNumbers.length} line(s) from CLAUDE.md`, type: "success" });
+      const data = await analyzeClaudeMd(activeProject.path);
+      setAnalysis(data);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, [activeProject, addToast]);
+
+  const applyMove = useCallback(async (lineRange: [number, number], targetFile: string) => {
+    if (!activeProject) return;
+    try {
+      const info = await readClaudeMd(activeProject.path);
+      const lines = info.content.split("\n");
+      const [start, end] = lineRange;
+      const extracted = lines.slice(start - 1, end).join("\n") + "\n";
+      const remaining = lines.filter((_, i) => i < start - 1 || i >= end);
+      await writeClaudeMd(activeProject.path, remaining.join("\n"));
+      await appendToProjectFile(activeProject.path, targetFile, "\n" + extracted);
+      addToast({ message: `Moved lines ${start}-${end} to ${targetFile}`, type: "success" });
+      const data = await analyzeClaudeMd(activeProject.path);
+      setAnalysis(data);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, [activeProject, addToast]);
+
   const refresh = useCallback(async () => {
     await Promise.all([loadSources(), loadLearnings(), loadHealth()]);
   }, [loadSources, loadLearnings, loadHealth]);
@@ -138,6 +175,8 @@ export function useMemory() {
     runAnalysis,
     updateStatus,
     promote,
+    applyRemoval,
+    applyMove,
     refresh,
   };
 }

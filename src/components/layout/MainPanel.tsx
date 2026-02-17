@@ -1838,6 +1838,8 @@ function MemoryView() {
     runAnalysis,
     updateStatus,
     promote,
+    applyRemoval,
+    applyMove,
     refresh,
   } = useMemory();
 
@@ -1920,6 +1922,8 @@ function MemoryView() {
           analysis={analysis}
           analyzing={analyzing}
           onAnalyze={runAnalysis}
+          onApplyRemoval={applyRemoval}
+          onApplyMove={applyMove}
         />
       )}
     </div>

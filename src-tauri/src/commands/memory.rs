@@ -902,6 +902,34 @@ pub async fn promote_learning(
 }
 
 // ---------------------------------------------------------------------------
+// append_to_project_file
+// ---------------------------------------------------------------------------
+
+/// Append content to a file relative to the project root (creating it if needed).
+/// Used by the "Move" action in CLAUDE.md analysis to relocate lines to rules files.
+#[tauri::command]
+pub async fn append_to_project_file(
+    project_path: String,
+    relative_path: String,
+    content: String,
+) -> Result<(), String> {
+    let target = PathBuf::from(&project_path).join(&relative_path);
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create directories: {}", e))?;
+    }
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&target)
+        .map_err(|e| format!("Failed to open file: {}", e))?;
+    use std::io::Write;
+    file.write_all(content.as_bytes())
+        .map_err(|e| format!("Failed to write: {}", e))?;
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1080,6 +1108,37 @@ mod tests {
         let path = PathBuf::from("/nonexistent/file.md");
         let result = read_memory_source(&path, "test", "test.md", "test");
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_append_to_project_file_creates_and_appends() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().to_string_lossy().to_string();
+        let relative = "subdir/appended.md";
+        let target = dir.path().join(relative);
+
+        // File doesn't exist yet
+        assert!(!target.exists());
+
+        // First write creates the file
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(append_to_project_file(
+            project_path.clone(),
+            relative.to_string(),
+            "line1\n".to_string(),
+        ))
+        .unwrap();
+        assert!(target.exists());
+        assert_eq!(fs::read_to_string(&target).unwrap(), "line1\n");
+
+        // Second write appends
+        rt.block_on(append_to_project_file(
+            project_path,
+            relative.to_string(),
+            "line2\n".to_string(),
+        ))
+        .unwrap();
+        assert_eq!(fs::read_to_string(&target).unwrap(), "line1\nline2\n");
     }
 
     #[test]

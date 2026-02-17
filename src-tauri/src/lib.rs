@@ -77,7 +77,7 @@ use commands::team_templates::{
 };
 use commands::memory::{
     list_memory_sources, list_learnings, update_learning_status, analyze_claude_md,
-    get_memory_health, promote_learning,
+    get_memory_health, promote_learning, append_to_project_file,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -196,6 +196,7 @@ pub fn run() {
             analyze_claude_md,
             get_memory_health,
             promote_learning,
+            append_to_project_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

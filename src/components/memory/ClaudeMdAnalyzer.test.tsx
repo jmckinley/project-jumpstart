@@ -432,4 +432,102 @@ describe("ClaudeMdAnalyzer", () => {
       expect(screen.getByText("25")).toBeInTheDocument();
     });
   });
+
+  describe("apply actions", () => {
+    it("should render Remove button on each line-to-remove when onApplyRemoval provided", () => {
+      const onApplyRemoval = vi.fn();
+      render(
+        <ClaudeMdAnalyzer
+          analysis={mockAnalysis}
+          analyzing={false}
+          onAnalyze={vi.fn()}
+          onApplyRemoval={onApplyRemoval}
+        />,
+      );
+
+      const removeBtn = screen.getByRole("button", { name: "Remove" });
+      expect(removeBtn).toBeInTheDocument();
+      fireEvent.click(removeBtn);
+      expect(onApplyRemoval).toHaveBeenCalledWith([55]);
+    });
+
+    it("should not render Remove button when onApplyRemoval is not provided", () => {
+      render(
+        <ClaudeMdAnalyzer
+          analysis={mockAnalysis}
+          analyzing={false}
+          onAnalyze={vi.fn()}
+        />,
+      );
+
+      expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+    });
+
+    it("should render Remove All button when multiple lines to remove", () => {
+      const multiRemoveAnalysis: ClaudeMdAnalysis = {
+        ...mockAnalysis,
+        linesToRemove: [
+          { lineNumber: 10, content: "line 10", reason: "self-evident" },
+          { lineNumber: 20, content: "line 20", reason: "self-evident" },
+        ],
+      };
+      const onApplyRemoval = vi.fn();
+      render(
+        <ClaudeMdAnalyzer
+          analysis={multiRemoveAnalysis}
+          analyzing={false}
+          onAnalyze={vi.fn()}
+          onApplyRemoval={onApplyRemoval}
+        />,
+      );
+
+      const removeAllBtn = screen.getByRole("button", { name: "Remove All" });
+      expect(removeAllBtn).toBeInTheDocument();
+      fireEvent.click(removeAllBtn);
+      expect(onApplyRemoval).toHaveBeenCalledWith([10, 20]);
+    });
+
+    it("should not render Remove All button when only one line to remove", () => {
+      const onApplyRemoval = vi.fn();
+      render(
+        <ClaudeMdAnalyzer
+          analysis={mockAnalysis}
+          analyzing={false}
+          onAnalyze={vi.fn()}
+          onApplyRemoval={onApplyRemoval}
+        />,
+      );
+
+      expect(screen.queryByRole("button", { name: "Remove All" })).not.toBeInTheDocument();
+    });
+
+    it("should render Move button on each line-to-move when onApplyMove provided", () => {
+      const onApplyMove = vi.fn();
+      render(
+        <ClaudeMdAnalyzer
+          analysis={mockAnalysis}
+          analyzing={false}
+          onAnalyze={vi.fn()}
+          onApplyMove={onApplyMove}
+        />,
+      );
+
+      const moveBtn = screen.getByRole("button", { name: "Move" });
+      expect(moveBtn).toBeInTheDocument();
+      fireEvent.click(moveBtn);
+      expect(onApplyMove).toHaveBeenCalledWith([100, 120], ".claude/rules/documentation.md");
+    });
+
+    it("should not render Move button when onApplyMove is not provided", () => {
+      render(
+        <ClaudeMdAnalyzer
+          analysis={mockAnalysis}
+          analyzing={false}
+          onAnalyze={vi.fn()}
+        />,
+      );
+
+      expect(screen.queryByRole("button", { name: "Move" })).not.toBeInTheDocument();
+    });
+  });
 });

@@ -16,6 +16,8 @@
  * PATTERNS:
  * - Receives analysis results and analyzing state as props
  * - "Analyze" button triggers analysis via onAnalyze callback
+ * - "Remove" / "Remove All" buttons on lines to remove, triggers onApplyRemoval
+ * - "Move" button on lines to move, triggers onApplyMove
  * - Suggestions list with type badges (remove, move, shorten, add)
  * - Lines to remove show content and reason
  * - Lines to move show target file suggestion
@@ -33,6 +35,8 @@ interface ClaudeMdAnalyzerProps {
   analysis: ClaudeMdAnalysis | null;
   analyzing: boolean;
   onAnalyze: () => void;
+  onApplyRemoval?: (lineNumbers: number[]) => void;
+  onApplyMove?: (lineRange: [number, number], targetFile: string) => void;
 }
 
 function getScoreColor(score: number): string {
@@ -71,7 +75,7 @@ function formatTokens(tokens: number): string {
   return tokens.toString();
 }
 
-export function ClaudeMdAnalyzer({ analysis, analyzing, onAnalyze }: ClaudeMdAnalyzerProps) {
+export function ClaudeMdAnalyzer({ analysis, analyzing, onAnalyze, onApplyRemoval, onApplyMove }: ClaudeMdAnalyzerProps) {
   return (
     <div className="space-y-6">
       {/* Analyze Button + Score Header */}
@@ -252,20 +256,40 @@ export function ClaudeMdAnalyzer({ analysis, analyzing, onAnalyze }: ClaudeMdAna
       {/* Lines to Remove */}
       {analysis && analysis.linesToRemove.length > 0 && (
         <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-6">
-          <h3 className="mb-4 text-sm font-medium uppercase tracking-wider text-neutral-400">
-            Lines to Remove ({analysis.linesToRemove.length})
-          </h3>
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-sm font-medium uppercase tracking-wider text-neutral-400">
+              Lines to Remove ({analysis.linesToRemove.length})
+            </h3>
+            {onApplyRemoval && analysis.linesToRemove.length > 1 && (
+              <button
+                onClick={() => onApplyRemoval(analysis.linesToRemove.map(l => l.lineNumber))}
+                className="rounded px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/20"
+              >
+                Remove All
+              </button>
+            )}
+          </div>
           <div className="space-y-2">
             {analysis.linesToRemove.map((line, idx) => (
               <div
                 key={idx}
                 className="rounded-lg border border-red-500/20 bg-red-950/20 p-3"
               >
-                <div className="mb-1 flex items-center gap-2">
-                  <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-xs font-mono text-red-400">
-                    L{line.lineNumber}
-                  </span>
-                  <span className="text-xs text-red-300">{line.reason}</span>
+                <div className="mb-1 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-xs font-mono text-red-400">
+                      L{line.lineNumber}
+                    </span>
+                    <span className="text-xs text-red-300">{line.reason}</span>
+                  </div>
+                  {onApplyRemoval && (
+                    <button
+                      onClick={() => onApplyRemoval([line.lineNumber])}
+                      className="rounded px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-500/20"
+                    >
+                      Remove
+                    </button>
+                  )}
                 </div>
                 <p className="truncate font-mono text-xs text-neutral-400">{line.content}</p>
               </div>
@@ -286,20 +310,30 @@ export function ClaudeMdAnalyzer({ analysis, analyzing, onAnalyze }: ClaudeMdAna
                 key={idx}
                 className="rounded-lg border border-purple-500/20 bg-purple-950/20 p-3"
               >
-                <div className="mb-1 flex items-center gap-2">
-                  <span className="rounded bg-purple-500/20 px-1.5 py-0.5 text-xs font-mono text-purple-400">
-                    L{move.lineRange[0]}-{move.lineRange[1]}
-                  </span>
-                  <svg
-                    className="h-3 w-3 text-neutral-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
-                  <span className="text-xs font-medium text-purple-300">{move.targetFile}</span>
+                <div className="mb-1 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded bg-purple-500/20 px-1.5 py-0.5 text-xs font-mono text-purple-400">
+                      L{move.lineRange[0]}-{move.lineRange[1]}
+                    </span>
+                    <svg
+                      className="h-3 w-3 text-neutral-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                    <span className="text-xs font-medium text-purple-300">{move.targetFile}</span>
+                  </div>
+                  {onApplyMove && (
+                    <button
+                      onClick={() => onApplyMove(move.lineRange as [number, number], move.targetFile)}
+                      className="rounded px-2 py-1 text-xs font-medium text-purple-400 hover:bg-purple-500/20"
+                    >
+                      Move
+                    </button>
+                  )}
                 </div>
                 <p className="mb-1 truncate font-mono text-xs text-neutral-400">
                   {move.contentPreview}

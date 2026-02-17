@@ -134,6 +134,7 @@
  * - analyzeClaudeMd - Run quality analysis on CLAUDE.md
  * - getMemoryHealth - Get overall memory health metrics
  * - promoteLearning - Promote a learning to CLAUDE.md or rules file
+ * - appendToProjectFile - Append content to a file relative to project root
  *
  * PATTERNS:
  * - Each function wraps a single Tauri command
@@ -908,4 +909,12 @@ export async function getMemoryHealth(projectPath: string): Promise<MemoryHealth
 
 export async function promoteLearning(id: string, target: string, projectPath: string): Promise<void> {
   return invoke<void>("promote_learning", { id, target, projectPath });
+}
+
+export async function appendToProjectFile(
+  projectPath: string,
+  relativePath: string,
+  content: string,
+): Promise<void> {
+  return invoke<void>("append_to_project_file", { projectPath, relativePath, content });
 }
