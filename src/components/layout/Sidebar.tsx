@@ -96,8 +96,8 @@ const NAV_GROUPS: NavGroup[] = [
     id: "monitoring",
     label: "Monitoring",
     sections: [
+      { id: "memory", label: "Claude Memory" },
       { id: "context", label: "Context Health" },
-      { id: "memory", label: "Memory" },
     ],
   },
   {

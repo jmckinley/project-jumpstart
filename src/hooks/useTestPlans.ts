@@ -34,6 +34,7 @@
 
 import { useCallback, useState } from "react";
 import { useProjectStore } from "@/stores/projectStore";
+import { useToastStore } from "@/stores/toastStore";
 import {
   listTestPlans,
   getTestPlan,
@@ -77,6 +78,7 @@ interface TestPlansState {
 
 export function useTestPlans() {
   const activeProject = useProjectStore((s) => s.activeProject);
+  const addToast = useToastStore((s) => s.addToast);
 
   const [state, setState] = useState<TestPlansState>({
     plans: [],
@@ -403,21 +405,22 @@ export function useTestPlans() {
   // Check for stale tests in the project
   const checkStalenessAction = useCallback(
     async (lookbackCommits?: number) => {
-      if (!activeProject) return;
+      if (!activeProject) {
+        addToast({ message: "No project selected", type: "error" });
+        return;
+      }
 
       setState((s) => ({ ...s, checkingStaleness: true, error: null }));
       try {
         const report = await checkTestStaleness(activeProject.path, lookbackCommits);
         setState((s) => ({ ...s, stalenessReport: report, checkingStaleness: false }));
       } catch (err) {
-        setState((s) => ({
-          ...s,
-          checkingStaleness: false,
-          error: err instanceof Error ? err.message : "Failed to check test staleness",
-        }));
+        const msg = err instanceof Error ? err.message : "Failed to check test staleness";
+        setState((s) => ({ ...s, checkingStaleness: false, error: msg }));
+        addToast({ message: msg, type: "error" });
       }
     },
-    [activeProject],
+    [activeProject, addToast],
   );
 
   return {

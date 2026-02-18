@@ -63,10 +63,11 @@ export function useMemory() {
       setSources(data);
     } catch (e) {
       setError(String(e));
+      addToast({ message: "Failed to load memory sources", type: "error" });
     } finally {
       setLoading(false);
     }
-  }, [activeProject]);
+  }, [activeProject, addToast]);
 
   const loadLearnings = useCallback(async () => {
     if (!activeProject) return;
@@ -75,8 +76,9 @@ export function useMemory() {
       setLearnings(data);
     } catch (e) {
       setError(String(e));
+      addToast({ message: "Failed to load learnings", type: "error" });
     }
-  }, [activeProject]);
+  }, [activeProject, addToast]);
 
   const loadHealth = useCallback(async () => {
     if (!activeProject) return;
@@ -85,21 +87,26 @@ export function useMemory() {
       setHealth(data);
     } catch (e) {
       setError(String(e));
+      addToast({ message: "Failed to load memory health", type: "error" });
     }
-  }, [activeProject]);
+  }, [activeProject, addToast]);
 
   const runAnalysis = useCallback(async () => {
-    if (!activeProject) return;
+    if (!activeProject) {
+      addToast({ message: "No project selected", type: "error" });
+      return;
+    }
     setAnalyzing(true);
     try {
       const data = await analyzeClaudeMd(activeProject.path);
       setAnalysis(data);
     } catch (e) {
       setError(String(e));
+      addToast({ message: "Failed to analyze CLAUDE.md", type: "error" });
     } finally {
       setAnalyzing(false);
     }
-  }, [activeProject]);
+  }, [activeProject, addToast]);
 
   const updateStatus = useCallback(async (id: string, status: string) => {
     try {
@@ -111,20 +118,26 @@ export function useMemory() {
   }, []);
 
   const promote = useCallback(async (id: string, target: string) => {
-    if (!activeProject) return;
+    if (!activeProject) {
+      addToast({ message: "No project selected", type: "error" });
+      return;
+    }
     try {
       await promoteLearning(id, target, activeProject.path);
-      // Reload learnings after promotion
       const data = await listLearnings(activeProject.path);
       setLearnings(data);
       addToast({ message: "Learning promoted", type: "success" });
     } catch (e) {
       setError(String(e));
+      addToast({ message: "Failed to promote learning", type: "error" });
     }
-  }, [activeProject]);
+  }, [activeProject, addToast]);
 
   const applyRemoval = useCallback(async (lineNumbers: number[]) => {
-    if (!activeProject) return;
+    if (!activeProject) {
+      addToast({ message: "No project selected", type: "error" });
+      return;
+    }
     try {
       const info = await readClaudeMd(activeProject.path);
       const lines = info.content.split("\n");
@@ -136,11 +149,15 @@ export function useMemory() {
       setAnalysis(data);
     } catch (e) {
       setError(String(e));
+      addToast({ message: "Failed to remove lines from CLAUDE.md", type: "error" });
     }
   }, [activeProject, addToast]);
 
   const applyMove = useCallback(async (lineRange: [number, number], targetFile: string) => {
-    if (!activeProject) return;
+    if (!activeProject) {
+      addToast({ message: "No project selected", type: "error" });
+      return;
+    }
     try {
       const info = await readClaudeMd(activeProject.path);
       const lines = info.content.split("\n");
@@ -154,12 +171,17 @@ export function useMemory() {
       setAnalysis(data);
     } catch (e) {
       setError(String(e));
+      addToast({ message: "Failed to move lines", type: "error" });
     }
   }, [activeProject, addToast]);
 
   const refresh = useCallback(async () => {
+    if (!activeProject) {
+      addToast({ message: "No project selected", type: "error" });
+      return;
+    }
     await Promise.all([loadSources(), loadLearnings(), loadHealth()]);
-  }, [loadSources, loadLearnings, loadHealth]);
+  }, [activeProject, addToast, loadSources, loadLearnings, loadHealth]);
 
   return {
     sources,
