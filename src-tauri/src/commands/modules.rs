@@ -142,32 +142,35 @@ pub async fn apply_module_doc(
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("file");
-    let _ = state.db.lock().map(|db| {
-        // Try to find project_id from a path prefix
-        let mut stmt = db
-            .prepare("SELECT id, path FROM projects")
-            .ok();
-        if let Some(ref mut s) = stmt {
-            let _ = s
-                .query_map([], |row| {
-                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-                })
-                .ok()
-                .map(|rows| {
-                    for r in rows.flatten() {
-                        if file_path.starts_with(&r.1) {
-                            let _ = db::log_activity_db(
-                                &db,
-                                &r.0,
-                                "generate",
-                                &format!("Applied docs to {}", filename),
-                            );
-                            break;
+    // Log activity (best-effort, non-critical)
+    match state.db.lock() {
+        Ok(db) => {
+            let mut stmt = db
+                .prepare("SELECT id, path FROM projects")
+                .ok();
+            if let Some(ref mut s) = stmt {
+                let _ = s
+                    .query_map([], |row| {
+                        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                    })
+                    .ok()
+                    .map(|rows| {
+                        for r in rows.flatten() {
+                            if file_path.starts_with(&r.1) {
+                                let _ = db::log_activity_db(
+                                    &db,
+                                    &r.0,
+                                    "generate",
+                                    &format!("Applied docs to {}", filename),
+                                );
+                                break;
+                            }
                         }
-                    }
-                });
+                    });
+            }
         }
-    });
+        Err(e) => eprintln!("Failed to lock DB for activity logging: {}", e),
+    }
 
     Ok(())
 }
@@ -190,8 +193,11 @@ pub async fn batch_generate_docs(
 
     for file_path in &file_paths {
         let doc_result = if let Ok(ref api_key) = api_key_result {
-            // Try AI generation
-            let content = std::fs::read_to_string(file_path).ok();
+            // Try AI generation — skip files >2MB to prevent OOM
+            let content = std::fs::metadata(file_path)
+                .ok()
+                .filter(|m| m.len() <= 2_000_000)
+                .and_then(|_| std::fs::read_to_string(file_path).ok());
             if let Some(content) = content {
                 let ext = std::path::Path::new(file_path)
                     .extension()
@@ -253,22 +259,25 @@ pub async fn batch_generate_docs(
         }
     }
 
-    // Log activity
+    // Log activity (best-effort, non-critical)
     let count = file_paths.len();
-    let _ = state.db.lock().map(|db| {
-        if let Ok(pid) = db.query_row(
-            "SELECT id FROM projects WHERE path = ?1",
-            [&project_path],
-            |row| row.get::<_, String>(0),
-        ) {
-            let _ = db::log_activity_db(
-                &db,
-                &pid,
-                "generate",
-                &format!("Generated docs for {} files", count),
-            );
+    match state.db.lock() {
+        Ok(db) => {
+            if let Ok(pid) = db.query_row(
+                "SELECT id FROM projects WHERE path = ?1",
+                [&project_path],
+                |row| row.get::<_, String>(0),
+            ) {
+                let _ = db::log_activity_db(
+                    &db,
+                    &pid,
+                    "generate",
+                    &format!("Generated docs for {} files", count),
+                );
+            }
         }
-    });
+        Err(e) => eprintln!("Failed to lock DB for activity logging: {}", e),
+    }
 
     Ok(results)
 }

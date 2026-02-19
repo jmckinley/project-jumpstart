@@ -95,16 +95,19 @@ pub async fn write_claude_md(
 
     std::fs::write(&file_path, &content).map_err(|e| format!("Failed to write CLAUDE.md: {}", e))?;
 
-    // Log activity
-    let _ = state.db.lock().map(|db| {
-        if let Ok(pid) = db.query_row(
-            "SELECT id FROM projects WHERE path = ?1",
-            [&project_path],
-            |row| row.get::<_, String>(0),
-        ) {
-            let _ = db::log_activity_db(&db, &pid, "edit", "Updated CLAUDE.md");
+    // Log activity (best-effort, non-critical)
+    match state.db.lock() {
+        Ok(db) => {
+            if let Ok(pid) = db.query_row(
+                "SELECT id FROM projects WHERE path = ?1",
+                [&project_path],
+                |row| row.get::<_, String>(0),
+            ) {
+                let _ = db::log_activity_db(&db, &pid, "edit", "Updated CLAUDE.md");
+            }
         }
-    });
+        Err(e) => eprintln!("Failed to lock DB for activity logging: {}", e),
+    }
 
     Ok(())
 }
@@ -164,10 +167,13 @@ pub async fn generate_claude_md(
     if let Ok(api_key) = api_key_result {
         match generator::generate_claude_md_with_ai(&project, &state.http_client, &api_key).await {
             Ok(content) => {
-                // Log activity on success
-                let _ = state.db.lock().map(|db| {
-                    let _ = db::log_activity_db(&db, &project.id, "generate", "Generated CLAUDE.md (AI)");
-                });
+                // Log activity on success (best-effort)
+                match state.db.lock() {
+                    Ok(db) => {
+                        let _ = db::log_activity_db(&db, &project.id, "generate", "Generated CLAUDE.md (AI)");
+                    }
+                    Err(e) => eprintln!("Failed to lock DB for activity logging: {}", e),
+                }
                 return Ok(content);
             }
             Err(_) => {
@@ -178,10 +184,13 @@ pub async fn generate_claude_md(
 
     let content = generator::generate_claude_md_content(&project);
 
-    // Log activity
-    let _ = state.db.lock().map(|db| {
-        let _ = db::log_activity_db(&db, &project.id, "generate", "Generated CLAUDE.md (template)");
-    });
+    // Log activity (best-effort)
+    match state.db.lock() {
+        Ok(db) => {
+            let _ = db::log_activity_db(&db, &project.id, "generate", "Generated CLAUDE.md (template)");
+        }
+        Err(e) => eprintln!("Failed to lock DB for activity logging: {}", e),
+    }
 
     Ok(content)
 }

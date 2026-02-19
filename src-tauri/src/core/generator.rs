@@ -249,6 +249,11 @@ fn collect_key_file_contents(project_path: &str) -> String {
 
         let full_path = root.join(rel_path);
         if full_path.exists() {
+            // Skip files larger than 1MB to avoid OOM on minified bundles
+            let file_size = std::fs::metadata(&full_path).map(|m| m.len()).unwrap_or(0);
+            if file_size > 1_000_000 {
+                continue;
+            }
             if let Ok(content) = std::fs::read_to_string(&full_path) {
                 let truncated: String = content.chars().take(*max_chars).collect();
                 let was_truncated = content.len() > *max_chars;
@@ -271,6 +276,11 @@ fn collect_key_file_contents(project_path: &str) -> String {
             for type_file in types_found.iter().take(3) {
                 if total_chars >= MAX_TOTAL_CHARS {
                     break;
+                }
+                // Skip files larger than 1MB
+                let file_size = std::fs::metadata(type_file).map(|m| m.len()).unwrap_or(0);
+                if file_size > 1_000_000 {
+                    continue;
                 }
                 if let Ok(content) = std::fs::read_to_string(type_file) {
                     let truncated: String = content.chars().take(2000).collect();
@@ -336,7 +346,7 @@ fn collect_source_files(project_path: &str, max_files: usize) -> Vec<String> {
     let mut files = Vec::new();
     let root = std::path::Path::new(project_path);
     if root.exists() {
-        collect_files_recursive(root, project_path, &mut files, max_files);
+        collect_files_recursive(root, project_path, &mut files, max_files, 0);
     }
     files
 }
@@ -346,8 +356,10 @@ fn collect_files_recursive(
     project_path: &str,
     files: &mut Vec<String>,
     max_files: usize,
+    depth: usize,
 ) {
-    if files.len() >= max_files {
+    const MAX_DEPTH: usize = 10;
+    if depth > MAX_DEPTH || files.len() >= max_files {
         return;
     }
 
@@ -374,7 +386,7 @@ fn collect_files_recursive(
 
         if path.is_dir() {
             if !skip_dirs.contains(&name.as_str()) {
-                collect_files_recursive(&path, project_path, files, max_files);
+                collect_files_recursive(&path, project_path, files, max_files, depth + 1);
             }
         } else {
             let source_exts = [".ts", ".tsx", ".js", ".jsx", ".rs", ".py", ".go", ".toml", ".json"];

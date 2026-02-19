@@ -235,7 +235,7 @@ pub fn check_project_freshness(project_path: &str) -> Result<Vec<ModuleStatus>, 
     }
 
     let mut results = Vec::new();
-    walk_with_freshness(path, project_path, &mut results);
+    walk_with_freshness(path, project_path, &mut results, 0);
     results.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(results)
 }
@@ -244,7 +244,12 @@ pub fn check_project_freshness(project_path: &str) -> Result<Vec<ModuleStatus>, 
 // File walking with freshness
 // ---------------------------------------------------------------------------
 
-fn walk_with_freshness(dir: &Path, project_path: &str, results: &mut Vec<ModuleStatus>) {
+fn walk_with_freshness(dir: &Path, project_path: &str, results: &mut Vec<ModuleStatus>, depth: usize) {
+    const MAX_DEPTH: usize = 10;
+    if depth > MAX_DEPTH {
+        return;
+    }
+
     let ignore_dirs = [
         "node_modules",
         "target",
@@ -274,7 +279,7 @@ fn walk_with_freshness(dir: &Path, project_path: &str, results: &mut Vec<ModuleS
 
         if path.is_dir() {
             if !ignore_dirs.contains(&name.as_str()) {
-                walk_with_freshness(&path, project_path, results);
+                walk_with_freshness(&path, project_path, results, depth + 1);
             }
         } else if analyzer::is_documentable(&name) {
             let abs_path = path.to_string_lossy().to_string();

@@ -245,21 +245,24 @@ exit 0
 
     let has_husky = path.join(".husky").exists();
 
-    // Log activity
-    let _ = state.db.lock().map(|db| {
-        if let Ok(pid) = db.query_row(
-            "SELECT id FROM projects WHERE path = ?1",
-            [&project_path],
-            |row| row.get::<_, String>(0),
-        ) {
-            let _ = db::log_activity_db(
-                &db,
-                &pid,
-                "enforcement",
-                &format!("Installed git hooks ({})", &mode),
-            );
+    // Log activity (best-effort, non-critical)
+    match state.db.lock() {
+        Ok(db) => {
+            if let Ok(pid) = db.query_row(
+                "SELECT id FROM projects WHERE path = ?1",
+                [&project_path],
+                |row| row.get::<_, String>(0),
+            ) {
+                let _ = db::log_activity_db(
+                    &db,
+                    &pid,
+                    "enforcement",
+                    &format!("Installed git hooks ({})", &mode),
+                );
+            }
         }
-    });
+        Err(e) => eprintln!("Failed to lock DB for activity logging: {}", e),
+    }
 
     Ok(HookStatus {
         installed: true,

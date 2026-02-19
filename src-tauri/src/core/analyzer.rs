@@ -98,7 +98,7 @@ pub fn scan_all_modules(project_path: &str) -> Result<Vec<ModuleStatus>, String>
     }
 
     let mut results = Vec::new();
-    walk_for_modules(path, project_path, &mut results);
+    walk_for_modules(path, project_path, &mut results, 0);
 
     // Sort by path for consistent display
     results.sort_by(|a, b| a.path.cmp(&b.path));
@@ -146,6 +146,12 @@ pub fn generate_module_doc_for_file(
     file_path: &str,
     project_path: &str,
 ) -> Result<ModuleDoc, String> {
+    // Guard against extremely large files (>2MB) to prevent OOM
+    let file_size = fs::metadata(file_path).map(|m| m.len()).unwrap_or(0);
+    if file_size > 2_000_000 {
+        return Err(format!("File too large to generate docs ({} bytes): {}", file_size, file_path));
+    }
+
     let content = fs::read_to_string(file_path)
         .map_err(|e| format!("Failed to read {}: {}", file_path, e))?;
 
@@ -335,6 +341,12 @@ OUTPUT: Return ONLY valid JSON, no markdown fences or explanation.
 /// Apply a ModuleDoc as a documentation header to a file.
 /// If the file already has a doc header, it is replaced. Otherwise, the header is prepended.
 pub fn apply_doc_to_file(file_path: &str, doc: &ModuleDoc) -> Result<(), String> {
+    // Guard against extremely large files (>2MB) to prevent OOM
+    let file_size = fs::metadata(file_path).map(|m| m.len()).unwrap_or(0);
+    if file_size > 2_000_000 {
+        return Err(format!("File too large to apply docs ({} bytes): {}", file_size, file_path));
+    }
+
     let content = fs::read_to_string(file_path)
         .map_err(|e| format!("Failed to read {}: {}", file_path, e))?;
 
@@ -360,7 +372,12 @@ pub fn apply_doc_to_file(file_path: &str, doc: &ModuleDoc) -> Result<(), String>
 // File walking
 // ---------------------------------------------------------------------------
 
-fn walk_for_modules(dir: &Path, project_path: &str, results: &mut Vec<ModuleStatus>) {
+fn walk_for_modules(dir: &Path, project_path: &str, results: &mut Vec<ModuleStatus>, depth: usize) {
+    const MAX_DEPTH: usize = 10;
+    if depth > MAX_DEPTH {
+        return;
+    }
+
     let entries = match fs::read_dir(dir) {
         Ok(e) => e,
         Err(_) => return,
@@ -376,7 +393,7 @@ fn walk_for_modules(dir: &Path, project_path: &str, results: &mut Vec<ModuleStat
 
         if path.is_dir() {
             if !IGNORE_DIRS.contains(&name.as_str()) {
-                walk_for_modules(&path, project_path, results);
+                walk_for_modules(&path, project_path, results, depth + 1);
             }
         } else if is_documentable(&name) {
             let abs_path = path.to_string_lossy().to_string();
