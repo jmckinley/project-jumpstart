@@ -63,6 +63,20 @@ const IGNORE_DIRS: &[&str] = &[
     "venv",
     "coverage",
     ".turbo",
+    "e2e",
+    "test",
+    "tests",
+    "__tests__",
+    "__mocks__",
+    "fixtures",
+    "ui",
+    "data",
+    "migrations",
+    "scripts",
+    "public",
+    "assets",
+    "static",
+    "vendor",
 ];
 
 /// Extensions that should have documentation headers.
@@ -80,6 +94,25 @@ const SKIP_FILES: &[&str] = &[
     "main.ts",
     "main.tsx",
     "vite-env.d.ts",
+    "build.rs",
+    "setup.ts",
+    "setup.js",
+];
+
+/// File name patterns to skip (checked with contains/ends_with).
+const SKIP_PATTERNS: &[&str] = &[
+    ".config.ts",
+    ".config.js",
+    ".config.mjs",
+    ".config.cjs",
+    ".d.ts",
+    ".stories.tsx",
+    ".stories.ts",
+    ".mock.ts",
+    ".mock.tsx",
+    ".fixture.ts",
+    ".generated.ts",
+    ".gen.ts",
 ];
 
 // ---------------------------------------------------------------------------
@@ -397,6 +430,15 @@ fn walk_for_modules(dir: &Path, project_path: &str, results: &mut Vec<ModuleStat
             }
         } else if is_documentable(&name) {
             let abs_path = path.to_string_lossy().to_string();
+
+            // Skip tiny files (<10 lines) — re-exports, barrel files, etc.
+            let line_count = fs::read_to_string(&abs_path)
+                .map(|c| c.lines().count())
+                .unwrap_or(0);
+            if line_count < 10 {
+                continue;
+            }
+
             let rel_path = make_relative_path(&abs_path, project_path);
 
             // Delegate to freshness engine for accurate status/score
@@ -426,6 +468,10 @@ pub fn is_documentable(name: &str) -> bool {
     }
     // Skip test files
     if name.contains(".test.") || name.contains(".spec.") || name.starts_with("test_") {
+        return false;
+    }
+    // Skip config, generated, mock, and type-declaration files
+    if SKIP_PATTERNS.iter().any(|pat| name.ends_with(pat)) {
         return false;
     }
     DOC_EXTENSIONS.iter().any(|ext| name.ends_with(ext))
@@ -2056,5 +2102,18 @@ import React from "react";
         assert!(!is_documentable("App.test.tsx"));
         assert!(!is_documentable("scanner.spec.ts"));
         assert!(!is_documentable("test_scanner.py"));
+        // Config files
+        assert!(!is_documentable("vite.config.ts"));
+        assert!(!is_documentable("vitest.config.ts"));
+        assert!(!is_documentable("tailwind.config.js"));
+        assert!(!is_documentable("postcss.config.cjs"));
+        // Type declarations, generated, mocks
+        assert!(!is_documentable("global.d.ts"));
+        assert!(!is_documentable("Button.stories.tsx"));
+        assert!(!is_documentable("api.mock.ts"));
+        assert!(!is_documentable("schema.generated.ts"));
+        // Build scripts and setup
+        assert!(!is_documentable("build.rs"));
+        assert!(!is_documentable("setup.ts"));
     }
 }

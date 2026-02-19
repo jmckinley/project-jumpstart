@@ -426,16 +426,8 @@ fn count_documented_files(dir: &Path, total: &mut u32, documented: &mut u32) {
 
 /// Check if a file is a source file that should have documentation.
 fn is_documentable_file(name: &str) -> bool {
-    let doc_extensions = [".ts", ".tsx", ".js", ".jsx", ".rs", ".py", ".go"];
-    // Skip hidden files, entry points, and config files
-    if name.starts_with('.') || name == "mod.rs" || name == "main.rs" || name == "index.ts" {
-        return false;
-    }
-    // Skip test files (must match analyzer.rs is_documentable logic)
-    if name.contains(".test.") || name.contains(".spec.") || name.starts_with("test_") {
-        return false;
-    }
-    doc_extensions.iter().any(|ext| name.ends_with(ext))
+    // Delegate to analyzer's canonical implementation
+    super::analyzer::is_documentable(name)
 }
 
 /// Check if a file has a documentation header.
