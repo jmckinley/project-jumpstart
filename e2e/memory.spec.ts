@@ -19,16 +19,16 @@ test.describe("Memory Management", () => {
     await page.goto("/");
     await page.waitForSelector("text=Project Overview", { timeout: 10000 });
     // Navigate to Memory section
-    await page.locator("nav >> text=Memory").click();
+    await page.locator("nav >> text=Claude Memory").click();
     await page.waitForTimeout(500);
   });
 
   test.describe("Navigation", () => {
-    test("Memory appears in sidebar", async ({ page }) => {
-      await expect(page.locator("nav >> text=Memory")).toBeVisible();
+    test("Claude Memory appears in sidebar", async ({ page }) => {
+      await expect(page.locator("nav >> text=Claude Memory")).toBeVisible();
     });
 
-    test("Memory section loads with Dashboard tab", async ({ page }) => {
+    test("Claude Memory section loads with Dashboard tab", async ({ page }) => {
       await expect(page.locator("main").getByText("Memory Health").first()).toBeVisible({ timeout: 5000 });
     });
   });
@@ -50,6 +50,18 @@ test.describe("Memory Management", () => {
       await expect(page.locator("main").getByText("CLAUDE.md").first()).toBeVisible({ timeout: 5000 });
       await expect(page.locator("main").getByText("testing.md")).toBeVisible({ timeout: 5000 });
       await expect(page.locator("main").getByText("tdd-workflow")).toBeVisible({ timeout: 5000 });
+    });
+
+    test("groups sources by scope", async ({ page }) => {
+      const main = page.locator("main");
+      await expect(main.getByText("Project Sources")).toBeVisible({ timeout: 5000 });
+      await expect(main.getByText("Global Sources")).toBeVisible({ timeout: 5000 });
+    });
+
+    test("shows global CLAUDE.md source", async ({ page }) => {
+      await expect(
+        page.locator("main").getByText("~/.claude/CLAUDE.md"),
+      ).toBeVisible({ timeout: 5000 });
     });
 
     test("displays quick stats", async ({ page }) => {

@@ -26,7 +26,7 @@ test.describe("Navigation", () => {
     await expect(page.locator("nav >> text=Modules")).toBeVisible();
     await expect(page.locator("nav >> text=Skills")).toBeVisible();
     await expect(page.locator("nav >> text=Agents")).toBeVisible();
-    await expect(page.locator("nav >> text=Memory")).toBeVisible();
+    await expect(page.locator("nav >> text=Claude Memory")).toBeVisible();
   });
 
   test("navigates to CLAUDE.md editor", async ({ page }) => {
