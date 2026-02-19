@@ -23,6 +23,7 @@
  * CLAUDE NOTES:
  * - Only files with status "missing" or "outdated" are shown as selectable (not "current")
  * - The onGenerateSelected callback receives the array of selected paths
+ * - The optional onCancel callback is called when the user clicks "Cancel" during generation
  * - After generation completes, the parent is responsible for refreshing module data
  * - The spinner uses a CSS animation via Tailwind's animate-spin class
  * - selectedPaths is cleared after generation is triggered to prevent double-submission
@@ -36,6 +37,7 @@ interface BatchGeneratorProps {
   generating: boolean;
   progress: { current: number; total: number } | null;
   onGenerateSelected: (paths: string[]) => void;
+  onCancel?: () => void;
 }
 
 export function BatchGenerator({
@@ -43,6 +45,7 @@ export function BatchGenerator({
   generating,
   progress,
   onGenerateSelected,
+  onCancel,
 }: BatchGeneratorProps) {
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [showAllFiles, setShowAllFiles] = useState(false);
@@ -156,10 +159,19 @@ export function BatchGenerator({
           </span>
         </button>
 
+        {generating && onCancel && (
+          <button
+            onClick={onCancel}
+            className="ml-auto rounded-md border border-red-700 bg-red-900/30 px-4 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-900/50"
+          >
+            Cancel
+          </button>
+        )}
+
         <button
           onClick={handleGenerate}
           disabled={selectedPaths.length === 0 || generating}
-          className={`ml-auto rounded-md px-4 py-1.5 text-xs font-medium transition-colors ${
+          className={`${!generating || !onCancel ? "ml-auto" : ""} rounded-md px-4 py-1.5 text-xs font-medium transition-colors ${
             generating
               ? "cursor-not-allowed bg-blue-600 text-white"
               : selectedPaths.length === 0

@@ -435,6 +435,8 @@ function ModulesView({ onDocApplied, onNavigate }: { onDocApplied?: () => void; 
     generating,
     hasScanned,
     scan,
+    cancelScan,
+    cancelBatchGenerate,
     getExistingDoc,
     generateDoc,
     applyDoc,
@@ -525,8 +527,14 @@ function ModulesView({ onDocApplied, onNavigate }: { onDocApplied?: () => void; 
 
   if (loading && modules.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-neutral-500">
+      <div className="flex h-full flex-col items-center justify-center gap-3 text-neutral-500">
         <p>Scanning modules...</p>
+        <button
+          onClick={cancelScan}
+          className="rounded-md border border-red-700 bg-red-900/30 px-4 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-900/50"
+        >
+          Cancel Scan
+        </button>
       </div>
     );
   }
@@ -571,6 +579,7 @@ function ModulesView({ onDocApplied, onNavigate }: { onDocApplied?: () => void; 
         generating={generating}
         progress={progress}
         onGenerateSelected={handleBatchGenerate}
+        onCancel={cancelBatchGenerate}
       />
     </div>
   );

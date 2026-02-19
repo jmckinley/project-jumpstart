@@ -23,7 +23,9 @@
  * - Call generateDoc(filePath) to generate new docs using AI (slower but higher quality)
  * - Call applyDoc(filePath, doc) to write to disk
  * - Call batchGenerate(filePaths) to generate + apply for multiple files
- * - Returns { modules, coverage, totalFiles, documentedFiles, missingFiles, loading, generating, hasScanned, error, scan, getExistingDoc, generateDoc, applyDoc, batchGenerate }
+ * - Call cancelScan() to discard an in-flight scan result and reset loading state
+ * - Call cancelBatchGenerate() to stop batch generation after the current file finishes
+ * - Returns { modules, coverage, totalFiles, documentedFiles, missingFiles, loading, generating, hasScanned, error, scan, cancelScan, cancelBatchGenerate, getExistingDoc, generateDoc, applyDoc, batchGenerate }
  *
  * CLAUDE NOTES:
  * - scan() should be called when the modules section becomes active
@@ -32,7 +34,7 @@
  * - hasScanned tracks whether initial scan completed (for empty project detection)
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useProjectStore } from "@/stores/projectStore";
 import {
   scanModules,
@@ -63,14 +65,22 @@ export function useModules() {
     progress: null,
   });
 
+  // Cancellation refs — not state so they don't cause re-renders
+  const cancelledRef = useRef(false);
+  const scanGenRef = useRef(0);
+
   const scan = useCallback(async () => {
     if (!activeProject) return;
 
+    const gen = scanGenRef.current;
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
       const modules = await scanModules(activeProject.path);
+      // If scan was cancelled while awaiting, discard the result
+      if (scanGenRef.current !== gen) return;
       setState({ modules, loading: false, generating: false, hasScanned: true, error: null, progress: null });
     } catch (err) {
+      if (scanGenRef.current !== gen) return;
       setState((s) => ({
         ...s,
         loading: false,
@@ -79,6 +89,15 @@ export function useModules() {
       }));
     }
   }, [activeProject]);
+
+  const cancelScan = useCallback(() => {
+    scanGenRef.current += 1;
+    setState((s) => ({ ...s, loading: false }));
+  }, []);
+
+  const cancelBatchGenerate = useCallback(() => {
+    cancelledRef.current = true;
+  }, []);
 
   /**
    * Get existing documentation from a file (local parse, no AI).
@@ -153,12 +172,16 @@ export function useModules() {
       if (!activeProject) return [];
 
       const total = filePaths.length;
+      cancelledRef.current = false;
       setState((s) => ({ ...s, generating: true, error: null, progress: { current: 0, total } }));
 
       const results: ModuleStatus[] = [];
 
       // Process files one at a time to show progress
       for (let i = 0; i < filePaths.length; i++) {
+        // Check cancellation before each iteration
+        if (cancelledRef.current) break;
+
         const filePath = filePaths[i];
         setState((s) => ({ ...s, progress: { current: i + 1, total } }));
 
@@ -184,7 +207,7 @@ export function useModules() {
         }
       }
 
-      // Refresh the full module list after batch generation
+      // Refresh the full module list after batch generation (or cancellation)
       try {
         const modules = await scanModules(activeProject.path);
         setState({ modules, loading: false, generating: false, hasScanned: true, error: null, progress: null });
@@ -216,6 +239,8 @@ export function useModules() {
     coverage,
     progress: state.progress,
     scan,
+    cancelScan,
+    cancelBatchGenerate,
     getExistingDoc,
     generateDoc,
     applyDoc,
