@@ -57,9 +57,9 @@ Detailed rules are in `.claude/rules/`:
 
 ## Current Status
 
-**Feature-Complete (Beta Ready)** | 951+ tests (822 frontend + 129 Rust)
+**Feature-Complete (Beta Ready)** | 1,310 tests (918 frontend + 149 Rust + 243 E2E)
 
-All sections implemented: Onboarding, Dashboard, CLAUDE.md Editor, Modules, Test Plans & TDD, Skills, Agents, Team Templates, RALPH, Context Health, Enforcement, Settings, Memory Management.
+All sections implemented: Onboarding, Dashboard, CLAUDE.md Editor, Modules, Test Plans & TDD, Skills, Agents, Team Templates, RALPH, Context Health, Performance, Enforcement, Settings, Memory Management.
 
 ## Important Decisions
 
@@ -103,6 +103,7 @@ All sections implemented: Onboarding, Dashboard, CLAUDE.md Editor, Modules, Test
 
 | Date | Change |
 |------|--------|
+| Feb 21, 2026 | Performance Engineering section: heuristic-based code/architecture analysis, health score integration (8 components), Resend reclassified to auth. Comprehensive E2E tests for all sections (243 Playwright tests). 1,310 total tests. |
 | Feb 16, 2026 | Test Staleness Detection: SessionEnd hook, Rust backend command, TestStalenessAlert UI in Memory Dashboard. Shell script + backend detect stale tests via git diff. |
 | Feb 16, 2026 | Added Memory Management feature: memory dashboard, learning browser, CLAUDE.md analyzer. Slimmed CLAUDE.md, added rules files, PreCompact hook, skills directory, upgraded learning extraction. |
 | Feb 10, 2026 | Added Windows build to release workflow |

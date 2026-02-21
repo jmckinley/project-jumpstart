@@ -923,7 +923,7 @@ export async function appendToProjectFile(
 // Performance Engineering Commands
 // =============================================================================
 
-import type { PerformanceReview } from "@/types/performance";
+import type { PerformanceReview, PerformanceIssue, RemediationResult } from "@/types/performance";
 
 export async function analyzePerformance(projectPath: string): Promise<PerformanceReview> {
   return invoke<PerformanceReview>("analyze_performance", { projectPath });
@@ -939,4 +939,16 @@ export async function getPerformanceReview(reviewId: string): Promise<Performanc
 
 export async function deletePerformanceReview(reviewId: string): Promise<void> {
   return invoke<void>("delete_performance_review", { reviewId });
+}
+
+export async function remediatePerformanceFile(
+  filePath: string,
+  issues: PerformanceIssue[],
+  projectPath: string,
+): Promise<RemediationResult[]> {
+  return invoke<RemediationResult[]>("remediate_performance_file", {
+    filePath,
+    issues,
+    projectPath,
+  });
 }

@@ -81,6 +81,7 @@ use commands::memory::{
 };
 use commands::performance::{
     analyze_performance, list_performance_reviews, get_performance_review, delete_performance_review,
+    remediate_performance_file,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -205,6 +206,7 @@ pub fn run() {
             list_performance_reviews,
             get_performance_review,
             delete_performance_review,
+            remediate_performance_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

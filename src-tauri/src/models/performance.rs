@@ -6,6 +6,7 @@
 //! - Define PerformanceComponents for category scoring
 //! - Define PerformanceIssue for code-level findings
 //! - Define ArchitectureFinding for architecture-level analysis
+//! - Define RemediationResult for per-issue fix results
 //!
 //! DEPENDENCIES:
 //! - serde - Serialization for Tauri IPC
@@ -15,6 +16,7 @@
 //! - PerformanceComponents - Score breakdown by category
 //! - PerformanceIssue - Individual code-level performance issue
 //! - ArchitectureFinding - Architecture-level finding with status
+//! - RemediationResult - Result of auto-fixing a single performance issue
 //!
 //! PATTERNS:
 //! - All structs derive Clone, Debug, Serialize, Deserialize
@@ -72,4 +74,13 @@ pub struct ArchitectureFinding {
     pub title: String,
     pub description: String,
     pub recommendation: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemediationResult {
+    pub issue_id: String,
+    pub file_path: String,
+    pub status: String,
+    pub message: String,
 }

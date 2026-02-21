@@ -926,6 +926,15 @@ export async function setupTauriMocks(page: Page, options: {
         case "delete_performance_review":
           return null;
 
+        case "remediate_performance_file":
+          await new Promise(r => setTimeout(r, 300));
+          return (args?.issues || []).map((issue: { id: string }) => ({
+            issueId: issue.id,
+            filePath: args?.filePath || "",
+            status: "fixed",
+            message: "Applied AI fix",
+          }));
+
         // Skills CRUD
         case "create_skill":
           return { id: `skill-${Date.now()}`, name: args?.name, description: args?.description, content: args?.content, projectId: args?.projectId || "test-project-1", usageCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };

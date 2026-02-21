@@ -7,12 +7,15 @@
  * - Define PerformanceComponents for category scoring
  * - Define PerformanceIssue for code-level findings
  * - Define ArchitectureFinding for architecture-level analysis
+ * - Define RemediationResult and RemediationSummary for auto-fix tracking
  *
  * EXPORTS:
  * - PerformanceReview - Full performance review result
  * - PerformanceComponents - Score breakdown by category (0-100 total)
  * - PerformanceIssue - Individual code-level performance issue
  * - ArchitectureFinding - Architecture-level finding with status
+ * - RemediationResult - Result of fixing a single issue
+ * - RemediationSummary - Aggregate results of batch remediation
  *
  * PATTERNS:
  * - Types mirror Rust structs in models/performance.rs
@@ -61,4 +64,19 @@ export interface ArchitectureFinding {
   title: string;
   description: string;
   recommendation: string;
+}
+
+export interface RemediationResult {
+  issueId: string;
+  filePath: string;
+  status: "fixed" | "failed" | "skipped";
+  message: string;
+}
+
+export interface RemediationSummary {
+  total: number;
+  fixed: number;
+  failed: number;
+  skipped: number;
+  results: RemediationResult[];
 }

@@ -1950,8 +1950,14 @@ function PerformanceView() {
     review,
     analyzing,
     error,
+    remediating,
+    remediationProgress,
+    remediationResult,
     analyze,
     loadHistory,
+    remediate,
+    cancelRemediation,
+    clearRemediationResult,
   } = usePerformance();
 
   const [activeTab, setActiveTab] = useState<"overview" | "issues" | "architecture">("overview");
@@ -2012,7 +2018,15 @@ function PerformanceView() {
       )}
 
       {activeTab === "issues" && (
-        <IssuesList issues={review?.issues ?? []} />
+        <IssuesList
+          issues={review?.issues ?? []}
+          onRemediate={remediate}
+          onCancelRemediation={cancelRemediation}
+          onClearRemediationResult={clearRemediationResult}
+          remediating={remediating}
+          remediationProgress={remediationProgress}
+          remediationResult={remediationResult}
+        />
       )}
 
       {activeTab === "architecture" && (

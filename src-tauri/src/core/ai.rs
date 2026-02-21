@@ -13,7 +13,8 @@
 //!
 //! EXPORTS:
 //! - MODEL - The Claude model ID string (single source of truth for all callers)
-//! - call_claude - Send a prompt to the Claude API and return the text response
+//! - call_claude - Send a prompt to the Claude API and return the text response (4096 max_tokens)
+//! - call_claude_long - Same as call_claude but with 8192 max_tokens for large code output
 //! - get_api_key - Read and decrypt the Anthropic API key from the settings table
 //!
 //! PATTERNS:
@@ -25,7 +26,7 @@
 //! CLAUDE NOTES:
 //! - The API key is stored encrypted in SQLite settings table (prefixed with "enc:")
 //! - get_api_key automatically decrypts the key before returning
-//! - max_tokens defaults to 4096 for generation requests
+//! - max_tokens defaults to 4096 for generation requests (call_claude_long uses 8192)
 //! - Response format: { content: [{ type: "text", text: "..." }] }
 
 use rusqlite::Connection;
@@ -46,6 +47,57 @@ pub async fn call_claude(
     let body = json!({
         "model": MODEL,
         "max_tokens": 4096,
+        "system": system,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+    });
+
+    let response = client
+        .post(API_URL)
+        .header("x-api-key", api_key)
+        .header("anthropic-version", ANTHROPIC_VERSION)
+        .header("content-type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("API request failed: {}", e))?;
+
+    let status = response.status();
+    let response_text = response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read API response: {}", e))?;
+
+    if !status.is_success() {
+        return Err(format!("API returned status {}: {}", status, response_text));
+    }
+
+    let parsed: serde_json::Value = serde_json::from_str(&response_text)
+        .map_err(|e| format!("Failed to parse API response: {}", e))?;
+
+    parsed["content"]
+        .as_array()
+        .and_then(|arr| arr.first())
+        .and_then(|block| block["text"].as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| "API response did not contain expected text content".to_string())
+}
+
+/// Call the Claude API with a higher token limit (8192) for large code output.
+/// Used for remediation where the full corrected file content must be returned.
+pub async fn call_claude_long(
+    client: &reqwest::Client,
+    api_key: &str,
+    system: &str,
+    prompt: &str,
+) -> Result<String, String> {
+    let body = json!({
+        "model": MODEL,
+        "max_tokens": 8192,
         "system": system,
         "messages": [
             {

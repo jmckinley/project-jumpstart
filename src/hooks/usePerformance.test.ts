@@ -90,6 +90,9 @@ describe("usePerformance", () => {
       expect(result.current.analyzing).toBe(false);
       expect(result.current.loading).toBe(false);
       expect(result.current.error).toBeNull();
+      expect(result.current.remediating).toBe(false);
+      expect(result.current.remediationProgress).toBeNull();
+      expect(result.current.remediationResult).toBeNull();
     });
   });
 
@@ -266,6 +269,147 @@ describe("usePerformance", () => {
       });
 
       expect(result.current.error).toBe("Delete failed");
+    });
+  });
+
+  describe("remediate", () => {
+    const mockIssues = [
+      {
+        id: "issue-1",
+        category: "rendering",
+        severity: "warning" as const,
+        title: "Inline handlers",
+        description: "Multiple inline handlers",
+        filePath: "src/App.tsx",
+        lineNumber: 10,
+        suggestion: "Use useCallback",
+      },
+      {
+        id: "issue-2",
+        category: "query-patterns",
+        severity: "critical" as const,
+        title: "N+1 query",
+        description: "Query in loop",
+        filePath: "src/api/users.ts",
+        lineNumber: 42,
+        suggestion: "Batch queries",
+      },
+      {
+        id: "issue-3",
+        category: "memory",
+        severity: "info" as const,
+        title: "No file path",
+        description: "General concern",
+        filePath: null,
+        lineNumber: null,
+        suggestion: "N/A",
+      },
+    ];
+
+    it("should call per-file command for each unique file", async () => {
+      vi.mocked(invoke).mockResolvedValue([
+        { issueId: "issue-1", filePath: "src/App.tsx", status: "fixed", message: "OK" },
+      ]);
+
+      const { result } = renderHook(() => usePerformance());
+
+      await act(async () => {
+        await result.current.remediate(mockIssues);
+      });
+
+      // Should call remediate_performance_file for 2 files (issue-3 has no filePath)
+      const remediateCalls = vi.mocked(invoke).mock.calls.filter(
+        (call) => call[0] === "remediate_performance_file"
+      );
+      expect(remediateCalls).toHaveLength(2);
+    });
+
+    it("should set remediating=true during processing", async () => {
+      let resolvePromise: (value: unknown) => void;
+      const pendingPromise = new Promise((resolve) => {
+        resolvePromise = resolve;
+      });
+      vi.mocked(invoke).mockReturnValue(pendingPromise);
+
+      const { result } = renderHook(() => usePerformance());
+
+      act(() => {
+        result.current.remediate([mockIssues[0]]);
+      });
+
+      expect(result.current.remediating).toBe(true);
+
+      await act(async () => {
+        resolvePromise!([
+          { issueId: "issue-1", filePath: "src/App.tsx", status: "fixed", message: "OK" },
+        ]);
+        await pendingPromise;
+      });
+
+      expect(result.current.remediating).toBe(false);
+    });
+
+    it("should build summary from results", async () => {
+      vi.mocked(invoke).mockResolvedValue([
+        { issueId: "issue-1", filePath: "src/App.tsx", status: "fixed", message: "OK" },
+      ]);
+
+      const { result } = renderHook(() => usePerformance());
+
+      await act(async () => {
+        await result.current.remediate([mockIssues[0]]);
+      });
+
+      expect(result.current.remediationResult).not.toBeNull();
+      expect(result.current.remediationResult!.fixed).toBe(1);
+      expect(result.current.remediationResult!.total).toBe(1);
+    });
+
+    it("should handle per-file errors gracefully", async () => {
+      vi.mocked(invoke).mockRejectedValue(new Error("API failed"));
+
+      const { result } = renderHook(() => usePerformance());
+
+      await act(async () => {
+        await result.current.remediate([mockIssues[0]]);
+      });
+
+      expect(result.current.remediationResult).not.toBeNull();
+      expect(result.current.remediationResult!.failed).toBe(1);
+      expect(result.current.remediating).toBe(false);
+    });
+
+    it("should skip issues without filePath", async () => {
+      vi.mocked(invoke).mockResolvedValue([]);
+
+      const { result } = renderHook(() => usePerformance());
+
+      await act(async () => {
+        await result.current.remediate([mockIssues[2]]);
+      });
+
+      // No IPC calls since the only issue has no filePath
+      expect(invoke).not.toHaveBeenCalled();
+    });
+
+    it("should clear remediation result", async () => {
+      vi.mocked(invoke).mockResolvedValue([
+        { issueId: "issue-1", filePath: "src/App.tsx", status: "fixed", message: "OK" },
+      ]);
+
+      const { result } = renderHook(() => usePerformance());
+
+      await act(async () => {
+        await result.current.remediate([mockIssues[0]]);
+      });
+
+      expect(result.current.remediationResult).not.toBeNull();
+
+      act(() => {
+        result.current.clearRemediationResult();
+      });
+
+      expect(result.current.remediationResult).toBeNull();
     });
   });
 });
