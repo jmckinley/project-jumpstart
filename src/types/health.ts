@@ -41,6 +41,7 @@ export interface HealthComponents {
   context: number;
   enforcement: number;
   tests: number;
+  performance: number;
 }
 
 export interface QuickWin {

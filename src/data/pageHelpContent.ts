@@ -324,6 +324,32 @@ export const PAGE_HELP: Record<string, PageHelpContent> = {
     ],
   },
 
+  performance: {
+    title: "Performance Engineering",
+    description:
+      "Analyze your codebase for performance anti-patterns, architecture issues, and optimization opportunities.",
+    concepts: [
+      {
+        term: "Performance Score",
+        definition: "0-100 rating across 6 categories: query patterns, rendering, memory, bundle, caching, and API design.",
+      },
+      {
+        term: "Code Issues",
+        definition: "File-level performance problems like N+1 queries, memory leaks, or expensive operations in loops.",
+      },
+      {
+        term: "Architecture Review",
+        definition: "Project-level analysis of dependencies, caching strategy, API design, and database patterns.",
+      },
+    ],
+    tips: [
+      "Run analysis after major code changes to catch new issues",
+      "Critical issues have the biggest impact on your score",
+      "Architecture findings show structural improvements",
+      "Click an issue to see the file and suggested fix",
+    ],
+  },
+
   kickstart: {
     title: "Project Kickstart",
     description:

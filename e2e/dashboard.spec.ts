@@ -38,6 +38,21 @@ test.describe("Dashboard", () => {
     await expect(page.getByText("Add documentation").first()).toBeVisible();
   });
 
+  test("displays health score component breakdown including Performance", async ({ page }) => {
+    // Breakdown section should be visible
+    await expect(page.getByText("Breakdown").first()).toBeVisible({ timeout: 5000 });
+
+    // All 8 health components should be shown
+    await expect(page.getByText("CLAUDE.md").first()).toBeVisible();
+    await expect(page.getByText("Modules").first()).toBeVisible();
+    await expect(page.getByText("Freshness").first()).toBeVisible();
+    await expect(page.getByText("Skills").first()).toBeVisible();
+    await expect(page.getByText("Context").first()).toBeVisible();
+    await expect(page.getByText("Enforcement").first()).toBeVisible();
+    await expect(page.getByText("Tests").first()).toBeVisible();
+    await expect(page.getByText("Performance").first()).toBeVisible();
+  });
+
   test("displays recent activity", async ({ page }) => {
     // Recent activity should show
     await expect(page.locator("text=Recent Activity")).toBeVisible();

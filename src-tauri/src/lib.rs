@@ -79,6 +79,9 @@ use commands::memory::{
     list_memory_sources, list_learnings, update_learning_status, analyze_claude_md,
     get_memory_health, promote_learning, append_to_project_file,
 };
+use commands::performance::{
+    analyze_performance, list_performance_reviews, get_performance_review, delete_performance_review,
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -197,6 +200,11 @@ pub fn run() {
             get_memory_health,
             promote_learning,
             append_to_project_file,
+            // Performance Engineering commands
+            analyze_performance,
+            list_performance_reviews,
+            get_performance_review,
+            delete_performance_review,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

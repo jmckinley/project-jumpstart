@@ -290,6 +290,7 @@ describe("Sidebar", () => {
       expect(screen.getByText("Skills")).toBeInTheDocument();
       expect(screen.getByText("Agents")).toBeInTheDocument();
       expect(screen.getByText("RALPH")).toBeInTheDocument();
+      expect(screen.getByText("Performance")).toBeInTheDocument();
       expect(screen.getByText("Team Templates")).toBeInTheDocument();
       expect(screen.getByText("Claude Memory")).toBeInTheDocument();
       expect(screen.getByText("Context Health")).toBeInTheDocument();

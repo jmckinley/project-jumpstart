@@ -33,3 +33,4 @@ pub mod freshness;
 pub mod health;
 pub mod crypto;
 pub mod test_runner;
+pub mod performance;

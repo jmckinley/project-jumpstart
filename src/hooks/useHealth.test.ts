@@ -35,8 +35,10 @@ const mockHealthScore = {
     moduleDocs: 15,
     freshness: 12,
     skills: 10,
-    context: 8,
-    enforcement: 10,
+    context: 7,
+    enforcement: 7,
+    tests: 0,
+    performance: 4,
   },
   quickWins: [
     { title: "Add CLAUDE.md", description: "Create project documentation", impact: 25 },

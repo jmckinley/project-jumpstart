@@ -202,7 +202,7 @@ pub async fn get_health_score(
     project_path: String,
     state: State<'_, AppState>,
 ) -> Result<HealthScore, String> {
-    let (skill_count, test_coverage, test_pass_rate) = {
+    let (skill_count, test_coverage, test_pass_rate, perf_score) = {
         let db = state
             .db
             .lock()
@@ -244,9 +244,19 @@ pub async fn get_health_score(
                 .ok();
 
             let (coverage, pass_rate) = test_metrics.unwrap_or((0.0, 0.0));
-            (skills, Some(coverage), Some(pass_rate))
+
+            // Get latest performance review score for this project
+            let perf_score: Option<u32> = db
+                .query_row(
+                    "SELECT overall_score FROM performance_reviews WHERE project_id = ?1 ORDER BY created_at DESC LIMIT 1",
+                    [pid],
+                    |row| row.get::<_, u32>(0),
+                )
+                .ok();
+
+            (skills, Some(coverage), Some(pass_rate), perf_score)
         } else {
-            (0, None, None)
+            (0, None, None, None)
         }
     };
 
@@ -255,5 +265,6 @@ pub async fn get_health_score(
         skill_count,
         test_coverage,
         test_pass_rate,
+        perf_score,
     ))
 }

@@ -347,6 +347,19 @@ pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
         );
         CREATE INDEX IF NOT EXISTS idx_learnings_project ON learnings(project_id);
         CREATE INDEX IF NOT EXISTS idx_learnings_status ON learnings(status);
+
+        -- Performance Reviews table
+        CREATE TABLE IF NOT EXISTS performance_reviews (
+            id              TEXT PRIMARY KEY,
+            project_id      TEXT NOT NULL,
+            overall_score   INTEGER NOT NULL DEFAULT 0,
+            components      TEXT NOT NULL DEFAULT '{}',
+            issues          TEXT NOT NULL DEFAULT '[]',
+            architecture    TEXT NOT NULL DEFAULT '[]',
+            created_at      TEXT NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_performance_reviews_project ON performance_reviews(project_id);
         ",
     )?;
 

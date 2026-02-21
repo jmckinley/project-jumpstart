@@ -23,7 +23,7 @@
 //! - Health score drives dashboard display
 //!
 //! CLAUDE NOTES:
-//! - Weights: CLAUDE.md=23, Modules=23, Freshness=14, Skills=14, Context=8, Enforcement=8, Tests=10
+//! - Weights: CLAUDE.md=20, Modules=20, Freshness=12, Skills=12, Context=7, Enforcement=7, Tests=10, Performance=12
 //! - Phase 5 added freshness scoring via core::freshness engine
 //! - Phase 6 added skills scoring: min(skill_count * 3, 14)
 //! - Phase 9 added enforcement scoring: 4 for hooks + 4 for CI config
@@ -40,14 +40,15 @@ use crate::core::freshness;
 use crate::models::project::{HealthComponents, HealthScore, QuickWin};
 use std::path::Path;
 
-// Weights adjusted to accommodate tests component (total must = 100)
-const WEIGHT_CLAUDE_MD: u32 = 23;
-const WEIGHT_MODULE_DOCS: u32 = 23;
-const WEIGHT_FRESHNESS: u32 = 14;
-const WEIGHT_SKILLS: u32 = 14;
-const WEIGHT_CONTEXT: u32 = 8;
-const WEIGHT_ENFORCEMENT: u32 = 8;
+// Weights adjusted to accommodate performance component (total must = 100)
+const WEIGHT_CLAUDE_MD: u32 = 20;
+const WEIGHT_MODULE_DOCS: u32 = 20;
+const WEIGHT_FRESHNESS: u32 = 12;
+const WEIGHT_SKILLS: u32 = 12;
+const WEIGHT_CONTEXT: u32 = 7;
+const WEIGHT_ENFORCEMENT: u32 = 7;
 const WEIGHT_TESTS: u32 = 10;
+const WEIGHT_PERFORMANCE: u32 = 12;
 
 /// Calculate the full health score for a project at the given path.
 /// `skill_count` is the number of skills created for the project (from DB).
@@ -56,15 +57,16 @@ const WEIGHT_TESTS: u32 = 10;
 /// Checks for CLAUDE.md existence, module documentation coverage, freshness, skills, tests.
 #[allow(dead_code)]
 pub fn calculate_health(project_path: &str, skill_count: u32) -> HealthScore {
-    calculate_health_with_tests(project_path, skill_count, None, None)
+    calculate_health_with_tests(project_path, skill_count, None, None, None)
 }
 
-/// Calculate health score with optional test metrics.
+/// Calculate health score with optional test metrics and performance score.
 pub fn calculate_health_with_tests(
     project_path: &str,
     skill_count: u32,
     test_coverage: Option<f64>,
     test_pass_rate: Option<f64>,
+    performance_score: Option<u32>,
 ) -> HealthScore {
     let path = Path::new(project_path);
 
@@ -75,9 +77,10 @@ pub fn calculate_health_with_tests(
     let context_score = calculate_context_score(path);
     let enforcement_score = enforcement::calculate_enforcement_score(project_path);
     let tests_score = calculate_tests_score(test_coverage, test_pass_rate);
+    let perf_score = calculate_performance_score(performance_score);
 
     let total = claude_md_score + module_docs_stats.score + freshness_score + skills_score
-        + context_score + enforcement_score + tests_score;
+        + context_score + enforcement_score + tests_score + perf_score;
 
     // Context rot risk is based on documentation-specific scores (CLAUDE.md + modules + freshness),
     // not the full composite. A project with perfect docs but no skills/enforcement shouldn't
@@ -125,6 +128,7 @@ pub fn calculate_health_with_tests(
             context: context_score,
             enforcement: enforcement_score,
             tests: tests_score,
+            performance: perf_score,
         },
         quick_wins,
         context_rot_risk,
@@ -136,7 +140,23 @@ pub fn estimate_tokens(content: &str) -> u32 {
     (content.len() as f64 / 4.0).ceil() as u32
 }
 
-/// Score the CLAUDE.md component (0-25 points).
+/// Score the performance component (0-12 points).
+/// Based on the latest performance analysis overall score (0-100).
+/// Scales linearly: full health weight at perf score >= 80.
+fn calculate_performance_score(performance_score: Option<u32>) -> u32 {
+    match performance_score {
+        Some(score) => {
+            if score >= 80 {
+                WEIGHT_PERFORMANCE
+            } else {
+                ((score as f64 / 80.0) * WEIGHT_PERFORMANCE as f64).round() as u32
+            }
+        }
+        None => 0,
+    }
+}
+
+/// Score the CLAUDE.md component (0-20 points).
 /// - Exists: 10 points
 /// - Has reasonable content (>200 chars): 10 points
 /// - Has structure (## headings): 5 points
@@ -175,9 +195,9 @@ fn calculate_claude_md_score(project_path: &Path) -> u32 {
     score.min(WEIGHT_CLAUDE_MD)
 }
 
-/// Score the skills component (0-14 points).
-/// Based on the number of skills created: min(skill_count * 3, 14).
-/// 5+ skills = full score.
+/// Score the skills component (0-12 points).
+/// Based on the number of skills created: min(skill_count * 3, 12).
+/// 4+ skills = full score.
 fn calculate_skills_score(skill_count: u32) -> u32 {
     (skill_count * 3).min(WEIGHT_SKILLS)
 }
@@ -206,7 +226,7 @@ fn calculate_tests_score(test_coverage: Option<f64>, test_pass_rate: Option<f64>
     (coverage_score + pass_rate_score).min(WEIGHT_TESTS)
 }
 
-/// Score the freshness component (0-15 points).
+/// Score the freshness component (0-12 points).
 /// Uses the freshness engine to calculate average freshness across documented files.
 fn calculate_freshness_score(project_path: &str) -> u32 {
     let modules = match freshness::check_project_freshness(project_path) {
@@ -235,10 +255,10 @@ fn calculate_freshness_score(project_path: &str) -> u32 {
     raw_score.min(WEIGHT_FRESHNESS)
 }
 
-/// Score the context efficiency component (0-10 points).
+/// Score the context efficiency component (0-7 points).
 /// Estimates persistent token usage (CLAUDE.md + doc headers + MCP configs) against the
 /// 200k context budget. Lower usage means more headroom for conversations.
-/// Scoring: <25% usage → 10pts, 25-50% → 8pts, 50-75% → 5pts, >75% → 2pts.
+/// Scoring: <25% usage → 7pts, 25-50% → 5pts, 50-75% → 3pts, >75% → 1pt.
 fn calculate_context_score(project_path: &Path) -> u32 {
     const CONTEXT_BUDGET: u32 = 200_000;
 
@@ -282,13 +302,13 @@ fn calculate_context_score(project_path: &Path) -> u32 {
     let usage_pct = persistent_tokens as f64 / CONTEXT_BUDGET as f64 * 100.0;
 
     let score = if usage_pct < 25.0 {
-        WEIGHT_CONTEXT // 10
+        WEIGHT_CONTEXT // 7
     } else if usage_pct < 50.0 {
-        8
-    } else if usage_pct < 75.0 {
         5
+    } else if usage_pct < 75.0 {
+        3
     } else {
-        2
+        1
     };
 
     score.min(WEIGHT_CONTEXT)
@@ -356,7 +376,7 @@ struct ModuleDocStats {
     undocumented_files: u32,
 }
 
-/// Score the module documentation component (0-25 points).
+/// Score the module documentation component (0-20 points).
 /// Scans the entire project tree for source files with documentation headers.
 /// Returns both the score and file counts for use in quick win messages.
 fn calculate_module_docs_stats(project_path: &Path) -> ModuleDocStats {
@@ -769,8 +789,18 @@ mod tests {
         assert_eq!(calculate_skills_score(0), 0);
         assert_eq!(calculate_skills_score(1), 3);
         assert_eq!(calculate_skills_score(3), 9);
-        assert_eq!(calculate_skills_score(5), 14); // capped at weight (14)
-        assert_eq!(calculate_skills_score(10), 14); // capped at weight
+        assert_eq!(calculate_skills_score(4), 12); // capped at weight (12)
+        assert_eq!(calculate_skills_score(5), 12); // capped at weight
+        assert_eq!(calculate_skills_score(10), 12); // capped at weight
+    }
+
+    #[test]
+    fn test_performance_score() {
+        assert_eq!(calculate_performance_score(None), 0);
+        assert_eq!(calculate_performance_score(Some(0)), 0);
+        assert_eq!(calculate_performance_score(Some(40)), 6);  // 40/80 * 12 = 6
+        assert_eq!(calculate_performance_score(Some(80)), 12); // full score at 80+
+        assert_eq!(calculate_performance_score(Some(100)), 12); // capped at weight
     }
 
     #[test]

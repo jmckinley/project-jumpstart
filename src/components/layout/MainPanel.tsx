@@ -179,6 +179,12 @@ import {
   ClaudeMdAnalyzer,
 } from "@/components/memory";
 import { useMemory } from "@/hooks/useMemory";
+import {
+  PerformanceScore as PerformanceScoreCard,
+  IssuesList,
+  ArchitectureReview,
+} from "@/components/performance";
+import { usePerformance } from "@/hooks/usePerformance";
 
 interface MainPanelProps {
   activeSection: string;
@@ -1939,6 +1945,83 @@ function MemoryView() {
   );
 }
 
+function PerformanceView() {
+  const {
+    review,
+    analyzing,
+    error,
+    analyze,
+    loadHistory,
+  } = usePerformance();
+
+  const [activeTab, setActiveTab] = useState<"overview" | "issues" | "architecture">("overview");
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className="rounded-md border border-red-900 bg-red-950/50 px-4 py-3 text-sm text-red-400">
+          {error}
+        </div>
+      )}
+
+      {/* Tab Navigation */}
+      <div className="flex gap-1 border-b border-neutral-800">
+        <button
+          onClick={() => setActiveTab("overview")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "overview"
+              ? "border-b-2 border-blue-500 text-blue-400"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          Overview
+        </button>
+        <button
+          onClick={() => setActiveTab("issues")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "issues"
+              ? "border-b-2 border-blue-500 text-blue-400"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          Issues ({review?.issues.length ?? 0})
+        </button>
+        <button
+          onClick={() => setActiveTab("architecture")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "architecture"
+              ? "border-b-2 border-blue-500 text-blue-400"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          Architecture
+        </button>
+      </div>
+
+      {activeTab === "overview" && (
+        <PerformanceScoreCard
+          score={review?.overallScore ?? 0}
+          components={review?.components ?? null}
+          analyzing={analyzing}
+          onAnalyze={analyze}
+        />
+      )}
+
+      {activeTab === "issues" && (
+        <IssuesList issues={review?.issues ?? []} />
+      )}
+
+      {activeTab === "architecture" && (
+        <ArchitectureReview findings={review?.architectureFindings ?? []} />
+      )}
+    </div>
+  );
+}
+
 function renderSection(
   section: string,
   onNavigate?: (section: string) => void,
@@ -1967,6 +2050,8 @@ function renderSection(
       return <RalphView onLoopStarted={onCompletionChange} />;
     case "context":
       return <ContextView />;
+    case "performance":
+      return <PerformanceView />;
     case "memory":
       return <MemoryView />;
     case "enforcement":

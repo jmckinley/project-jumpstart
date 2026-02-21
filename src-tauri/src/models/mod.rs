@@ -36,3 +36,4 @@ pub mod enforcement;
 pub mod test_plan;
 pub mod team_template;
 pub mod memory;
+pub mod performance;

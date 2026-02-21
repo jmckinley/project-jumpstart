@@ -918,3 +918,25 @@ export async function appendToProjectFile(
 ): Promise<void> {
   return invoke<void>("append_to_project_file", { projectPath, relativePath, content });
 }
+
+// =============================================================================
+// Performance Engineering Commands
+// =============================================================================
+
+import type { PerformanceReview } from "@/types/performance";
+
+export async function analyzePerformance(projectPath: string): Promise<PerformanceReview> {
+  return invoke<PerformanceReview>("analyze_performance", { projectPath });
+}
+
+export async function listPerformanceReviews(projectId: string): Promise<PerformanceReview[]> {
+  return invoke<PerformanceReview[]>("list_performance_reviews", { projectId });
+}
+
+export async function getPerformanceReview(reviewId: string): Promise<PerformanceReview> {
+  return invoke<PerformanceReview>("get_performance_review", { reviewId });
+}
+
+export async function deletePerformanceReview(reviewId: string): Promise<void> {
+  return invoke<void>("delete_performance_review", { reviewId });
+}

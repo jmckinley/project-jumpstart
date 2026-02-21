@@ -115,7 +115,6 @@ describe("stackTemplates", () => {
         hosting: "Vercel",
         payments: "Stripe",
         monitoring: "PostHog",
-        email: "Resend",
       });
     });
 

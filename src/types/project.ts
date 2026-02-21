@@ -224,6 +224,7 @@ export const AUTH_OPTIONS = [
   "Supabase Auth",
   "Firebase Auth",
   "Custom JWT",
+  "Resend",
 ] as const;
 
 export const HOSTING_OPTIONS = [
@@ -250,7 +251,6 @@ export const MONITORING_OPTIONS = [
 ] as const;
 
 export const EMAIL_OPTIONS = [
-  "Resend",
   "SendGrid",
   "Postmark",
   "AWS SES",

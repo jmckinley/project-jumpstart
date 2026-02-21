@@ -51,8 +51,10 @@ export const mockHealthScore = {
     moduleDocs: 15,
     freshness: 12,
     skills: 10,
-    context: 8,
-    enforcement: 10,
+    context: 7,
+    enforcement: 7,
+    tests: 0,
+    performance: 4,
   },
   quickWins: [
     {
@@ -63,6 +65,97 @@ export const mockHealthScore = {
     },
   ],
   contextRotRisk: "low" as const,
+};
+
+export const mockPerformanceReview = {
+  id: "perf-review-1",
+  projectId: "test-project-1",
+  overallScore: 72,
+  components: {
+    queryPatterns: 16,
+    rendering: 14,
+    memory: 12,
+    bundle: 10,
+    caching: 10,
+    apiDesign: 10,
+  },
+  issues: [
+    {
+      id: "issue-1",
+      category: "query-patterns",
+      severity: "critical" as const,
+      title: "N+1 query detected in user loader",
+      description: "Database query inside a loop fetches users one at a time instead of batching.",
+      filePath: "src/services/userService.ts",
+      lineNumber: 42,
+      suggestion: "Use a batch query with WHERE id IN (...) to fetch all users at once.",
+    },
+    {
+      id: "issue-2",
+      category: "rendering",
+      severity: "warning" as const,
+      title: "Inline object in JSX prop",
+      description: "Passing inline style object causes unnecessary re-renders on every parent render.",
+      filePath: "src/components/Card.tsx",
+      lineNumber: 15,
+      suggestion: "Extract the style object to a constant outside the component or use useMemo.",
+    },
+    {
+      id: "issue-3",
+      category: "memory",
+      severity: "warning" as const,
+      title: "Event listener without cleanup",
+      description: "addEventListener called without corresponding removeEventListener in cleanup.",
+      filePath: "src/hooks/useResize.ts",
+      lineNumber: 8,
+      suggestion: "Return a cleanup function from useEffect that calls removeEventListener.",
+    },
+    {
+      id: "issue-4",
+      category: "bundle",
+      severity: "info" as const,
+      title: "Heavy dependency detected: moment.js",
+      description: "moment.js adds ~300KB to bundle. Consider lighter alternatives.",
+      filePath: "package.json",
+      lineNumber: null,
+      suggestion: "Replace with date-fns or dayjs for a significantly smaller bundle.",
+    },
+  ],
+  architectureFindings: [
+    {
+      id: "arch-1",
+      category: "caching",
+      status: "good" as const,
+      title: "React Query configured for data fetching",
+      description: "The project uses React Query with appropriate stale time and cache settings.",
+      recommendation: "",
+    },
+    {
+      id: "arch-2",
+      category: "api-design",
+      status: "warning" as const,
+      title: "No API rate limiting detected",
+      description: "API endpoints do not appear to implement rate limiting.",
+      recommendation: "Add rate limiting middleware to prevent abuse and ensure fair usage.",
+    },
+    {
+      id: "arch-3",
+      category: "database",
+      status: "missing" as const,
+      title: "No database connection pooling",
+      description: "Database connections are created per-request without pooling.",
+      recommendation: "Configure connection pooling (e.g., PgBouncer or built-in pool) to reduce connection overhead.",
+    },
+    {
+      id: "arch-4",
+      category: "bundle",
+      status: "good" as const,
+      title: "Tree-shaking enabled via ESM imports",
+      description: "The project uses ES module imports which enables tree-shaking during bundling.",
+      recommendation: "",
+    },
+  ],
+  createdAt: new Date().toISOString(),
 };
 
 export const mockModules = [
@@ -320,6 +413,307 @@ export const mockSettings: Record<string, string> = {
   last_active_project_id: "test-project-1",
 };
 
+export const mockPatterns = [
+  {
+    id: "pattern-1",
+    description: "React component with useState and useEffect hooks",
+    frequency: 12,
+    suggestedSkill: "Create a reusable React hook pattern with state management and side effects.",
+  },
+  {
+    id: "pattern-2",
+    description: "API fetch with error handling",
+    frequency: 6,
+    suggestedSkill: null,
+  },
+];
+
+export const mockPromptAnalysis = {
+  qualityScore: 72,
+  criteria: [
+    { name: "Clarity", score: 20, maxScore: 25, feedback: "Prompt is mostly clear but could specify file targets" },
+    { name: "Specificity", score: 15, maxScore: 25, feedback: "Could be more specific about expected behavior" },
+    { name: "Context", score: 22, maxScore: 25, feedback: "Good project context provided" },
+    { name: "Scope", score: 15, maxScore: 25, feedback: "Scope is reasonable but could be more focused" },
+  ],
+  suggestions: [
+    "Add specific file paths to target",
+    "Include expected test outcomes",
+    "Specify error handling requirements",
+  ],
+  enhancedPrompt: "## Task\nAdd user authentication with JWT tokens.\n\n## Files\n- src/auth/login.ts\n- src/middleware/auth.ts\n\n## Requirements\n1. Implement login endpoint\n2. Add JWT token generation\n3. Create auth middleware\n\n## Tests\n- Verify login returns token\n- Verify middleware rejects invalid tokens",
+};
+
+export const mockRalphLoop = {
+  id: "loop-1",
+  projectId: "test-project-1",
+  prompt: "Add user authentication with JWT",
+  enhancedPrompt: null,
+  status: "completed" as const,
+  qualityScore: 72,
+  iterations: 3,
+  outcome: "Successfully implemented JWT authentication with login, middleware, and tests.",
+  startedAt: new Date(Date.now() - 3600000).toISOString(),
+  pausedAt: null,
+  completedAt: new Date().toISOString(),
+  createdAt: new Date(Date.now() - 3600000).toISOString(),
+  mode: "iterative" as const,
+  currentStory: null,
+  totalStories: null,
+};
+
+export const mockRalphMistakes = [
+  {
+    id: "mistake-1",
+    projectId: "test-project-1",
+    loopId: "loop-1",
+    mistakeType: "implementation" as const,
+    description: "Forgot to hash passwords before storing",
+    context: "During JWT auth implementation",
+    resolution: "Added bcrypt hashing to user registration",
+    learnedPattern: "Always hash passwords with bcrypt before storage",
+    createdAt: new Date().toISOString(),
+  },
+];
+
+export const mockRalphContext = {
+  claudeMdSummary: "TypeScript + React project with Vitest testing",
+  recentMistakes: [
+    {
+      id: "mistake-1",
+      projectId: "test-project-1",
+      loopId: "loop-1",
+      mistakeType: "implementation" as const,
+      description: "Forgot to hash passwords",
+      context: null,
+      resolution: "Added bcrypt",
+      learnedPattern: "Always hash passwords",
+      createdAt: new Date().toISOString(),
+    },
+  ],
+  projectPatterns: ["React hooks pattern", "Tauri IPC pattern"],
+};
+
+export const mockTestPlan = {
+  id: "plan-1",
+  projectId: "test-project-1",
+  name: "Authentication Tests",
+  description: "Test plan for user authentication features",
+  status: "active" as const,
+  targetCoverage: 80,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
+export const mockTestPlanSummary = {
+  plan: {
+    id: "plan-1",
+    projectId: "test-project-1",
+    name: "Authentication Tests",
+    description: "Test plan for user authentication features",
+    status: "active" as const,
+    targetCoverage: 80,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  totalCases: 3,
+  passingCases: 2,
+  failingCases: 1,
+  pendingCases: 0,
+  skippedCases: 0,
+  lastRun: null,
+  currentCoverage: 65,
+  coverageTrend: [50, 55, 60, 65],
+};
+
+export const mockTestCases = [
+  {
+    id: "case-1",
+    planId: "plan-1",
+    name: "Login returns JWT token",
+    description: "Verify that valid credentials return a JWT token",
+    filePath: "src/auth/login.test.ts",
+    testType: "unit" as const,
+    priority: "high" as const,
+    status: "passing" as const,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "case-2",
+    planId: "plan-1",
+    name: "Auth middleware rejects invalid token",
+    description: "Verify middleware blocks requests with invalid tokens",
+    filePath: "src/middleware/auth.test.ts",
+    testType: "unit" as const,
+    priority: "high" as const,
+    status: "passing" as const,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "case-3",
+    planId: "plan-1",
+    name: "Full auth flow e2e",
+    description: "End-to-end test of registration, login, and authenticated request",
+    filePath: "e2e/auth.spec.ts",
+    testType: "e2e" as const,
+    priority: "medium" as const,
+    status: "failing" as const,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+
+export const mockTestRun = {
+  id: "run-1",
+  planId: "plan-1",
+  status: "passed" as const,
+  totalTests: 3,
+  passedTests: 2,
+  failedTests: 1,
+  skippedTests: 0,
+  durationMs: 4500,
+  coveragePercent: 65,
+  stdout: "Test Suites: 2 passed, 1 failed\nTests: 2 passed, 1 failed",
+  stderr: "",
+  startedAt: new Date().toISOString(),
+  completedAt: new Date().toISOString(),
+};
+
+export const mockTestSuggestions = [
+  {
+    name: "Test error handling for network failures",
+    description: "Verify graceful error handling when API calls fail",
+    testType: "unit" as const,
+    priority: "high" as const,
+    rationale: "Network error handling is critical for user experience",
+    suggestedFilePath: "src/services/api.test.ts",
+  },
+  {
+    name: "Test form validation rules",
+    description: "Ensure form inputs are validated before submission",
+    testType: "integration" as const,
+    priority: "medium" as const,
+    rationale: "Form validation prevents invalid data from reaching the backend",
+    suggestedFilePath: "src/components/Form.test.tsx",
+  },
+];
+
+export const mockTddSession = {
+  id: "tdd-1",
+  projectId: "test-project-1",
+  featureName: "Add logout button",
+  testFilePath: "src/components/Logout.test.tsx",
+  currentPhase: "red" as const,
+  phaseStatus: "pending" as const,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
+export const mockContextHealth = {
+  totalTokens: 84600,
+  usagePercent: 42.3,
+  breakdown: {
+    conversation: 45000,
+    code: 25000,
+    mcp: 8600,
+    skills: 6000,
+  },
+  rotRisk: "low" as const,
+};
+
+export const mockMcpServers = [
+  {
+    name: "filesystem",
+    status: "configured",
+    tokenOverhead: 3200,
+    recommendation: "keep",
+    description: "File system access for reading and writing files",
+  },
+  {
+    name: "github",
+    status: "configured",
+    tokenOverhead: 5400,
+    recommendation: "optimize",
+    description: "GitHub API integration for PRs, issues, and repos",
+  },
+];
+
+export const mockCheckpoints = [
+  {
+    id: "chk-1",
+    projectId: "test-project-1",
+    label: "Before refactor",
+    summary: "Stable state before auth refactoring",
+    tokenSnapshot: 78000,
+    contextPercent: 39,
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+  },
+];
+
+export const mockEnforcementEvents = [
+  {
+    id: "evt-1",
+    projectId: "test-project-1",
+    eventType: "warning",
+    source: "hook",
+    message: "Missing @module header in src/utils/helpers.ts",
+    filePath: "src/utils/helpers.ts",
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "evt-2",
+    projectId: "test-project-1",
+    eventType: "block",
+    source: "hook",
+    message: "Commit blocked: 2 files missing documentation headers",
+    filePath: null,
+    createdAt: new Date(Date.now() - 3600000).toISOString(),
+  },
+];
+
+export const mockCiSnippets = [
+  {
+    provider: "github_actions",
+    name: "Doc Check Workflow",
+    description: "GitHub Actions workflow that checks for missing documentation headers",
+    filename: ".github/workflows/doc-check.yml",
+    content: "name: Doc Check\non:\n  pull_request:\n    branches: [main]\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: ./scripts/check-docs.sh",
+  },
+  {
+    provider: "gitlab_ci",
+    name: "Doc Check Pipeline",
+    description: "GitLab CI pipeline for documentation enforcement",
+    filename: ".gitlab-ci.yml",
+    content: "doc-check:\n  stage: test\n  script:\n    - ./scripts/check-docs.sh\n  only:\n    - merge_requests",
+  },
+];
+
+export const mockTeamTemplate = {
+  id: "team-1",
+  name: "Full Stack Feature Team",
+  description: "A team for building full-stack features end-to-end",
+  orchestrationPattern: "leader" as const,
+  category: "feature-development" as const,
+  teammates: [
+    { role: "Frontend Dev", description: "React component development", spawnPrompt: "Build React components with tests" },
+    { role: "Backend Dev", description: "API endpoint development", spawnPrompt: "Build API endpoints with validation" },
+  ],
+  tasks: [
+    { id: "task-1", title: "Build UI Components", description: "Create React components for the feature", assignedTo: "Frontend Dev", blockedBy: [] as string[] },
+    { id: "task-2", title: "Build API Endpoints", description: "Create API endpoints for the feature", assignedTo: "Backend Dev", blockedBy: [] as string[] },
+  ],
+  hooks: [
+    { event: "PostToolUse", command: "pnpm test", description: "Run tests after file changes" },
+  ],
+  leadSpawnInstructions: "Coordinate the Frontend Dev and Backend Dev to build the feature end-to-end. Ensure tests pass before marking complete.",
+  projectId: "test-project-1",
+  usageCount: 2,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
 /**
  * Set up Tauri API mocks on a page
  */
@@ -417,7 +811,7 @@ export async function setupTauriMocks(page: Page, options: {
           return mocks.activities;
 
         case "get_hook_status":
-          return { installed: false, hookPath: "", mode: "off", hasHusky: false };
+          return { installed: false, hookPath: "", mode: "off", hasHusky: false, hasGit: true, version: null, outdated: false, currentVersion: "2.0.0" };
 
         case "analyze_session":
           await new Promise(r => setTimeout(r, 500));
@@ -455,7 +849,7 @@ export async function setupTauriMocks(page: Page, options: {
           return [];
 
         case "list_test_plans":
-          return [];
+          return [mocks.testPlan];
 
         case "detect_project_test_framework":
           if (!hasTestFramework) {
@@ -517,7 +911,149 @@ export async function setupTauriMocks(page: Page, options: {
           return mocks.testStalenessReport;
 
         case "list_team_templates":
+          return [mocks.teamTemplate];
+
+        case "analyze_performance":
+          await new Promise(r => setTimeout(r, 500));
+          return mocks.performanceReview;
+
+        case "list_performance_reviews":
           return [];
+
+        case "get_performance_review":
+          return mocks.performanceReview;
+
+        case "delete_performance_review":
+          return null;
+
+        // Skills CRUD
+        case "create_skill":
+          return { id: `skill-${Date.now()}`, name: args?.name, description: args?.description, content: args?.content, projectId: args?.projectId || "test-project-1", usageCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        case "update_skill":
+          return { ...mocks.skills[0], name: args?.name || mocks.skills[0].name, description: args?.description || mocks.skills[0].description, content: args?.content || mocks.skills[0].content, updatedAt: new Date().toISOString() };
+        case "delete_skill":
+          return null;
+        case "detect_patterns":
+          await new Promise(r => setTimeout(r, 300));
+          return mocks.patterns;
+        case "increment_skill_usage":
+          return 1;
+
+        // Agents CRUD
+        case "create_agent":
+          return { id: `agent-${Date.now()}`, name: args?.name, description: args?.description, tier: args?.tier || "essential", category: args?.category || "testing", instructions: args?.instructions || "", workflow: args?.workflow || null, tools: args?.tools || null, triggerPatterns: args?.triggerPatterns || null, projectId: args?.projectId || "test-project-1", usageCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        case "update_agent":
+          return { ...mocks.agents[0], name: args?.name || mocks.agents[0].name, description: args?.description || mocks.agents[0].description, updatedAt: new Date().toISOString() };
+        case "delete_agent":
+          return null;
+        case "increment_agent_usage":
+          return 1;
+        case "enhance_agent_instructions":
+          await new Promise(r => setTimeout(r, 500));
+          return "# Enhanced Instructions\n\nYou are an expert test-driven development agent.\n\n## Workflow\n1. Write a failing test\n2. Implement minimal code to pass\n3. Refactor while green\n\n## Rules\n- Never skip the red phase\n- Keep tests atomic and focused";
+
+        // Team Templates CRUD
+        case "create_team_template":
+          return { id: `team-${Date.now()}`, name: args?.name, description: args?.description, orchestrationPattern: args?.orchestrationPattern || "leader", category: args?.category || "feature-development", teammates: JSON.parse((args?.teammatesJson as string) || "[]"), tasks: JSON.parse((args?.tasksJson as string) || "[]"), hooks: JSON.parse((args?.hooksJson as string) || "[]"), leadSpawnInstructions: args?.leadSpawnInstructions || "", projectId: args?.projectId || "test-project-1", usageCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        case "update_team_template":
+          return { ...mocks.teamTemplate, name: args?.name || mocks.teamTemplate.name, description: args?.description || mocks.teamTemplate.description, updatedAt: new Date().toISOString() };
+        case "delete_team_template":
+          return null;
+        case "increment_team_template_usage":
+          return 1;
+        case "generate_team_deploy_output":
+          await new Promise(r => setTimeout(r, 500));
+          return "# Team Deploy Output\n\nLead Agent: Coordinate the team.\n\n## Teammates\n- Frontend Dev: Build React components\n- Backend Dev: Build API endpoints\n\n## Tasks\n1. Build UI Components\n2. Build API Endpoints";
+
+        // RALPH
+        case "analyze_ralph_prompt":
+          await new Promise(r => setTimeout(r, 300));
+          return mocks.promptAnalysis;
+        case "analyze_ralph_prompt_with_ai":
+          await new Promise(r => setTimeout(r, 500));
+          return mocks.promptAnalysis;
+        case "start_ralph_loop":
+          await new Promise(r => setTimeout(r, 300));
+          return { ...mocks.ralphLoop, id: `loop-${Date.now()}`, status: "running", prompt: args?.prompt, qualityScore: args?.qualityScore || 72 };
+        case "start_ralph_loop_prd":
+          await new Promise(r => setTimeout(r, 300));
+          return { ...mocks.ralphLoop, id: `loop-${Date.now()}`, status: "running", mode: "prd", currentStory: 0, totalStories: 3 };
+        case "pause_ralph_loop":
+          return null;
+        case "resume_ralph_loop":
+          return null;
+        case "kill_ralph_loop":
+          return null;
+        case "list_ralph_loops":
+          return [mocks.ralphLoop];
+        case "list_ralph_mistakes":
+          return mocks.ralphMistakes;
+        case "get_ralph_context":
+          return mocks.ralphContext;
+        case "record_ralph_mistake":
+          return { id: `mistake-${Date.now()}`, projectId: args?.projectId, loopId: args?.loopId, mistakeType: args?.mistakeType, description: args?.description, context: args?.context || null, resolution: args?.resolution || null, learnedPattern: args?.learnedPattern || null, createdAt: new Date().toISOString() };
+        case "update_claude_md_with_pattern":
+          return null;
+
+        // Test Plans CRUD
+        case "get_test_plan":
+          return mocks.testPlanSummary;
+        case "create_test_plan":
+          return { id: `plan-${Date.now()}`, projectId: args?.projectId || "test-project-1", name: args?.name, description: args?.description || "", status: "draft", targetCoverage: args?.targetCoverage || 80, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        case "update_test_plan":
+          return { ...mocks.testPlan, name: args?.name || mocks.testPlan.name, status: args?.status || mocks.testPlan.status, updatedAt: new Date().toISOString() };
+        case "delete_test_plan":
+          return null;
+        case "list_test_cases":
+          return mocks.testCases;
+        case "create_test_case":
+          return { id: `case-${Date.now()}`, planId: args?.planId, name: args?.name, description: args?.description || "", filePath: args?.filePath || null, testType: args?.testType || "unit", priority: args?.priority || "medium", status: "pending", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        case "update_test_case":
+          return { ...mocks.testCases[0], status: args?.status || mocks.testCases[0].status, updatedAt: new Date().toISOString() };
+        case "delete_test_case":
+          return null;
+        case "run_test_plan":
+          await new Promise(r => setTimeout(r, 500));
+          return mocks.testRun;
+        case "get_test_runs":
+          return [mocks.testRun];
+        case "generate_test_suggestions":
+          await new Promise(r => setTimeout(r, 500));
+          return mocks.testSuggestions;
+
+        // TDD Workflow
+        case "create_tdd_session":
+          return { ...mocks.tddSession, id: `tdd-${Date.now()}`, featureName: args?.featureName, testFilePath: args?.testFilePath || null };
+        case "update_tdd_session":
+          return { ...mocks.tddSession, currentPhase: args?.phase || mocks.tddSession.currentPhase, phaseStatus: args?.phaseStatus || mocks.tddSession.phaseStatus, updatedAt: new Date().toISOString() };
+        case "get_tdd_session":
+          return mocks.tddSession;
+        case "list_tdd_sessions":
+          return [mocks.tddSession];
+        case "generate_subagent_config":
+          return `# ${args?.agentType || "TDD"} Subagent\n\nYou are a specialized ${args?.agentType || "TDD"} agent.\n\n## Instructions\n- Follow red-green-refactor cycle\n- Write minimal code to pass tests\n- Keep tests focused and atomic`;
+
+        // Context Health
+        case "get_context_health":
+          return mocks.contextHealth;
+        case "get_mcp_status":
+          return mocks.mcpServers;
+        case "create_checkpoint":
+          return { id: `chk-${Date.now()}`, projectId: args?.projectId || "test-project-1", label: args?.label, summary: args?.summary || "", tokenSnapshot: 84600, contextPercent: 42.3, createdAt: new Date().toISOString() };
+        case "list_checkpoints":
+          return mocks.checkpoints;
+
+        // Enforcement
+        case "install_git_hooks":
+          await new Promise(r => setTimeout(r, 300));
+          return { installed: true, hookPath: ".git/hooks/pre-commit", mode: args?.mode || "warn", hasHusky: false, hasGit: true, version: "2.0.0", outdated: false, currentVersion: "2.0.0" };
+        case "get_enforcement_events":
+          return mocks.enforcementEvents;
+        case "get_ci_snippets":
+          await new Promise(r => setTimeout(r, 300));
+          return mocks.ciSnippets;
+        case "init_git":
+          return null;
 
         default:
           console.warn(`[Mock] Unhandled command: ${cmd}`);
@@ -583,6 +1119,24 @@ export async function setupTauriMocks(page: Page, options: {
       memoryHealth: mockMemoryHealth,
       testStalenessReport: mockTestStalenessReport,
       claudeMdAnalysis: mockClaudeMdAnalysis,
+      performanceReview: mockPerformanceReview,
+      patterns: mockPatterns,
+      promptAnalysis: mockPromptAnalysis,
+      ralphLoop: mockRalphLoop,
+      ralphMistakes: mockRalphMistakes,
+      ralphContext: mockRalphContext,
+      testPlan: mockTestPlan,
+      testPlanSummary: mockTestPlanSummary,
+      testCases: mockTestCases,
+      testRun: mockTestRun,
+      testSuggestions: mockTestSuggestions,
+      tddSession: mockTddSession,
+      contextHealth: mockContextHealth,
+      mcpServers: mockMcpServers,
+      checkpoints: mockCheckpoints,
+      enforcementEvents: mockEnforcementEvents,
+      ciSnippets: mockCiSnippets,
+      teamTemplate: mockTeamTemplate,
     },
   });
 }

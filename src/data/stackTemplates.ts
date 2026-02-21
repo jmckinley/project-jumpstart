@@ -56,7 +56,6 @@ export const STACK_TEMPLATES: StackTemplate[] = [
       hosting: "Vercel",
       payments: "Stripe",
       monitoring: "PostHog",
-      email: "Resend",
     },
   },
   {
@@ -151,7 +150,6 @@ export const STACK_TEMPLATES: StackTemplate[] = [
       hosting: "Vercel",
       payments: "Stripe",
       monitoring: "Sentry",
-      email: "Resend",
     },
   },
   {
@@ -215,7 +213,6 @@ export const STACK_TEMPLATES: StackTemplate[] = [
       hosting: "Vercel",
       payments: "Stripe",
       monitoring: "Sentry",
-      email: "Resend",
     },
   },
   {

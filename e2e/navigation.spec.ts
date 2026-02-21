@@ -26,6 +26,7 @@ test.describe("Navigation", () => {
     await expect(page.locator("nav >> text=Modules")).toBeVisible();
     await expect(page.locator("nav >> text=Skills")).toBeVisible();
     await expect(page.locator("nav >> text=Agents")).toBeVisible();
+    await expect(page.locator("nav >> text=Performance")).toBeVisible();
     await expect(page.locator("nav >> text=Claude Memory")).toBeVisible();
   });
 
@@ -56,6 +57,13 @@ test.describe("Navigation", () => {
 
     // Should show agents view - look for heading or main content
     await expect(page.locator("main").getByText("Agents").first()).toBeVisible({ timeout: 5000 });
+  });
+
+  test("navigates to Performance", async ({ page }) => {
+    await page.locator("nav >> text=Performance").click();
+
+    // Should show performance view with Overview tab
+    await expect(page.locator("main").getByText("Performance Score").first()).toBeVisible({ timeout: 5000 });
   });
 
   test("navigates to Test Plans", async ({ page }) => {

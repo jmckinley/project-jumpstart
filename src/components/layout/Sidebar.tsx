@@ -90,6 +90,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: "agents", label: "Agents" },
       { id: "team-templates", label: "Team Templates" },
       { id: "ralph", label: "RALPH" },
+      { id: "performance", label: "Performance" },
     ],
   },
   {
