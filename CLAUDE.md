@@ -103,6 +103,7 @@ All sections implemented: Onboarding, Dashboard, CLAUDE.md Editor, Modules, Test
 
 | Date | Change |
 |------|--------|
+| Feb 22, 2026 | Self-Healing Pre-Commit Hook v4.0.0: backup/validate/restore on every file modification, health file tracking (~/.project-jumpstart/.hook-health), auto-downgrade after 3 consecutive failures, HookHealth Rust model + commands, downgrade alert UI in GitHookSetup. 173 Rust + 945 frontend + 17 E2E enforcement tests. |
 | Feb 21, 2026 | Batch Auto-Remediation: AI-powered per-file performance fix via Claude API. RemediationPanel with quick-select, progress tracking, cancellation. Rust backend command + call_claude_long. 155 Rust + 933 frontend tests. |
 | Feb 21, 2026 | Performance Engineering section: heuristic-based code/architecture analysis, health score integration (8 components), Resend reclassified to auth. Comprehensive E2E tests for all sections (243 Playwright tests). 1,310 total tests. |
 | Feb 16, 2026 | Test Staleness Detection: SessionEnd hook, Rust backend command, TestStalenessAlert UI in Memory Dashboard. Shell script + backend detect stale tests via git diff. |

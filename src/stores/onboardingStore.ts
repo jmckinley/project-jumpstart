@@ -102,7 +102,7 @@ const initialState = {
   stackExtras: null as StackExtras | null,
   goals: ["features", "tests", "reviews", "debugging", "documentation"] as string[],
   generateModuleDocs: true,
-  setupEnforcement: true,
+  setupEnforcement: false,
 };
 
 export const useOnboardingStore = create<OnboardingState>((set) => ({

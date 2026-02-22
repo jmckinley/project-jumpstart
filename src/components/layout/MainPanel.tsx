@@ -1109,19 +1109,23 @@ function EnforcementView({ onHooksInstalled }: { onHooksInstalled?: () => void }
   const activeProject = useProjectStore((s) => s.activeProject);
   const {
     hookStatus,
+    hookHealth,
     snippets,
     loading,
     installing,
     error,
     refreshHookStatus,
+    refreshHookHealth,
+    resetHealth,
     installHooks,
     loadSnippets,
   } = useEnforcement();
 
   useEffect(() => {
     refreshHookStatus();
+    refreshHookHealth();
     loadSnippets();
-  }, [refreshHookStatus, loadSnippets]);
+  }, [refreshHookStatus, refreshHookHealth, loadSnippets]);
 
   const handleInstall = useCallback(
     async (mode: "warn" | "block" | "auto-update") => {
@@ -1142,11 +1146,13 @@ function EnforcementView({ onHooksInstalled }: { onHooksInstalled?: () => void }
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <GitHookSetup
           hookStatus={hookStatus}
+          hookHealth={hookHealth}
           projectPath={activeProject?.path ?? ""}
           loading={loading}
           installing={installing}
           onInstall={handleInstall}
           onRefresh={refreshHookStatus}
+          onResetHealth={resetHealth}
         />
         <CISetup
           snippets={snippets}

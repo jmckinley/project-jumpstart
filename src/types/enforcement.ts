@@ -51,6 +51,17 @@ export interface HookStatus {
   currentVersion: string;
 }
 
+export interface HookHealth {
+  consecutiveFailures: number;
+  lastFailureFile: string | null;
+  lastFailureReason: string | null;
+  lastFailureTime: string | null;
+  downgraded: boolean;
+  downgradeTime: string | null;
+  totalSuccesses: number;
+  totalFailures: number;
+}
+
 export interface CiSnippet {
   provider: string;
   name: string;

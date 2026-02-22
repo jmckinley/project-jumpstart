@@ -155,7 +155,7 @@ import type { HealthScore, ContextHealth, McpServerStatus, Checkpoint } from "@/
 import type { ModuleStatus, ModuleDoc } from "@/types/module";
 import type { Skill, Pattern } from "@/types/skill";
 import type { RalphLoop, PromptAnalysis, RalphMistake, RalphLoopContext } from "@/types/ralph";
-import type { EnforcementEvent, HookStatus, CiSnippet } from "@/types/enforcement";
+import type { EnforcementEvent, HookStatus, HookHealth, CiSnippet } from "@/types/enforcement";
 import type { Agent, AgentWorkflowStep, AgentTool } from "@/types/agent";
 import type { KickstartInput, KickstartPrompt, InferStackInput, InferredStack } from "@/types/kickstart";
 import type {
@@ -433,6 +433,14 @@ export async function getEnforcementEvents(
 
 export async function getCiSnippets(projectPath: string): Promise<CiSnippet[]> {
   return invoke<CiSnippet[]>("get_ci_snippets", { projectPath });
+}
+
+export async function getHookHealth(): Promise<HookHealth> {
+  return invoke<HookHealth>("get_hook_health");
+}
+
+export async function resetHookHealth(projectPath?: string): Promise<void> {
+  return invoke<void>("reset_hook_health", { projectPath: projectPath ?? null });
 }
 
 export async function logActivity(

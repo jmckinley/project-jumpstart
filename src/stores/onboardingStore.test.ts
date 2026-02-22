@@ -113,7 +113,7 @@ describe("onboardingStore", () => {
       expect(state.stackExtras).toBeNull();
       expect(state.goals).toEqual(["features", "tests", "reviews", "debugging", "documentation"]);
       expect(state.generateModuleDocs).toBe(true);
-      expect(state.setupEnforcement).toBe(true);
+      expect(state.setupEnforcement).toBe(false);
     });
   });
 

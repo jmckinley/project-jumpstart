@@ -724,6 +724,7 @@ export async function setupTauriMocks(page: Page, options: {
   projectId?: string;
   hasTestFramework?: boolean;
   hasClaudeCodeHooks?: boolean;
+  noProjects?: boolean;
 } = {}) {
   const {
     hasApiKey = true,
@@ -732,6 +733,7 @@ export async function setupTauriMocks(page: Page, options: {
     projectId = "test-project-1",
     hasTestFramework = true,
     hasClaudeCodeHooks = false,
+    noProjects = false,
   } = options;
 
   // Use route interception to inject mocks before any scripts load
@@ -739,7 +741,7 @@ export async function setupTauriMocks(page: Page, options: {
     await route.continue();
   });
 
-  await page.addInitScript(({ hasApiKey, hasClaudeMd, isEmptyProject, projectId, hasTestFramework, hasClaudeCodeHooks, mocks }) => {
+  await page.addInitScript(({ hasApiKey, hasClaudeMd, isEmptyProject, projectId, hasTestFramework, hasClaudeCodeHooks, noProjects, mocks }) => {
     // Store settings in memory - always include has_seen_welcome to bypass first-run
     const settingsStore: Record<string, string> = {
       ...mocks.settings,
@@ -758,6 +760,7 @@ export async function setupTauriMocks(page: Page, options: {
 
       switch (cmd) {
         case "list_projects":
+          if (noProjects) return [];
           // Adjust testing field based on hasTestFramework option
           return mocks.projects.map((p: { id: string; testing: string | null }) => ({
             ...p,
@@ -811,7 +814,7 @@ export async function setupTauriMocks(page: Page, options: {
           return mocks.activities;
 
         case "get_hook_status":
-          return { installed: false, hookPath: "", mode: "off", hasHusky: false, hasGit: true, version: null, outdated: false, currentVersion: "2.0.0" };
+          return { installed: false, hookPath: "", mode: "off", hasHusky: false, hasGit: true, version: null, outdated: false, currentVersion: "4.0.0" };
 
         case "analyze_session":
           await new Promise(r => setTimeout(r, 500));
@@ -1055,7 +1058,11 @@ export async function setupTauriMocks(page: Page, options: {
         // Enforcement
         case "install_git_hooks":
           await new Promise(r => setTimeout(r, 300));
-          return { installed: true, hookPath: ".git/hooks/pre-commit", mode: args?.mode || "warn", hasHusky: false, hasGit: true, version: "2.0.0", outdated: false, currentVersion: "2.0.0" };
+          return { installed: true, hookPath: ".git/hooks/pre-commit", mode: args?.mode || "warn", hasHusky: false, hasGit: true, version: "4.0.0", outdated: false, currentVersion: "4.0.0" };
+        case "get_hook_health":
+          return { consecutiveFailures: 0, lastFailureFile: null, lastFailureReason: null, lastFailureTime: null, downgraded: false, downgradeTime: null, totalSuccesses: 0, totalFailures: 0 };
+        case "reset_hook_health":
+          return null;
         case "get_enforcement_events":
           return mocks.enforcementEvents;
         case "get_ci_snippets":
@@ -1063,6 +1070,40 @@ export async function setupTauriMocks(page: Page, options: {
           return mocks.ciSnippets;
         case "init_git":
           return null;
+
+        // Dialog plugin (used by pickFolder)
+        case "plugin:dialog|open":
+          return "/test/project/path";
+
+        // Onboarding
+        case "scan_project":
+          return {
+            confidence: "high",
+            language: { value: "TypeScript", confidence: 0.9, source: "package.json" },
+            framework: { value: "React", confidence: 0.8, source: "package.json" },
+            database: null,
+            testing: { value: "Vitest", confidence: 0.7, source: "vitest.config.ts" },
+            styling: { value: "Tailwind CSS", confidence: 0.8, source: "tailwind.config.js" },
+            projectName: "test-project",
+            projectType: "Web App",
+            fileCount: 42,
+            hasExistingClaudeMd: false,
+          };
+        case "save_project":
+          return {
+            id: `proj-${Date.now()}`,
+            name: args?.name || "test-project",
+            path: args?.path || "/test/project",
+            language: args?.language || "TypeScript",
+            framework: args?.framework || "React",
+            database: args?.database || null,
+            testing: args?.testing || "Vitest",
+            styling: args?.styling || "Tailwind CSS",
+            healthScore: 50,
+            createdAt: new Date().toISOString(),
+            description: args?.description || "",
+            projectType: args?.projectType || "Web App",
+          };
 
         default:
           console.warn(`[Mock] Unhandled command: ${cmd}`);
@@ -1113,6 +1154,7 @@ export async function setupTauriMocks(page: Page, options: {
     projectId,
     hasTestFramework,
     hasClaudeCodeHooks,
+    noProjects,
     mocks: {
       projects: mockProjects,
       healthScore: mockHealthScore,

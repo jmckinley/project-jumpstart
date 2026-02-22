@@ -251,7 +251,7 @@ export function ReviewGenerate({ onComplete }: ReviewGenerateProps) {
                   d="M12 4.5v15m7.5-7.5h-15"
                 />
               </svg>
-              Git hooks and CI enforcement checks
+              Pre-commit hook with AI-powered doc enforcement
             </li>
           )}
         </ul>

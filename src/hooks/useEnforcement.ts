@@ -9,8 +9,8 @@
  *
  * DEPENDENCIES:
  * - react - useState, useCallback
- * - @/lib/tauri - installGitHooks, getHookStatus, getEnforcementEvents, getCiSnippets
- * - @/types/enforcement - EnforcementEvent, HookStatus, CiSnippet
+ * - @/lib/tauri - installGitHooks, getHookStatus, getEnforcementEvents, getCiSnippets, getHookHealth, resetHookHealth
+ * - @/types/enforcement - EnforcementEvent, HookStatus, HookHealth, CiSnippet
  * - @/stores/projectStore - Active project for path and ID
  *
  * EXPORTS:
@@ -18,7 +18,9 @@
  *
  * PATTERNS:
  * - Call refreshHookStatus() to check current hook state
+ * - Call refreshHookHealth() to check hook self-healing health
  * - Call installHooks(mode) to install or update pre-commit hook
+ * - Call resetHealth() to re-enable auto-update after downgrade
  * - Call loadSnippets() to fetch CI templates
  * - Call loadEvents() to fetch recent enforcement events
  * - All actions auto-resolve project path/ID from the active project store
@@ -39,12 +41,15 @@ import {
   getHookStatus,
   getEnforcementEvents,
   getCiSnippets,
+  getHookHealth,
+  resetHookHealth,
 } from "@/lib/tauri";
-import type { EnforcementEvent, HookStatus, CiSnippet } from "@/types/enforcement";
+import type { EnforcementEvent, HookStatus, HookHealth, CiSnippet } from "@/types/enforcement";
 import { useProjectStore } from "@/stores/projectStore";
 
 export function useEnforcement() {
   const [hookStatus, setHookStatus] = useState<HookStatus | null>(null);
+  const [hookHealth, setHookHealth] = useState<HookHealth | null>(null);
   const [snippets, setSnippets] = useState<CiSnippet[]>([]);
   const [events, setEvents] = useState<EnforcementEvent[]>([]);
   const [loading, setLoading] = useState(false);
@@ -115,14 +120,38 @@ export function useEnforcement() {
     [activeProject],
   );
 
+  const refreshHookHealth = useCallback(async () => {
+    try {
+      const health = await getHookHealth();
+      setHookHealth(health);
+    } catch (err) {
+      // Non-critical — don't set error state for health check failures
+      console.error("Failed to fetch hook health:", err);
+    }
+  }, []);
+
+  const resetHealth = useCallback(async () => {
+    if (!activeProject) return;
+    setError(null);
+    try {
+      await resetHookHealth(activeProject.path);
+      setHookHealth(null);
+    } catch (err) {
+      setError(String(err));
+    }
+  }, [activeProject]);
+
   return {
     hookStatus,
+    hookHealth,
     snippets,
     events,
     loading,
     installing,
     error,
     refreshHookStatus,
+    refreshHookHealth,
+    resetHealth,
     installHooks,
     loadSnippets,
     loadEvents,

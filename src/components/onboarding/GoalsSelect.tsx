@@ -24,7 +24,7 @@
  * CLAUDE NOTES:
  * - GOALS constant has { id, label, skill } shape
  * - Default goals are ["features", "tests", "reviews", "debugging", "documentation"] (set in store initial state)
- * - generateModuleDocs and setupEnforcement default to true
+ * - generateModuleDocs defaults to true, setupEnforcement defaults to false (opt-in)
  * - These selections influence what gets generated in step 4
  */
 
@@ -115,13 +115,20 @@ export function GoalsSelect() {
               onChange={(e) => setSetupEnforcement(e.target.checked)}
               className="mt-0.5 h-4 w-4 rounded border-neutral-600 bg-neutral-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
             />
-            <div className="flex flex-col">
+            <div className="flex flex-col gap-1">
               <span className="text-sm text-neutral-100">
-                Set up documentation enforcement
+                Install pre-commit hook for automatic doc enforcement
               </span>
               <span className="text-xs leading-relaxed text-neutral-500">
-                Adds git hooks and CI checks to ensure documentation stays
-                up-to-date as code changes.
+                Installs a git pre-commit hook that checks staged files for
+                missing documentation headers. In auto-update mode, it uses the
+                Anthropic API to generate headers automatically before each
+                commit. Includes self-healing: if AI output corrupts a file, the
+                hook restores the original and continues safely.
+              </span>
+              <span className="text-xs leading-relaxed text-neutral-400">
+                You can configure or remove the hook at any time from the
+                Enforcement section.
               </span>
             </div>
           </label>

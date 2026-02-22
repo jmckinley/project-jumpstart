@@ -67,6 +67,74 @@ test.describe("Enforcement Section", () => {
   });
 });
 
+test.describe("Hook Installation Flow", () => {
+  test.beforeEach(async ({ page }) => {
+    await setupTauriMocks(page, { hasApiKey: true, hasClaudeMd: true });
+    await page.goto("/");
+    await page.waitForSelector("text=Project Overview", { timeout: 10000 });
+    await page.locator("aside").getByText("Enforcement").click();
+    await page.waitForTimeout(500);
+  });
+
+  test("installing Warn mode shows Installed (warn) badge", async ({ page }) => {
+    const gotItBtn = page.getByRole("button", { name: "Got it" });
+    if (await gotItBtn.isVisible()) await gotItBtn.click();
+
+    await page.getByRole("button", { name: /^Warn$/ }).first().click();
+    await page.waitForTimeout(1000);
+
+    // After install, mock returns installed=true with mode=warn
+    await expect(page.getByText("Installed (warn)")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("installing Block mode shows Installed (block) badge", async ({ page }) => {
+    const gotItBtn = page.getByRole("button", { name: "Got it" });
+    if (await gotItBtn.isVisible()) await gotItBtn.click();
+
+    await page.getByRole("button", { name: /^Block$/ }).first().click();
+    await page.waitForTimeout(1000);
+
+    await expect(page.getByText("Installed (block)")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("installing Auto-Update mode shows Installed (auto-update) badge", async ({ page }) => {
+    const gotItBtn = page.getByRole("button", { name: "Got it" });
+    if (await gotItBtn.isVisible()) await gotItBtn.click();
+
+    await page.getByRole("button", { name: /Auto-Update/i }).first().click();
+    await page.waitForTimeout(1000);
+
+    await expect(page.getByText("Installed (auto-update)")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("shows hook version and path after installation", async ({ page }) => {
+    const gotItBtn = page.getByRole("button", { name: "Got it" });
+    if (await gotItBtn.isVisible()) await gotItBtn.click();
+
+    await page.getByRole("button", { name: /^Warn$/ }).first().click();
+    await page.waitForTimeout(1000);
+
+    // Should show hook path and version info
+    await expect(page.getByText(".git/hooks/pre-commit")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/Version: 4\.0\.0/)).toBeVisible({ timeout: 5000 });
+  });
+
+  test("shows mode descriptions for all three modes", async ({ page }) => {
+    // Auto-update description
+    await expect(page.getByText(/Generates missing docs via AI/i)).toBeVisible({ timeout: 5000 });
+    // Block description
+    await expect(page.getByText(/Prevents commits with missing doc headers/i)).toBeVisible({ timeout: 5000 });
+    // Warn description
+    await expect(page.getByText(/Allows commits but prints warnings/i)).toBeVisible({ timeout: 5000 });
+  });
+
+  test("explains which file headers are checked", async ({ page }) => {
+    // Should mention @module and @description
+    await expect(page.getByText(/@module/).first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/@description/).first()).toBeVisible({ timeout: 5000 });
+  });
+});
+
 test.describe("CI Integration", () => {
   test.beforeEach(async ({ page }) => {
     await setupTauriMocks(page, { hasApiKey: true, hasClaudeMd: true });

@@ -12,6 +12,7 @@
 //! EXPORTS:
 //! - EnforcementEvent - A hook block/warning event record
 //! - HookStatus - Git hook installation status
+//! - HookHealth - Auto-update hook health and downgrade tracking
 //! - CiSnippet - CI template with provider and content
 //!
 //! PATTERNS:
@@ -55,6 +56,22 @@ pub struct HookStatus {
     pub outdated: bool,
     /// Current app hook version for reference
     pub current_version: String,
+}
+
+/// Health status of the auto-update pre-commit hook.
+/// Tracks consecutive failures and auto-downgrade state.
+/// Populated from ~/.project-jumpstart/.hook-health key=value file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HookHealth {
+    pub consecutive_failures: u32,
+    pub last_failure_file: Option<String>,
+    pub last_failure_reason: Option<String>,
+    pub last_failure_time: Option<String>,
+    pub downgraded: bool,
+    pub downgrade_time: Option<String>,
+    pub total_successes: u32,
+    pub total_failures: u32,
 }
 
 /// CI integration template snippet.

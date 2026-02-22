@@ -396,6 +396,101 @@ describe("GitHookSetup", () => {
     });
   });
 
+  describe("self-healing downgrade alert", () => {
+    it("should show downgrade alert when hookHealth.downgraded is true", () => {
+      const hookHealth = {
+        consecutiveFailures: 3,
+        lastFailureFile: "src/main.ts",
+        lastFailureReason: "SIZE_DELTA: grew by 5000 bytes",
+        lastFailureTime: "2026-02-22T10:00:00Z",
+        downgraded: true,
+        downgradeTime: "2026-02-22T10:05:00Z",
+        totalSuccesses: 10,
+        totalFailures: 5,
+      };
+      render(<GitHookSetup {...defaultProps} hookHealth={hookHealth} />);
+
+      expect(screen.getByText("Auto-Update Disabled (Self-Healed)")).toBeInTheDocument();
+    });
+
+    it("should not show downgrade alert when hookHealth is null", () => {
+      render(<GitHookSetup {...defaultProps} hookHealth={null} />);
+
+      expect(screen.queryByText("Auto-Update Disabled (Self-Healed)")).not.toBeInTheDocument();
+    });
+
+    it("should not show downgrade alert when downgraded is false", () => {
+      const hookHealth = {
+        consecutiveFailures: 0,
+        lastFailureFile: null,
+        lastFailureReason: null,
+        lastFailureTime: null,
+        downgraded: false,
+        downgradeTime: null,
+        totalSuccesses: 5,
+        totalFailures: 0,
+      };
+      render(<GitHookSetup {...defaultProps} hookHealth={hookHealth} />);
+
+      expect(screen.queryByText("Auto-Update Disabled (Self-Healed)")).not.toBeInTheDocument();
+    });
+
+    it("should show failure count and reason in alert", () => {
+      const hookHealth = {
+        consecutiveFailures: 3,
+        lastFailureFile: "src/main.ts",
+        lastFailureReason: "TAIL_MISMATCH: original file content not preserved",
+        lastFailureTime: "2026-02-22T10:00:00Z",
+        downgraded: true,
+        downgradeTime: "2026-02-22T10:05:00Z",
+        totalSuccesses: 10,
+        totalFailures: 5,
+      };
+      render(<GitHookSetup {...defaultProps} hookHealth={hookHealth} />);
+
+      expect(screen.getByText(/3 consecutive failed commits/)).toBeInTheDocument();
+      expect(screen.getByText(/TAIL_MISMATCH/)).toBeInTheDocument();
+      expect(screen.getByText(/10 succeeded, 5 failed/)).toBeInTheDocument();
+    });
+
+    it("should show Re-enable button that calls onResetHealth", () => {
+      const mockResetHealth = vi.fn();
+      const hookHealth = {
+        consecutiveFailures: 3,
+        lastFailureFile: null,
+        lastFailureReason: null,
+        lastFailureTime: null,
+        downgraded: true,
+        downgradeTime: null,
+        totalSuccesses: 0,
+        totalFailures: 3,
+      };
+      render(<GitHookSetup {...defaultProps} hookHealth={hookHealth} onResetHealth={mockResetHealth} />);
+
+      const btn = screen.getByRole("button", { name: "Re-enable Auto-Update" });
+      expect(btn).toBeInTheDocument();
+      fireEvent.click(btn);
+      expect(mockResetHealth).toHaveBeenCalled();
+    });
+
+    it("should show health stats when installed and healthy", () => {
+      const hookHealth = {
+        consecutiveFailures: 0,
+        lastFailureFile: null,
+        lastFailureReason: null,
+        lastFailureTime: null,
+        downgraded: false,
+        downgradeTime: null,
+        totalSuccesses: 15,
+        totalFailures: 2,
+      };
+      render(<GitHookSetup {...defaultProps} hookHealth={hookHealth} />);
+
+      // When healthy (not downgraded), the alert should not show
+      expect(screen.queryByText("Auto-Update Disabled (Self-Healed)")).not.toBeInTheDocument();
+    });
+  });
+
   describe("active state buttons", () => {
     it("should show Auto-Update (Active) when auto-update mode is installed", () => {
       const hookStatus: HookStatus = {

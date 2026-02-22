@@ -303,6 +303,84 @@ describe("useEnforcement", () => {
     });
   });
 
+  describe("refreshHookHealth", () => {
+    it("should fetch hook health and store it", async () => {
+      const mockHealth = {
+        consecutiveFailures: 0,
+        lastFailureFile: null,
+        lastFailureReason: null,
+        lastFailureTime: null,
+        downgraded: false,
+        downgradeTime: null,
+        totalSuccesses: 5,
+        totalFailures: 0,
+      };
+      vi.mocked(invoke).mockResolvedValue(mockHealth);
+
+      const { result } = renderHook(() => useEnforcement());
+
+      await act(async () => {
+        await result.current.refreshHookHealth();
+      });
+
+      expect(result.current.hookHealth).toEqual(mockHealth);
+      expect(invoke).toHaveBeenCalledWith("get_hook_health");
+    });
+
+    it("should handle errors gracefully without setting error state", async () => {
+      vi.mocked(invoke).mockRejectedValue(new Error("File not found"));
+
+      const { result } = renderHook(() => useEnforcement());
+
+      await act(async () => {
+        await result.current.refreshHookHealth();
+      });
+
+      // Should not set error state for health check failures (non-critical)
+      expect(result.current.error).toBeNull();
+      expect(result.current.hookHealth).toBeNull();
+    });
+  });
+
+  describe("resetHealth", () => {
+    it("should call reset_hook_health and clear hookHealth state", async () => {
+      vi.mocked(invoke).mockResolvedValue(null);
+
+      const { result } = renderHook(() => useEnforcement());
+
+      await act(async () => {
+        await result.current.resetHealth();
+      });
+
+      expect(invoke).toHaveBeenCalledWith("reset_hook_health", {
+        projectPath: mockProject.path,
+      });
+      expect(result.current.hookHealth).toBeNull();
+    });
+
+    it("should not call when no project is selected", async () => {
+      vi.mocked(useProjectStore).mockImplementation((selector) =>
+        selector({ activeProject: null } as ReturnType<typeof useProjectStore.getState>)
+      );
+
+      const { result } = renderHook(() => useEnforcement());
+
+      await act(async () => {
+        await result.current.resetHealth();
+      });
+
+      expect(invoke).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("initial hookHealth state", () => {
+    it("should start with null hookHealth", () => {
+      const { result } = renderHook(() => useEnforcement());
+
+      expect(result.current.hookHealth).toBeNull();
+    });
+  });
+
   describe("loadEvents", () => {
     it("should fetch enforcement events and update state", async () => {
       vi.mocked(invoke).mockResolvedValue(mockEvents);

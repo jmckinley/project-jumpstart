@@ -44,17 +44,19 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import type { HookStatus } from "@/types/enforcement";
+import type { HookStatus, HookHealth } from "@/types/enforcement";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { saveSetting, initGit } from "@/lib/tauri";
 
 interface GitHookSetupProps {
   hookStatus: HookStatus | null;
+  hookHealth?: HookHealth | null;
   projectPath: string;
   loading: boolean;
   installing: boolean;
   onInstall: (mode: "warn" | "block" | "auto-update") => void;
   onRefresh: () => void;
+  onResetHealth?: () => void;
 }
 
 function getStatusBadge(status: HookStatus | null) {
@@ -70,7 +72,7 @@ function getStatusBadge(status: HookStatus | null) {
   return <Badge variant="outline" className="text-neutral-500">Not Installed</Badge>;
 }
 
-export function GitHookSetup({ hookStatus, projectPath, loading, installing, onInstall, onRefresh }: GitHookSetupProps) {
+export function GitHookSetup({ hookStatus, hookHealth, projectPath, loading, installing, onInstall, onRefresh, onResetHealth }: GitHookSetupProps) {
   const setEnforcementLevel = useSettingsStore((s) => s.setEnforcementLevel);
   const [initializingGit, setInitializingGit] = useState(false);
 
@@ -173,6 +175,39 @@ export function GitHookSetup({ hookStatus, projectPath, loading, installing, onI
               </Button>
               {hookStatus.mode === "auto-update" && (
                 <span className="text-xs text-orange-400">Requires jq to be installed</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Self-healing downgrade alert */}
+        {hookHealth?.downgraded && (
+          <div className="rounded-md border border-red-800 bg-red-950/40 p-4 space-y-3">
+            <div className="flex items-center gap-2 text-red-400">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span className="font-medium">Auto-Update Disabled (Self-Healed)</span>
+            </div>
+            <p className="text-sm text-red-300/80">
+              Auto-update was disabled after {hookHealth.consecutiveFailures} consecutive failed commits
+              to protect your files from corruption.
+              {hookHealth.lastFailureReason && (
+                <> Last failure: {hookHealth.lastFailureReason}</>
+              )}
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="text-xs text-red-400/60">
+                Total: {hookHealth.totalSuccesses} succeeded, {hookHealth.totalFailures} failed
+              </div>
+              {onResetHealth && (
+                <Button
+                  size="sm"
+                  onClick={onResetHealth}
+                  className="bg-red-500 hover:bg-red-400 text-white font-medium"
+                >
+                  Re-enable Auto-Update
+                </Button>
               )}
             </div>
           </div>
