@@ -30,6 +30,7 @@ import type { HealthComponents } from "@/types/health";
 interface HealthScoreProps {
   score: number;
   components: HealthComponents | null;
+  discoveredTestCount?: number | null;
 }
 
 const COMPONENT_CONFIG = [
@@ -61,7 +62,7 @@ function getBarColorClass(ratio: number): string {
   return "bg-red-500";
 }
 
-export function HealthScore({ score, components }: HealthScoreProps) {
+export function HealthScore({ score, components, discoveredTestCount }: HealthScoreProps) {
   const circumference = 2 * Math.PI * 54;
   const offset = circumference * (1 - score / 100);
   const color = getScoreColor(score);
@@ -122,11 +123,19 @@ export function HealthScore({ score, components }: HealthScoreProps) {
           const ratio = max > 0 ? value / max : 0;
           const barColor = getBarColorClass(ratio);
           const widthPercent = Math.min(ratio * 100, 100);
+          const showDiscovery = key === "tests" && discoveredTestCount && discoveredTestCount > 0 && value <= 3;
 
           return (
             <div key={key}>
               <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs text-neutral-400">{label}</span>
+                <span className="text-xs text-neutral-400">
+                  {label}
+                  {showDiscovery && (
+                    <span className="ml-1.5 text-blue-400">
+                      ({discoveredTestCount} discovered)
+                    </span>
+                  )}
+                </span>
                 <span className="text-xs font-mono text-neutral-500">
                   {value} / {max}
                 </span>

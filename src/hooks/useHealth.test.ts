@@ -68,6 +68,7 @@ describe("useHealth", () => {
       expect(result.current.components).toBeNull();
       expect(result.current.quickWins).toEqual([]);
       expect(result.current.contextRotRisk).toBe("low");
+      expect(result.current.discoveredTestCount).toBeNull();
       expect(result.current.loading).toBe(false);
       expect(result.current.error).toBeNull();
     });
@@ -169,6 +170,33 @@ describe("useHealth", () => {
       });
 
       expect(result.current.contextRotRisk).toBe("high");
+    });
+
+    it("should capture discoveredTestCount from response", async () => {
+      vi.mocked(invoke).mockResolvedValue({
+        ...mockHealthScore,
+        discoveredTestCount: 42,
+      });
+
+      const { result } = renderHook(() => useHealth());
+
+      await act(async () => {
+        await result.current.refresh();
+      });
+
+      expect(result.current.discoveredTestCount).toBe(42);
+    });
+
+    it("should set discoveredTestCount to null when absent", async () => {
+      vi.mocked(invoke).mockResolvedValue(mockHealthScore);
+
+      const { result } = renderHook(() => useHealth());
+
+      await act(async () => {
+        await result.current.refresh();
+      });
+
+      expect(result.current.discoveredTestCount).toBeNull();
     });
   });
 });

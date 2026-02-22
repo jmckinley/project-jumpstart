@@ -103,6 +103,43 @@ describe("HealthScore", () => {
     });
   });
 
+  describe("test discovery display", () => {
+    it("should show discovered count when tests are discovered and score is low", () => {
+      const lowTestComponents = { ...mockComponents, tests: 2 };
+      render(
+        <HealthScore score={50} components={lowTestComponents} discoveredTestCount={42} />
+      );
+
+      expect(screen.getByText("(42 discovered)")).toBeInTheDocument();
+    });
+
+    it("should not show discovered count when test score is high", () => {
+      render(
+        <HealthScore score={75} components={mockComponents} discoveredTestCount={42} />
+      );
+
+      expect(screen.queryByText("(42 discovered)")).not.toBeInTheDocument();
+    });
+
+    it("should not show discovered count when count is zero", () => {
+      const lowTestComponents = { ...mockComponents, tests: 2 };
+      render(
+        <HealthScore score={50} components={lowTestComponents} discoveredTestCount={0} />
+      );
+
+      expect(screen.queryByText(/discovered/)).not.toBeInTheDocument();
+    });
+
+    it("should not show discovered count when null", () => {
+      const lowTestComponents = { ...mockComponents, tests: 2 };
+      render(
+        <HealthScore score={50} components={lowTestComponents} discoveredTestCount={null} />
+      );
+
+      expect(screen.queryByText(/discovered/)).not.toBeInTheDocument();
+    });
+  });
+
   describe("edge cases", () => {
     it("should handle score of 0", () => {
       render(<HealthScore score={0} components={mockComponents} />);

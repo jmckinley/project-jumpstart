@@ -437,3 +437,13 @@ pub struct TestStalenessReport {
     pub results: Vec<TestStalenessResult>,
     pub checked_at: String,
 }
+
+/// Result of automatic test discovery (without running tests)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TestDiscoveryResult {
+    pub framework_name: String,
+    pub test_count: u32,
+    pub method: String, // "list_command" | "static_grep"
+    pub discovered_at: String,
+}

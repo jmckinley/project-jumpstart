@@ -45,7 +45,7 @@ export const mockProjects: MockProject[] = [
 ];
 
 export const mockHealthScore = {
-  total: 75,
+  total: 77,
   components: {
     claudeMd: 20,
     moduleDocs: 15,
@@ -53,7 +53,7 @@ export const mockHealthScore = {
     skills: 10,
     context: 7,
     enforcement: 7,
-    tests: 0,
+    tests: 2,
     performance: 4,
   },
   quickWins: [
@@ -65,6 +65,7 @@ export const mockHealthScore = {
     },
   ],
   contextRotRisk: "low" as const,
+  discoveredTestCount: 42,
 };
 
 export const mockPerformanceReview = {
@@ -853,6 +854,14 @@ export async function setupTauriMocks(page: Page, options: {
 
         case "list_test_plans":
           return [mocks.testPlan];
+
+        case "count_project_tests":
+          return {
+            frameworkName: hasTestFramework ? "Vitest" : "static_grep",
+            testCount: hasTestFramework ? 42 : 0,
+            method: hasTestFramework ? "list_command" : "static_grep",
+            discoveredAt: new Date().toISOString(),
+          };
 
         case "detect_project_test_framework":
           if (!hasTestFramework) {

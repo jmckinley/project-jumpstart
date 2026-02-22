@@ -35,6 +35,7 @@ interface HealthState {
   components: HealthComponents | null;
   quickWins: QuickWin[];
   contextRotRisk: "low" | "medium" | "high";
+  discoveredTestCount: number | null;
   loading: boolean;
   error: string | null;
 }
@@ -47,6 +48,7 @@ export function useHealth() {
     components: null,
     quickWins: [],
     contextRotRisk: "low",
+    discoveredTestCount: null,
     loading: false,
     error: null,
   });
@@ -62,6 +64,7 @@ export function useHealth() {
         components: health.components,
         quickWins: health.quickWins,
         contextRotRisk: health.contextRotRisk,
+        discoveredTestCount: health.discoveredTestCount ?? null,
         loading: false,
         error: null,
       });

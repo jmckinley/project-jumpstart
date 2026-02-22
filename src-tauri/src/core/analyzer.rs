@@ -407,7 +407,8 @@ pub fn apply_doc_to_file(file_path: &str, doc: &ModuleDoc) -> Result<(), String>
 
 fn walk_for_modules(dir: &Path, project_path: &str, results: &mut Vec<ModuleStatus>, depth: usize) {
     const MAX_DEPTH: usize = 10;
-    if depth > MAX_DEPTH {
+    const MAX_FILES: usize = 2000;
+    if depth > MAX_DEPTH || results.len() >= MAX_FILES {
         return;
     }
 
@@ -417,10 +418,19 @@ fn walk_for_modules(dir: &Path, project_path: &str, results: &mut Vec<ModuleStat
     };
 
     for entry in entries.flatten() {
+        if results.len() >= MAX_FILES {
+            return;
+        }
+
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
 
         if name.starts_with('.') {
+            continue;
+        }
+
+        // Skip symlinks to avoid infinite loops
+        if path.symlink_metadata().map_or(true, |m| m.file_type().is_symlink()) {
             continue;
         }
 

@@ -78,6 +78,8 @@ pub struct HealthScore {
     pub components: HealthComponents,
     pub quick_wins: Vec<QuickWin>,
     pub context_rot_risk: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub discovered_test_count: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

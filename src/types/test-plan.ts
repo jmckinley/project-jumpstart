@@ -171,6 +171,16 @@ export interface TestStalenessReport {
 }
 
 /**
+ * Result of automatic test discovery (without running tests)
+ */
+export interface TestDiscoveryResult {
+  frameworkName: string;
+  testCount: number;
+  method: "list_command" | "static_grep";
+  discoveredAt: string;
+}
+
+/**
  * TDD Phase configuration for UI display
  */
 export interface TDDPhaseConfig {

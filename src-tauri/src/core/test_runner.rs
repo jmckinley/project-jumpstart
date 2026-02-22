@@ -862,6 +862,345 @@ pub fn parse_coverage_lcov(path: &Path) -> Option<f64> {
     }
 }
 
+// =============================================================================
+// Test Discovery (count tests without running them)
+// =============================================================================
+
+/// Discover and count tests in a project without executing them.
+/// Returns (test_count, framework_name, method).
+/// Tries framework-specific list commands first, falls back to static grep.
+pub fn count_tests(project_path: &str) -> Result<(u32, String, String), String> {
+    let path = Path::new(project_path);
+
+    // Try framework-specific list commands first
+    if let Some(result) = count_vitest(path) {
+        return Ok(result);
+    }
+    if let Some(result) = count_playwright(path) {
+        return Ok(result);
+    }
+    if let Some(result) = count_cargo_tests(path) {
+        return Ok(result);
+    }
+    if let Some(result) = count_pytest(path) {
+        return Ok(result);
+    }
+    if let Some(result) = count_go_tests(path) {
+        return Ok(result);
+    }
+
+    // Fallback: static grep across all test files
+    let count = count_static_grep(path);
+    if count > 0 {
+        Ok((count, "static_grep".to_string(), "static_grep".to_string()))
+    } else {
+        Ok((0, "none".to_string(), "static_grep".to_string()))
+    }
+}
+
+/// Count tests via `npx vitest --list` (parses line count of test names).
+fn count_vitest(path: &Path) -> Option<(u32, String, String)> {
+    // Only try if vitest is a dependency
+    let pkg_json = path.join("package.json");
+    if pkg_json.exists() {
+        if let Ok(content) = fs::read_to_string(&pkg_json) {
+            if !content.contains("vitest") {
+                return None;
+            }
+        } else {
+            return None;
+        }
+    } else {
+        return None;
+    }
+
+    let output = Command::new("npx")
+        .args(["vitest", "--list", "--reporter=verbose"])
+        .current_dir(path)
+        .env("CI", "true")
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Each test line starts with spaces and contains a test name
+    // Count non-empty, non-heading lines
+    let count = stdout
+        .lines()
+        .filter(|line| {
+            let trimmed = line.trim();
+            !trimmed.is_empty()
+                && !trimmed.starts_with("RUN")
+                && !trimmed.starts_with("Test Files")
+                && !trimmed.starts_with("Tests")
+                && !trimmed.starts_with("Duration")
+                && !trimmed.starts_with("Start")
+                && !trimmed.contains(".test.")
+                && !trimmed.contains(".spec.")
+                && trimmed.starts_with(' ')
+        })
+        .count() as u32;
+
+    if count > 0 {
+        Some((count, "Vitest".to_string(), "list_command".to_string()))
+    } else {
+        None
+    }
+}
+
+/// Count tests via `npx playwright test --list`.
+fn count_playwright(path: &Path) -> Option<(u32, String, String)> {
+    let pkg_json = path.join("package.json");
+    if pkg_json.exists() {
+        if let Ok(content) = fs::read_to_string(&pkg_json) {
+            if !content.contains("playwright") {
+                return None;
+            }
+        } else {
+            return None;
+        }
+    } else {
+        return None;
+    }
+
+    let output = Command::new("npx")
+        .args(["playwright", "test", "--list"])
+        .current_dir(path)
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Playwright --list outputs lines like "  [chromium] > test.spec.ts:5:3 > test name"
+    let count = stdout
+        .lines()
+        .filter(|line| {
+            let trimmed = line.trim();
+            !trimmed.is_empty() && (trimmed.contains('>') || trimmed.contains("test"))
+        })
+        .count() as u32;
+
+    if count > 0 {
+        Some((count, "Playwright".to_string(), "list_command".to_string()))
+    } else {
+        None
+    }
+}
+
+/// Count tests via `cargo test -- --list` and grep for `: test$`.
+fn count_cargo_tests(path: &Path) -> Option<(u32, String, String)> {
+    if !path.join("Cargo.toml").exists() {
+        return None;
+    }
+
+    let output = Command::new("cargo")
+        .args(["test", "--", "--list"])
+        .current_dir(path)
+        .output()
+        .ok()?;
+
+    // cargo test -- --list returns success even if there are no tests
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let count = stdout
+        .lines()
+        .filter(|line| line.ends_with(": test"))
+        .count() as u32;
+
+    if count > 0 {
+        Some((count, "cargo test".to_string(), "list_command".to_string()))
+    } else {
+        None
+    }
+}
+
+/// Count tests via `pytest --collect-only -q`.
+fn count_pytest(path: &Path) -> Option<(u32, String, String)> {
+    let has_pytest = path.join("pytest.ini").exists()
+        || path.join("conftest.py").exists()
+        || path.join("pyproject.toml").exists();
+
+    if !has_pytest {
+        return None;
+    }
+
+    let output = Command::new("pytest")
+        .args(["--collect-only", "-q"])
+        .current_dir(path)
+        .output()
+        .ok()?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Last line is typically "X tests collected" or "X test collected"
+    for line in stdout.lines().rev() {
+        if line.contains("test") && line.contains("collected") {
+            // Parse "X tests collected" or "X test collected"
+            if let Some(num_str) = line.split_whitespace().next() {
+                if let Ok(count) = num_str.parse::<u32>() {
+                    return Some((count, "pytest".to_string(), "list_command".to_string()));
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Count tests via `go test -list '.*' ./...`.
+fn count_go_tests(path: &Path) -> Option<(u32, String, String)> {
+    if !path.join("go.mod").exists() {
+        return None;
+    }
+
+    let output = Command::new("go")
+        .args(["test", "-list", ".*", "./..."])
+        .current_dir(path)
+        .output()
+        .ok()?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let count = stdout
+        .lines()
+        .filter(|line| {
+            let trimmed = line.trim();
+            !trimmed.is_empty() && !trimmed.starts_with("ok") && !trimmed.starts_with("?")
+        })
+        .count() as u32;
+
+    if count > 0 {
+        Some((count, "go test".to_string(), "list_command".to_string()))
+    } else {
+        None
+    }
+}
+
+/// Count tests by statically grepping test files for test patterns.
+/// This is the universal fallback that works without installing any tools.
+/// Fast enough to call on every health score poll (~milliseconds).
+pub fn count_static_grep(path: &Path) -> u32 {
+    count_test_patterns_recursive(path, 0)
+}
+
+/// Recursively walk directories counting test pattern matches in test files.
+fn count_test_patterns_recursive(dir: &Path, depth: u32) -> u32 {
+    // Don't recurse too deeply
+    if depth > 10 {
+        return 0;
+    }
+
+    let entries = match fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return 0,
+    };
+
+    let mut count = 0u32;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+
+        // Skip common non-source directories
+        if name.starts_with('.')
+            || name == "node_modules"
+            || name == "target"
+            || name == "dist"
+            || name == "build"
+            || name == ".git"
+            || name == "__pycache__"
+            || name == "vendor"
+        {
+            continue;
+        }
+
+        if path.is_dir() {
+            count += count_test_patterns_recursive(&path, depth + 1);
+        } else if is_test_file(&name) {
+            if let Ok(content) = fs::read_to_string(&path) {
+                count += count_test_calls(&content, &name);
+            }
+        } else if name.ends_with(".rs") {
+            // Rust uses inline #[test] in regular source files
+            if let Ok(content) = fs::read_to_string(&path) {
+                count += content.matches("#[test]").count() as u32;
+            }
+        }
+    }
+
+    count
+}
+
+/// Check if a filename matches common test file naming patterns.
+pub fn is_test_file(name: &str) -> bool {
+    let lower = name.to_lowercase();
+
+    // JS/TS: *.test.*, *.spec.*
+    if lower.contains(".test.") || lower.contains(".spec.") {
+        return true;
+    }
+
+    // Python: test_*.py
+    if lower.starts_with("test_") && lower.ends_with(".py") {
+        return true;
+    }
+
+    // Go: *_test.go
+    if lower.ends_with("_test.go") {
+        return true;
+    }
+
+    // Rust files with inline tests are handled separately — here we look
+    // for dedicated test files only. Rust inline tests in source files are
+    // also counted if the source file itself is a test file name pattern.
+
+    false
+}
+
+/// Count test invocations within file content based on language patterns.
+pub fn count_test_calls(content: &str, filename: &str) -> u32 {
+    let lower_filename = filename.to_lowercase();
+    let mut count = 0u32;
+
+    if lower_filename.ends_with(".rs") {
+        // Rust: count #[test] attributes
+        count += content.matches("#[test]").count() as u32;
+    } else if lower_filename.ends_with(".py") {
+        // Python: count `def test_` function definitions
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("def test_") || trimmed.starts_with("async def test_") {
+                count += 1;
+            }
+        }
+    } else if lower_filename.ends_with(".go") {
+        // Go: count `func Test` function definitions
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("func Test") {
+                count += 1;
+            }
+        }
+    } else {
+        // JS/TS: count `it(`, `test(`, `it.each(`, `test.each(`
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("it(")
+                || trimmed.starts_with("it.each(")
+                || trimmed.starts_with("test(")
+                || trimmed.starts_with("test.each(")
+            {
+                count += 1;
+            }
+        }
+    }
+
+    count
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -891,6 +1230,76 @@ mod tests {
         assert_eq!(extract_number_before("10 passed", "passed"), Some(10));
         assert_eq!(extract_number_before("Tests: 5 failed", "failed"), Some(5));
         assert_eq!(extract_number_before("no numbers here", "here"), None);
+    }
+
+    #[test]
+    fn test_count_test_calls_js() {
+        let content = r#"
+describe("App", () => {
+  it("should render", () => {});
+  it("should handle click", () => {});
+  test("should update state", () => {});
+  test.each([1, 2])("should work for %d", () => {});
+});
+"#;
+        assert_eq!(count_test_calls(content, "App.test.tsx"), 4);
+    }
+
+    #[test]
+    fn test_count_test_calls_rust() {
+        let content = r#"
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_one() {}
+
+    #[test]
+    fn test_two() {}
+}
+"#;
+        assert_eq!(count_test_calls(content, "health.rs"), 2);
+    }
+
+    #[test]
+    fn test_count_test_calls_python() {
+        let content = r#"
+import pytest
+
+def test_add():
+    assert 1 + 1 == 2
+
+def test_subtract():
+    assert 2 - 1 == 1
+
+async def test_async_op():
+    pass
+
+def helper_function():
+    pass
+"#;
+        assert_eq!(count_test_calls(content, "test_math.py"), 3);
+    }
+
+    #[test]
+    fn test_is_test_file() {
+        assert!(is_test_file("App.test.tsx"));
+        assert!(is_test_file("utils.spec.ts"));
+        assert!(is_test_file("test_models.py"));
+        assert!(is_test_file("server_test.go"));
+        assert!(!is_test_file("App.tsx"));
+        assert!(!is_test_file("health.rs"));
+        assert!(!is_test_file("main.py"));
+        assert!(!is_test_file("server.go"));
+        assert!(!is_test_file("package.json"));
+    }
+
+    #[test]
+    fn test_count_static_grep_self_project() {
+        // Run static grep on our own project — should find #[test] annotations
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let count = count_static_grep(path);
+        // We have many cargo tests, so count should be > 0
+        assert!(count > 0, "Expected > 0 tests from static grep, got {}", count);
     }
 
     #[test]

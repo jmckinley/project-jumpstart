@@ -31,6 +31,7 @@ export interface HealthScore {
   components: HealthComponents;
   quickWins: QuickWin[];
   contextRotRisk: "low" | "medium" | "high";
+  discoveredTestCount?: number;
 }
 
 export interface HealthComponents {

@@ -57,7 +57,7 @@ const WEIGHT_PERFORMANCE: u32 = 12;
 /// Checks for CLAUDE.md existence, module documentation coverage, freshness, skills, tests.
 #[allow(dead_code)]
 pub fn calculate_health(project_path: &str, skill_count: u32) -> HealthScore {
-    calculate_health_with_tests(project_path, skill_count, None, None, None)
+    calculate_health_with_tests(project_path, skill_count, None, None, None, None)
 }
 
 /// Calculate health score with optional test metrics and performance score.
@@ -67,6 +67,7 @@ pub fn calculate_health_with_tests(
     test_coverage: Option<f64>,
     test_pass_rate: Option<f64>,
     performance_score: Option<u32>,
+    discovered_test_count: Option<u32>,
 ) -> HealthScore {
     let path = Path::new(project_path);
 
@@ -76,7 +77,7 @@ pub fn calculate_health_with_tests(
     let skills_score = calculate_skills_score(skill_count);
     let context_score = calculate_context_score(path);
     let enforcement_score = enforcement::calculate_enforcement_score(project_path);
-    let tests_score = calculate_tests_score(test_coverage, test_pass_rate);
+    let tests_score = calculate_tests_score(test_coverage, test_pass_rate, discovered_test_count);
     let perf_score = calculate_performance_score(performance_score);
 
     let total = claude_md_score + module_docs_stats.score + freshness_score + skills_score
@@ -116,6 +117,7 @@ pub fn calculate_health_with_tests(
         tests_score,
         test_coverage,
         test_pass_rate,
+        discovered_test_count,
     );
 
     HealthScore {
@@ -132,6 +134,7 @@ pub fn calculate_health_with_tests(
         },
         quick_wins,
         context_rot_risk,
+        discovered_test_count,
     }
 }
 
@@ -203,11 +206,24 @@ fn calculate_skills_score(skill_count: u32) -> u32 {
 }
 
 /// Score the tests component (0-10 points).
-/// Based on test coverage (60%) and pass rate (40%).
-/// - Coverage: 0-6 points based on coverage percentage
-/// - Pass rate: 0-4 points based on pass rate percentage
-fn calculate_tests_score(test_coverage: Option<f64>, test_pass_rate: Option<f64>) -> u32 {
-    // If no test data available, score is 0
+/// Uses tiered scoring with test discovery as a floor:
+/// - Discovery only: 1-3 points based on discovered test count
+/// - Run data: 0-10 points based on coverage (60%) and pass rate (40%)
+/// - Both: max(discovery, run_data) — run data typically wins
+fn calculate_tests_score(
+    test_coverage: Option<f64>,
+    test_pass_rate: Option<f64>,
+    discovered_test_count: Option<u32>,
+) -> u32 {
+    // Discovery-based floor score (0-3 points)
+    let discovery_score = match discovered_test_count {
+        Some(count) if count >= 50 => 3,
+        Some(count) if count >= 20 => 2,
+        Some(count) if count >= 1 => 1,
+        _ => 0,
+    };
+
+    // Run-data score (0-10 points)
     let coverage = test_coverage.unwrap_or(0.0);
     let pass_rate = test_pass_rate.unwrap_or(0.0);
 
@@ -223,7 +239,10 @@ fn calculate_tests_score(test_coverage: Option<f64>, test_pass_rate: Option<f64>
     // Full score at 100% pass rate, scales linearly
     let pass_rate_score = ((pass_rate / 100.0) * 4.0).round() as u32;
 
-    (coverage_score + pass_rate_score).min(WEIGHT_TESTS)
+    let run_score = (coverage_score + pass_rate_score).min(WEIGHT_TESTS);
+
+    // Take the max of discovery floor and run data
+    run_score.max(discovery_score).min(WEIGHT_TESTS)
 }
 
 /// Score the freshness component (0-12 points).
@@ -562,6 +581,7 @@ fn generate_quick_wins(
     tests: u32,
     test_coverage: Option<f64>,
     test_pass_rate: Option<f64>,
+    discovered_test_count: Option<u32>,
 ) -> Vec<QuickWin> {
     let mut wins = Vec::new();
 
@@ -675,13 +695,25 @@ fn generate_quick_wins(
         });
     }
 
-    // Tests: suggest based on coverage and pass rate
+    // Tests: suggest based on coverage, pass rate, and discovery
     if tests == 0 {
         wins.push(QuickWin {
             title: "Add test coverage".to_string(),
             description: "Create test plans and run tests to track code coverage and quality.".to_string(),
             impact: WEIGHT_TESTS,
             effort: "medium".to_string(),
+        });
+    } else if tests <= 3 && discovered_test_count.unwrap_or(0) > 0 {
+        // Tests discovered but not yet run through Project Jumpstart
+        let disc_count = discovered_test_count.unwrap_or(0);
+        wins.push(QuickWin {
+            title: "Run tests for full score".to_string(),
+            description: format!(
+                "{} tests discovered. Run them through Project Jumpstart to unlock up to 10 points.",
+                disc_count
+            ),
+            impact: WEIGHT_TESTS - tests,
+            effort: "low".to_string(),
         });
     }
 
@@ -805,22 +837,62 @@ mod tests {
 
     #[test]
     fn test_tests_score() {
-        // No test data
-        assert_eq!(calculate_tests_score(None, None), 0);
+        // No test data, no discovery
+        assert_eq!(calculate_tests_score(None, None, None), 0);
 
         // Full coverage (80%+) and full pass rate (100%)
-        assert_eq!(calculate_tests_score(Some(80.0), Some(100.0)), 10);
-        assert_eq!(calculate_tests_score(Some(100.0), Some(100.0)), 10);
+        assert_eq!(calculate_tests_score(Some(80.0), Some(100.0), None), 10);
+        assert_eq!(calculate_tests_score(Some(100.0), Some(100.0), None), 10);
 
         // Partial coverage
-        assert_eq!(calculate_tests_score(Some(40.0), Some(100.0)), 7); // 3 coverage + 4 pass
-        assert_eq!(calculate_tests_score(Some(0.0), Some(100.0)), 4); // 0 coverage + 4 pass
+        assert_eq!(calculate_tests_score(Some(40.0), Some(100.0), None), 7); // 3 coverage + 4 pass
+        assert_eq!(calculate_tests_score(Some(0.0), Some(100.0), None), 4); // 0 coverage + 4 pass
 
         // Partial pass rate
-        assert_eq!(calculate_tests_score(Some(80.0), Some(50.0)), 8); // 6 coverage + 2 pass
-        assert_eq!(calculate_tests_score(Some(80.0), Some(0.0)), 6); // 6 coverage + 0 pass
+        assert_eq!(calculate_tests_score(Some(80.0), Some(50.0), None), 8); // 6 coverage + 2 pass
+        assert_eq!(calculate_tests_score(Some(80.0), Some(0.0), None), 6); // 6 coverage + 0 pass
 
         // Both partial
-        assert_eq!(calculate_tests_score(Some(40.0), Some(50.0)), 5); // 3 coverage + 2 pass
+        assert_eq!(calculate_tests_score(Some(40.0), Some(50.0), None), 5); // 3 coverage + 2 pass
+    }
+
+    #[test]
+    fn test_tests_score_discovery_only() {
+        // No discovery, no runs
+        assert_eq!(calculate_tests_score(None, None, None), 0);
+        assert_eq!(calculate_tests_score(None, None, Some(0)), 0);
+
+        // 1-19 tests → 1 point
+        assert_eq!(calculate_tests_score(None, None, Some(1)), 1);
+        assert_eq!(calculate_tests_score(None, None, Some(19)), 1);
+
+        // 20-49 tests → 2 points
+        assert_eq!(calculate_tests_score(None, None, Some(20)), 2);
+        assert_eq!(calculate_tests_score(None, None, Some(49)), 2);
+
+        // 50+ tests → 3 points
+        assert_eq!(calculate_tests_score(None, None, Some(50)), 3);
+        assert_eq!(calculate_tests_score(None, None, Some(500)), 3);
+    }
+
+    #[test]
+    fn test_tests_score_run_data_overrides_discovery() {
+        // Full coverage + pass rate (10 pts) beats discovery (3 pts)
+        assert_eq!(calculate_tests_score(Some(80.0), Some(100.0), Some(500)), 10);
+    }
+
+    #[test]
+    fn test_tests_score_discovery_is_floor() {
+        // Discovery provides a floor: 50+ tests = 3 pts, but run data is only 0 pts
+        assert_eq!(calculate_tests_score(Some(0.0), Some(0.0), Some(50)), 3);
+        // 20+ tests = 2 pts floor, run data gives 1 pt → floor wins
+        assert_eq!(calculate_tests_score(Some(10.0), Some(0.0), Some(20)), 2);
+    }
+
+    #[test]
+    fn test_tests_score_no_discovery_no_runs() {
+        assert_eq!(calculate_tests_score(None, None, None), 0);
+        assert_eq!(calculate_tests_score(Some(0.0), Some(0.0), None), 0);
+        assert_eq!(calculate_tests_score(Some(0.0), Some(0.0), Some(0)), 0);
     }
 }

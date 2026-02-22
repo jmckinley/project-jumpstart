@@ -26,8 +26,8 @@ test.describe("Dashboard", () => {
     // Health score should be visible
     await expect(page.getByText("Health Score").first()).toBeVisible();
 
-    // Score value should be displayed (75 from mock)
-    await expect(page.getByText("75").first()).toBeVisible();
+    // Score value should be displayed (77 from mock)
+    await expect(page.getByText("77").first()).toBeVisible();
   });
 
   test("displays quick wins", async ({ page }) => {
@@ -51,6 +51,11 @@ test.describe("Dashboard", () => {
     await expect(page.getByText("Enforcement").first()).toBeVisible();
     await expect(page.getByText("Tests").first()).toBeVisible();
     await expect(page.getByText("Performance").first()).toBeVisible();
+  });
+
+  test("shows discovered test count when tests are discovered", async ({ page }) => {
+    // Mock has discoveredTestCount: 42 and tests: 2 (low score triggers display)
+    await expect(page.getByText("(42 discovered)").first()).toBeVisible({ timeout: 5000 });
   });
 
   test("displays recent activity", async ({ page }) => {

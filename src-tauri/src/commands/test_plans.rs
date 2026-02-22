@@ -63,6 +63,25 @@ use crate::models::test_plan::{
 };
 
 // =============================================================================
+// Test Discovery
+// =============================================================================
+
+/// Count tests in a project without running them.
+/// Uses framework-specific list commands with static grep fallback.
+#[tauri::command]
+pub async fn count_project_tests(
+    project_path: String,
+) -> Result<crate::models::test_plan::TestDiscoveryResult, String> {
+    let (count, framework, method) = test_runner::count_tests(&project_path)?;
+    Ok(crate::models::test_plan::TestDiscoveryResult {
+        framework_name: framework,
+        test_count: count,
+        method,
+        discovered_at: Utc::now().to_rfc3339(),
+    })
+}
+
+// =============================================================================
 // Test Plan CRUD
 // =============================================================================
 

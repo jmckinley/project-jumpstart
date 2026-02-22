@@ -167,6 +167,7 @@ import type {
   GeneratedTestSuggestion,
   TestFrameworkInfo,
   TestStalenessReport,
+  TestDiscoveryResult,
 } from "@/types/test-plan";
 
 export async function scanProject(path: string): Promise<DetectionResult> {
@@ -694,6 +695,14 @@ export async function generateTestSuggestions(
     projectPath,
     filePaths: filePaths ?? null,
   });
+}
+
+// =============================================================================
+// Test Discovery
+// =============================================================================
+
+export async function countProjectTests(projectPath: string): Promise<TestDiscoveryResult> {
+  return invoke<TestDiscoveryResult>("count_project_tests", { projectPath });
 }
 
 // =============================================================================

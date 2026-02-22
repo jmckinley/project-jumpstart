@@ -41,6 +41,7 @@ use tauri::State;
 use crate::core::ai;
 use crate::core::generator;
 use crate::core::health;
+use crate::core::test_runner;
 use crate::db::{self, AppState};
 use crate::models::project::{HealthScore, Project};
 
@@ -260,11 +261,25 @@ pub async fn get_health_score(
         }
     };
 
+    // When no test run data exists, discover tests via fast static grep.
+    // Uses pattern matching only (no framework commands) so it completes in milliseconds,
+    // safe to call on every 15-second health score poll.
+    let has_run_data = test_coverage.map_or(false, |c| c > 0.0)
+        || test_pass_rate.map_or(false, |r| r > 0.0);
+
+    let discovered_test_count = if !has_run_data {
+        let count = test_runner::count_static_grep(std::path::Path::new(&project_path));
+        if count > 0 { Some(count) } else { None }
+    } else {
+        None
+    };
+
     Ok(health::calculate_health_with_tests(
         &project_path,
         skill_count,
         test_coverage,
         test_pass_rate,
         perf_score,
+        discovered_test_count,
     ))
 }

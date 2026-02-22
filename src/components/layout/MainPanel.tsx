@@ -121,6 +121,7 @@ import { useHealth } from "@/hooks/useHealth";
 import { useModules } from "@/hooks/useModules";
 import { useSkills } from "@/hooks/useSkills";
 import { useProjectStore } from "@/stores/projectStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { SkillsList } from "@/components/skills/SkillsList";
 import { SkillEditor } from "@/components/skills/SkillEditor";
 import { PatternDetector } from "@/components/skills/PatternDetector";
@@ -193,13 +194,14 @@ interface MainPanelProps {
 }
 
 function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void }) {
-  const { score, components, quickWins, contextRotRisk, refresh } = useHealth();
+  const { score, components, quickWins, contextRotRisk, discoveredTestCount, refresh } = useHealth();
   const { modules, hasScanned, scan: scanModules } = useModules();
   const activeProject = useProjectStore((s) => s.activeProject);
+  const hasApiKey = useSettingsStore((s) => s.hasApiKey);
+  const setHasApiKey = useSettingsStore((s) => s.setHasApiKey);
   const [activities, setActivities] = useState<Activity[]>([]);
 
   // Smart Next Step state
-  const [hasApiKey, setHasApiKey] = useState(false);
   const [hasClaudeMd, setHasClaudeMd] = useState(false);
   const [hasSkills, setHasSkills] = useState(false);
   const [hasAgents, setHasAgents] = useState(false);
@@ -410,7 +412,7 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <HealthScore score={score} components={components} />
+        <HealthScore score={score} components={components} discoveredTestCount={discoveredTestCount} />
         <QuickWins
           quickWins={quickWins}
           onAction={(win) => {
