@@ -144,5 +144,14 @@ describe("TestStalenessAlert", () => {
       fireEvent.click(screen.getByText("Check Staleness"));
       expect(onCheck).toHaveBeenCalledTimes(1);
     });
+
+    it("should not pass the click event to onCheck", () => {
+      const onCheck = vi.fn();
+      render(<TestStalenessAlert report={null} loading={false} onCheck={onCheck} />);
+      fireEvent.click(screen.getByText("Check Staleness"));
+      // onCheck must be called with no arguments to prevent SyntheticEvent
+      // from leaking into Tauri IPC serialization (causes cyclic JSON error)
+      expect(onCheck).toHaveBeenCalledWith();
+    });
   });
 });

@@ -308,9 +308,10 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
     scanModules();
     fetchActivities();
 
-    // Poll activities every 15 seconds
+    // Poll activities and health score every 15 seconds
     const interval = setInterval(() => {
       fetchActivities();
+      refresh();
     }, 15_000);
 
     return () => clearInterval(interval);
@@ -1945,7 +1946,7 @@ function MemoryView() {
   );
 }
 
-function PerformanceView() {
+function PerformanceView({ onAnalysisComplete }: { onAnalysisComplete?: () => void }) {
   const {
     review,
     analyzing,
@@ -1961,6 +1962,11 @@ function PerformanceView() {
   } = usePerformance();
 
   const [activeTab, setActiveTab] = useState<"overview" | "issues" | "architecture">("overview");
+
+  const handleAnalyze = useCallback(async () => {
+    await analyze();
+    onAnalysisComplete?.();
+  }, [analyze, onAnalysisComplete]);
 
   useEffect(() => {
     loadHistory();
@@ -2013,7 +2019,7 @@ function PerformanceView() {
           score={review?.overallScore ?? 0}
           components={review?.components ?? null}
           analyzing={analyzing}
-          onAnalyze={analyze}
+          onAnalyze={handleAnalyze}
         />
       )}
 
@@ -2065,7 +2071,7 @@ function renderSection(
     case "context":
       return <ContextView />;
     case "performance":
-      return <PerformanceView />;
+      return <PerformanceView onAnalysisComplete={onCompletionChange} />;
     case "memory":
       return <MemoryView />;
     case "enforcement":

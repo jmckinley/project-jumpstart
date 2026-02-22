@@ -50,7 +50,7 @@ export function TestStalenessAlert({ report, loading, onCheck }: TestStalenessAl
           )}
         </div>
         <button
-          onClick={onCheck}
+          onClick={() => onCheck()}
           disabled={loading}
           className="rounded-md border border-neutral-700 px-3 py-1 text-xs text-neutral-400 transition-colors hover:border-neutral-600 hover:text-neutral-200 disabled:opacity-50"
         >

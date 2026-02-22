@@ -180,11 +180,11 @@ test.describe("Performance Issues Tab", () => {
   test("displays all issues from analysis", async ({ page }) => {
     const main = page.locator("main");
 
-    // All mock issues should be visible
-    await expect(main.getByText("N+1 query detected in user loader")).toBeVisible({ timeout: 5000 });
-    await expect(main.getByText("Inline object in JSX prop")).toBeVisible();
-    await expect(main.getByText("Event listener without cleanup")).toBeVisible();
-    await expect(main.getByText("Heavy dependency detected: moment.js")).toBeVisible();
+    // All mock issues should be visible (use .first() since titles appear in both RemediationPanel and IssuesList)
+    await expect(main.getByText("N+1 query detected in user loader").first()).toBeVisible({ timeout: 5000 });
+    await expect(main.getByText("Inline object in JSX prop").first()).toBeVisible();
+    await expect(main.getByText("Event listener without cleanup").first()).toBeVisible();
+    await expect(main.getByText("Heavy dependency detected: moment.js").first()).toBeVisible();
   });
 
   test("displays severity summary counts", async ({ page }) => {
@@ -198,7 +198,7 @@ test.describe("Performance Issues Tab", () => {
 
   test("displays severity badges on issues", async ({ page }) => {
     const main = page.locator("main");
-    await expect(main.getByText("N+1 query detected")).toBeVisible({ timeout: 5000 });
+    await expect(main.getByText("N+1 query detected").first()).toBeVisible({ timeout: 5000 });
 
     // Severity badges should be displayed
     await expect(main.getByText("critical").first()).toBeVisible();
@@ -229,7 +229,7 @@ test.describe("Performance Issues Tab", () => {
 
   test("displays category labels on issues", async ({ page }) => {
     const main = page.locator("main");
-    await expect(main.getByText("N+1 query detected")).toBeVisible({ timeout: 5000 });
+    await expect(main.getByText("N+1 query detected").first()).toBeVisible({ timeout: 5000 });
 
     // Category labels from mock data (use exact to avoid matching filter dropdown options)
     await expect(main.getByText("query-patterns", { exact: true })).toBeVisible();
@@ -238,40 +238,40 @@ test.describe("Performance Issues Tab", () => {
 
   test("filters issues by category", async ({ page }) => {
     const main = page.locator("main");
-    await expect(main.getByText("N+1 query detected")).toBeVisible({ timeout: 5000 });
+    await expect(main.getByText("N+1 query detected").first()).toBeVisible({ timeout: 5000 });
 
     // Select "Memory" category filter
     const categorySelect = main.locator("select").first();
     await categorySelect.selectOption("memory");
 
-    // Should only show memory issues
-    await expect(main.getByText("Event listener without cleanup")).toBeVisible();
+    // Should only show memory issues (use heading to target IssuesList cards, not RemediationPanel)
+    await expect(main.getByRole("heading", { name: "Event listener without cleanup" })).toBeVisible();
 
-    // Other issues should be hidden
-    await expect(main.getByText("N+1 query detected in user loader")).not.toBeVisible();
-    await expect(main.getByText("Inline object in JSX prop")).not.toBeVisible();
-    await expect(main.getByText("Heavy dependency detected: moment.js")).not.toBeVisible();
+    // Other issues should be hidden from the issues list (RemediationPanel still shows them)
+    await expect(main.getByRole("heading", { name: "N+1 query detected in user loader" })).not.toBeVisible();
+    await expect(main.getByRole("heading", { name: "Inline object in JSX prop" })).not.toBeVisible();
+    await expect(main.getByRole("heading", { name: "Heavy dependency detected: moment.js" })).not.toBeVisible();
   });
 
   test("filters issues by severity", async ({ page }) => {
     const main = page.locator("main");
-    await expect(main.getByText("N+1 query detected")).toBeVisible({ timeout: 5000 });
+    await expect(main.getByText("N+1 query detected").first()).toBeVisible({ timeout: 5000 });
 
     // Select "Critical" severity filter
     const severitySelect = main.locator("select").nth(1);
     await severitySelect.selectOption("critical");
 
-    // Should only show critical issues
-    await expect(main.getByText("N+1 query detected in user loader")).toBeVisible();
+    // Should only show critical issues (use heading to target IssuesList cards)
+    await expect(main.getByRole("heading", { name: "N+1 query detected in user loader" })).toBeVisible();
 
-    // Warning and info issues should be hidden
-    await expect(main.getByText("Inline object in JSX prop")).not.toBeVisible();
-    await expect(main.getByText("Heavy dependency detected: moment.js")).not.toBeVisible();
+    // Warning and info issues should be hidden from the issues list
+    await expect(main.getByRole("heading", { name: "Inline object in JSX prop" })).not.toBeVisible();
+    await expect(main.getByRole("heading", { name: "Heavy dependency detected: moment.js" })).not.toBeVisible();
   });
 
   test("shows no-match message when filters exclude all issues", async ({ page }) => {
     const main = page.locator("main");
-    await expect(main.getByText("N+1 query detected")).toBeVisible({ timeout: 5000 });
+    await expect(main.getByText("N+1 query detected").first()).toBeVisible({ timeout: 5000 });
 
     // Select a category that has no critical issues
     const categorySelect = main.locator("select").first();
@@ -283,19 +283,19 @@ test.describe("Performance Issues Tab", () => {
 
   test("resets filters to show all issues", async ({ page }) => {
     const main = page.locator("main");
-    await expect(main.getByText("N+1 query detected")).toBeVisible({ timeout: 5000 });
+    await expect(main.getByText("N+1 query detected").first()).toBeVisible({ timeout: 5000 });
 
-    // Filter to memory only
+    // Filter to memory only (use heading to target IssuesList cards)
     const categorySelect = main.locator("select").first();
     await categorySelect.selectOption("memory");
-    await expect(main.getByText("N+1 query detected in user loader")).not.toBeVisible();
+    await expect(main.getByRole("heading", { name: "N+1 query detected in user loader" })).not.toBeVisible();
 
     // Reset to all
     await categorySelect.selectOption("all");
 
     // All issues should be visible again
-    await expect(main.getByText("N+1 query detected in user loader")).toBeVisible();
-    await expect(main.getByText("Event listener without cleanup")).toBeVisible();
+    await expect(main.getByRole("heading", { name: "N+1 query detected in user loader" })).toBeVisible();
+    await expect(main.getByRole("heading", { name: "Event listener without cleanup" })).toBeVisible();
   });
 });
 
@@ -419,7 +419,7 @@ test.describe("Performance Tab Switching", () => {
 
     // Switch to Issues
     await main.getByText("Issues (4)").click();
-    await expect(main.getByText("N+1 query detected")).toBeVisible({ timeout: 5000 });
+    await expect(main.getByText("N+1 query detected").first()).toBeVisible({ timeout: 5000 });
 
     // Performance Score should not be visible (Overview content hidden)
     await expect(main.getByText("Performance Score")).not.toBeVisible();
@@ -449,13 +449,13 @@ test.describe("Performance Tab Switching", () => {
 
     // Go to Issues
     await main.getByText("Issues (4)").click();
-    await expect(main.getByText("N+1 query detected")).toBeVisible({ timeout: 5000 });
+    await expect(main.getByText("N+1 query detected").first()).toBeVisible({ timeout: 5000 });
 
     // Go to Architecture
     await main.getByText("Architecture").click();
     await expect(main.getByText("Architecture Review")).toBeVisible({ timeout: 5000 });
 
     // Issues content should be hidden
-    await expect(main.getByText("N+1 query detected")).not.toBeVisible();
+    await expect(main.getByRole("heading", { name: "N+1 query detected in user loader" })).not.toBeVisible();
   });
 });

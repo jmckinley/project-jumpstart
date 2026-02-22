@@ -698,7 +698,7 @@ export async function checkTestStaleness(
 ): Promise<TestStalenessReport> {
   return invoke<TestStalenessReport>("check_test_staleness", {
     projectPath,
-    lookbackCommits: lookbackCommits ?? null,
+    lookbackCommits: typeof lookbackCommits === "number" ? lookbackCommits : null,
   });
 }
 
