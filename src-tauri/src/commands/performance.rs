@@ -158,10 +158,8 @@ pub async fn list_performance_reviews(
         .map_err(|e| format!("Failed to query reviews: {}", e))?;
 
     let mut result = Vec::new();
-    for review in reviews {
-        if let Ok(r) = review {
-            result.push(r);
-        }
+    for r in reviews.flatten() {
+        result.push(r);
     }
 
     Ok(result)

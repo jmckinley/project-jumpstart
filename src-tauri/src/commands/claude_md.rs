@@ -264,8 +264,8 @@ pub async fn get_health_score(
     // When no test run data exists, discover tests via fast static grep.
     // Uses pattern matching only (no framework commands) so it completes in milliseconds,
     // safe to call on every 15-second health score poll.
-    let has_run_data = test_coverage.map_or(false, |c| c > 0.0)
-        || test_pass_rate.map_or(false, |r| r > 0.0);
+    let has_run_data = test_coverage.is_some_and(|c| c > 0.0)
+        || test_pass_rate.is_some_and(|r| r > 0.0);
 
     let discovered_test_count = if !has_run_data {
         let count = test_runner::count_static_grep(std::path::Path::new(&project_path));
