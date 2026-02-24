@@ -9,11 +9,11 @@ Use this document to bootstrap a new Claude Code session with full project conte
 | Field | Value |
 |-------|-------|
 | **Branch** | `main` |
-| **Latest Commit** | `abfb8f9` — feat: Smart Session Handoff + Dashboard 3-tier redesign |
+| **Latest Commit** | `79f01c3` — fix: Health score loads instantly on large projects (spawn_blocking + skip list) |
 | **Status** | Feature-complete (Beta Ready) |
-| **Tests** | 1,470 total (1,033 frontend + 194 Rust + 243 E2E) |
+| **Tests** | 1,472 total (1,034 frontend + 195 Rust + 243 E2E) |
 | **Build** | Passing locally; CI triggers on `v*` tags |
-| **Latest Tag** | `v1.0.0-beta.7` |
+| **Latest Tag** | `v1.0.0-beta.24` |
 
 ---
 
@@ -56,6 +56,20 @@ project-jumpstart/
 ---
 
 ## Recent Changes (Latest Session — Feb 24, 2026)
+
+### Health Score Reliability + Session Insights Fix (`79f01c3`)
+
+**Problem**: Health score showed 0 on large projects (e.g., 9.6GB with `.next`, `data`, `models` dirs). Synchronous filesystem I/O inside async Tauri commands blocked all Tokio worker threads, preventing IPC responses from being sent back. Multiple concurrent calls (hook effect + dashboard effect + React StrictMode) amplified the deadlock.
+
+**What shipped**:
+- **`spawn_blocking` + 10s timeout** in `get_health_score` (`commands/claude_md.rs`) — moves filesystem scanning to a dedicated thread pool; if it takes >10s, returns a DB-only fallback score
+- **Shared `SKIP_DIRS` constant** in `core/test_runner.rs` — expanded from ~8 to 30+ directories (`.next`, `.nuxt`, `data`, `models`, `playwright-report`, etc.), used by `health.rs` and `freshness.rs` for consistent exclusion
+- **File size guards** (512KB) in `health.rs` and `test_runner.rs` — skip giant files during doc header scanning and test pattern grep
+- **Reduced max recursion depth** from 10 to 6 in `count_test_patterns_recursive`
+- **Simplified `useHealth` hook** — stable `fetchScore` callback (empty deps), keyed on `activeProject?.id`; removed duplicate `refresh()` calls from `MainPanel.tsx` DashboardView
+- **Session Insights serde fix** — added `#[serde(alias = "rec_type")]` to `SessionRecommendation` so both camelCase (`recType`) and snake_case (`rec_type`) are accepted from AI responses
+
+**Files modified**: `commands/claude_md.rs`, `core/test_runner.rs`, `core/health.rs`, `core/freshness.rs`, `hooks/useHealth.ts`, `hooks/useHealth.test.ts`, `components/layout/MainPanel.tsx`, `commands/session_analysis.rs`
 
 ### Smart Session Handoff + Dashboard 3-Tier Redesign (`abfb8f9`)
 
@@ -232,7 +246,7 @@ SESSION_ID=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.st
 5. **Test assertion updates** — Adding optional callback params requires updating `toHaveBeenCalledWith` assertions in existing tests to include `undefined`
 6. **macOS signing** — Release build requires 6 signing/notarization secrets in GitHub repo settings
 7. **RALPH AI mode** — Requires API key; heuristic mode works but gives simpler feedback
-8. **Health score polling** — Fixed cyclic JSON error (commit `55b33fc`), but watch for similar serialization issues in nested types
+8. **Large project scanning** — Projects >5GB may hit the 10s health score timeout; score falls back to DB-only data (no filesystem-based doc coverage or test discovery). Expanding `SKIP_DIRS` in `core/test_runner.rs` is the fix for new directory patterns.
 
 ---
 
