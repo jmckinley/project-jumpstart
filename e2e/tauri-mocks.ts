@@ -954,6 +954,8 @@ export async function setupTauriMocks(page: Page, options: {
           return { ...mocks.skills[0], name: args?.name || mocks.skills[0].name, description: args?.description || mocks.skills[0].description, content: args?.content || mocks.skills[0].content, updatedAt: new Date().toISOString() };
         case "delete_skill":
           return null;
+        case "export_skill_to_file":
+          return `/mock/project/.claude/skills/mock-skill/SKILL.md`;
         case "detect_patterns":
           await new Promise(r => setTimeout(r, 300));
           return mocks.patterns;
@@ -969,6 +971,8 @@ export async function setupTauriMocks(page: Page, options: {
           return null;
         case "increment_agent_usage":
           return 1;
+        case "export_agent_to_file":
+          return `/mock/project/.claude/agents/mock-agent.md`;
         case "enhance_agent_instructions":
           await new Promise(r => setTimeout(r, 500));
           return "# Enhanced Instructions\n\nYou are an expert test-driven development agent.\n\n## Workflow\n1. Write a failing test\n2. Implement minimal code to pass\n3. Refactor while green\n\n## Rules\n- Never skip the red phase\n- Keep tests atomic and focused";

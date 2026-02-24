@@ -33,6 +33,10 @@ const VALID_ICON_NAMES = [
   "FileText",
   "Store",
   "Terminal",
+  "Cpu",
+  "Zap",
+  "Box",
+  "Building",
 ];
 
 // Valid StackExtras keys
@@ -47,9 +51,9 @@ const VALID_EXTRAS_KEYS = [
 
 describe("stackTemplates", () => {
   describe("STACK_TEMPLATES export", () => {
-    it("should export an array of 12 templates", () => {
+    it("should export an array of 16 templates", () => {
       expect(STACK_TEMPLATES).toBeInstanceOf(Array);
-      expect(STACK_TEMPLATES).toHaveLength(12);
+      expect(STACK_TEMPLATES).toHaveLength(16);
     });
 
     it("each template should have required fields (id, name, description, icon, language, framework)", () => {

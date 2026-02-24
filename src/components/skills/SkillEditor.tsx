@@ -32,6 +32,8 @@
 
 import { useState, useEffect } from "react";
 import type { Skill } from "@/types/skill";
+import { exportSkillToFile } from "@/lib/tauri";
+import { useProjectStore } from "@/stores/projectStore";
 
 interface SkillEditorProps {
   skill: Skill | null;
@@ -43,6 +45,9 @@ export function SkillEditor({ skill, onSave, onCancel }: SkillEditorProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [content, setContent] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportResult, setExportResult] = useState<string | null>(null);
+  const activeProject = useProjectStore((s) => s.activeProject);
 
   // Sync form state when the selected skill changes
   useEffect(() => {
@@ -69,8 +74,23 @@ export function SkillEditor({ skill, onSave, onCancel }: SkillEditorProps) {
     onCancel();
   };
 
+  const handleExport = async () => {
+    if (!skill || !skill.id || !activeProject) return;
+    setExporting(true);
+    setExportResult(null);
+    try {
+      const path = await exportSkillToFile(skill.id, activeProject.path);
+      setExportResult(path);
+    } catch (err) {
+      setExportResult(`Error: ${err}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const isEditing = skill !== null && skill.id !== "";
   const canSave = name.trim().length > 0;
+  const canExport = isEditing && activeProject !== null;
 
   return (
     <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-5">
@@ -133,6 +153,17 @@ export function SkillEditor({ skill, onSave, onCancel }: SkillEditorProps) {
           />
         </div>
 
+        {/* Export result */}
+        {exportResult && (
+          <div className={`rounded-md px-3 py-2 text-xs font-mono ${
+            exportResult.startsWith("Error")
+              ? "bg-red-500/10 text-red-400"
+              : "bg-green-500/10 text-green-400"
+          }`}>
+            {exportResult.startsWith("Error") ? exportResult : `Exported to ${exportResult}`}
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex items-center justify-end gap-3 border-t border-neutral-800 pt-4">
           <button
@@ -141,6 +172,15 @@ export function SkillEditor({ skill, onSave, onCancel }: SkillEditorProps) {
           >
             Cancel
           </button>
+          {canExport && (
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="rounded-md border border-emerald-700 bg-emerald-900/30 px-4 py-2 text-sm font-medium text-emerald-400 transition-colors hover:bg-emerald-900/50 disabled:opacity-50"
+            >
+              {exporting ? "Exporting..." : "Export to .claude"}
+            </button>
+          )}
           <button
             onClick={handleSave}
             disabled={!canSave}

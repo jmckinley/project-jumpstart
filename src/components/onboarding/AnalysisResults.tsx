@@ -70,6 +70,10 @@ import {
   FileText,
   Store,
   Terminal,
+  Cpu,
+  Zap,
+  Box,
+  Building,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
@@ -87,6 +91,10 @@ const TEMPLATE_ICONS: Record<string, React.ElementType> = {
   FileText,
   Store,
   Terminal,
+  Cpu,
+  Zap,
+  Box,
+  Building,
 };
 
 function getTemplateIcon(iconName: string) {

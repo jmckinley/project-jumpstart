@@ -21,6 +21,7 @@
 //! - delete_agent - Delete an agent by ID
 //! - increment_agent_usage - Bump usage count for an agent
 //! - enhance_agent_instructions - AI-enhance an agent's instructions
+//! - export_agent_to_file - Export an agent to .claude/agents/<slug>.md
 //!
 //! PATTERNS:
 //! - All commands use AppState for DB access
@@ -272,6 +273,104 @@ pub async fn increment_agent_usage(id: String, state: State<'_, AppState>) -> Re
     Ok(count)
 }
 
+/// Export an agent to `.claude/agents/<slug>.md` with YAML frontmatter.
+/// Creates the directory structure and writes the file with proper Claude Code format.
+#[tauri::command]
+pub async fn export_agent_to_file(
+    agent_id: String,
+    project_path: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let db = state.db.lock().map_err(|e| format!("DB lock error: {}", e))?;
+
+    let agent: Agent = db
+        .query_row(
+            "SELECT id, project_id, name, description, tier, category, instructions,
+                    workflow, tools, trigger_patterns, usage_count, created_at, updated_at
+             FROM agents WHERE id = ?1",
+            [&agent_id],
+            map_agent_row,
+        )
+        .map_err(|e| format!("Agent not found: {}", e))?;
+
+    // Generate slug from name (lowercase, hyphens for spaces, strip non-alphanumeric)
+    let slug: String = agent
+        .name
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '-' })
+        .collect::<String>()
+        .split('-')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<&str>>()
+        .join("-");
+
+    let agents_dir = std::path::Path::new(&project_path)
+        .join(".claude")
+        .join("agents");
+
+    std::fs::create_dir_all(&agents_dir)
+        .map_err(|e| format!("Failed to create directory: {}", e))?;
+
+    let file_path = agents_dir.join(format!("{}.md", slug));
+
+    // Map agent tools to allowed-tools list, or use defaults
+    let allowed_tools = if let Some(ref tools) = agent.tools {
+        if tools.is_empty() {
+            vec!["Read", "Glob", "Grep", "Edit", "Write", "Bash"]
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>()
+        } else {
+            tools.iter().map(|t| t.name.clone()).collect::<Vec<_>>()
+        }
+    } else {
+        vec!["Read", "Glob", "Grep", "Edit", "Write", "Bash"]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+    };
+
+    let tools_yaml = allowed_tools
+        .iter()
+        .map(|t| format!("  - {}", t))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    // Build markdown body
+    let mut body = format!("# {}\n\n{}", agent.name, agent.instructions);
+
+    // Append workflow steps if present
+    if let Some(ref workflow) = agent.workflow {
+        if !workflow.is_empty() {
+            body.push_str("\n\n## Workflow\n\n");
+            for (i, step) in workflow.iter().enumerate() {
+                body.push_str(&format!("{}. **{}**: {}\n", i + 1, step.action, step.description));
+            }
+        }
+    }
+
+    let content = format!(
+        "---\n\
+         description: {}\n\
+         model: sonnet\n\
+         allowed-tools:\n\
+         {}\n\
+         ---\n\
+         \n\
+         {}",
+        agent.description,
+        tools_yaml,
+        body,
+    );
+
+    std::fs::write(&file_path, &content)
+        .map_err(|e| format!("Failed to write agent file: {}", e))?;
+
+    let result_path = file_path.to_string_lossy().to_string();
+    Ok(result_path)
+}
+
 /// Enhance an agent's instructions using AI.
 /// Optionally includes project context for more relevant enhancement.
 #[tauri::command]
@@ -488,4 +587,123 @@ fn map_agent_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Agent> {
         created_at,
         updated_at,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_export_agent_creates_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().to_str().unwrap().to_string();
+
+        let agent = Agent {
+            id: "test-id".to_string(),
+            project_id: Some("proj-1".to_string()),
+            name: "TDD Test Writer".to_string(),
+            description: "Writes failing tests for TDD red phase".to_string(),
+            tier: "advanced".to_string(),
+            category: "testing".to_string(),
+            instructions: "Write failing tests that capture expected behavior.".to_string(),
+            workflow: Some(vec![
+                WorkflowStep {
+                    step: 1,
+                    action: "Analyze".to_string(),
+                    description: "Read the feature requirements".to_string(),
+                },
+                WorkflowStep {
+                    step: 2,
+                    action: "Write Test".to_string(),
+                    description: "Write a focused failing test".to_string(),
+                },
+            ]),
+            tools: Some(vec![
+                AgentTool {
+                    name: "Read".to_string(),
+                    description: "Read files".to_string(),
+                    required: true,
+                },
+                AgentTool {
+                    name: "Write".to_string(),
+                    description: "Write files".to_string(),
+                    required: true,
+                },
+            ]),
+            trigger_patterns: None,
+            usage_count: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        // Generate slug
+        let slug: String = agent
+            .name
+            .to_lowercase()
+            .chars()
+            .map(|c| if c.is_alphanumeric() { c } else { '-' })
+            .collect::<String>()
+            .split('-')
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<&str>>()
+            .join("-");
+
+        assert_eq!(slug, "tdd-test-writer");
+
+        let agents_dir = std::path::Path::new(&project_path)
+            .join(".claude")
+            .join("agents");
+        std::fs::create_dir_all(&agents_dir).unwrap();
+
+        let file_path = agents_dir.join(format!("{}.md", slug));
+
+        // Build allowed-tools from agent tools
+        let allowed_tools: Vec<String> = agent
+            .tools
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|t| t.name.clone())
+            .collect();
+
+        let tools_yaml = allowed_tools
+            .iter()
+            .map(|t| format!("  - {}", t))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let mut body = format!("# {}\n\n{}", agent.name, agent.instructions);
+        if let Some(ref workflow) = agent.workflow {
+            body.push_str("\n\n## Workflow\n\n");
+            for (i, step) in workflow.iter().enumerate() {
+                body.push_str(&format!("{}. **{}**: {}\n", i + 1, step.action, step.description));
+            }
+        }
+
+        let content = format!(
+            "---\n\
+             description: {}\n\
+             model: sonnet\n\
+             allowed-tools:\n\
+             {}\n\
+             ---\n\
+             \n\
+             {}",
+            agent.description, tools_yaml, body,
+        );
+
+        std::fs::write(&file_path, &content).unwrap();
+
+        // Verify
+        assert!(file_path.exists());
+        let written = std::fs::read_to_string(&file_path).unwrap();
+        assert!(written.contains("description: Writes failing tests for TDD red phase"));
+        assert!(written.contains("model: sonnet"));
+        assert!(written.contains("  - Read"));
+        assert!(written.contains("  - Write"));
+        assert!(written.contains("# TDD Test Writer"));
+        assert!(written.contains("## Workflow"));
+        assert!(written.contains("**Analyze**: Read the feature requirements"));
+        assert!(written.contains("**Write Test**: Write a focused failing test"));
+    }
 }

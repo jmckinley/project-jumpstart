@@ -39,6 +39,10 @@ vi.mock("lucide-react", () => ({
   FileText: () => <span data-testid="icon-filetext">FileText</span>,
   Store: () => <span data-testid="icon-store">Store</span>,
   Terminal: () => <span data-testid="icon-terminal">Terminal</span>,
+  Cpu: () => <span data-testid="icon-cpu">Cpu</span>,
+  Zap: () => <span data-testid="icon-zap">Zap</span>,
+  Box: () => <span data-testid="icon-box">Box</span>,
+  Building: () => <span data-testid="icon-building">Building</span>,
   ChevronDown: () => <span data-testid="icon-chevrondown">ChevronDown</span>,
   ChevronUp: () => <span data-testid="icon-chevronup">ChevronUp</span>,
 }));
@@ -209,12 +213,12 @@ describe("AnalysisResults", () => {
       expect(screen.getByText("API-First")).toBeInTheDocument();
     });
 
-    it("should show 12 template cards when expanded", () => {
+    it("should show 16 template cards when expanded", () => {
       render(<AnalysisResults />);
 
       // Templates are already visible by default for new projects
-      // All 12 templates should be visible
-      expect(STACK_TEMPLATES).toHaveLength(12);
+      // All 16 templates should be visible
+      expect(STACK_TEMPLATES).toHaveLength(16);
 
       for (const template of STACK_TEMPLATES) {
         expect(screen.getByText(template.name)).toBeInTheDocument();

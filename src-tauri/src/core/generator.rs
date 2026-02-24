@@ -33,7 +33,7 @@ use crate::models::project::Project;
 /// Generate a complete CLAUDE.md file from project configuration data.
 /// Returns the full markdown content as a string.
 pub fn generate_claude_md_content(project: &Project) -> String {
-    let sections: Vec<String> = vec![
+    let mut sections: Vec<String> = vec![
         generate_header(project),
         generate_tech_stack(project),
         generate_project_structure(project),
@@ -44,6 +44,12 @@ pub fn generate_claude_md_content(project: &Project) -> String {
         generate_decisions(project),
         generate_notes(project),
     ];
+
+    // Add @import section if .claude/rules/ exists
+    let imports = generate_imports(&project.path);
+    if !imports.is_empty() {
+        sections.insert(0, imports);
+    }
 
     sections.join("\n---\n\n")
 }
@@ -119,6 +125,12 @@ pub async fn generate_claude_md_with_ai(
            - Specific gotchas from the code \
            - Non-obvious relationships \
            - Important constants or magic values \
+        \
+        11. **Memory & Context Management** (if .claude/ directory exists) \
+           - Suggest @import directives for any .claude/rules/*.md files found \
+           - Example: @import .claude/rules/testing.md \
+           - Mention .claude/skills/ directory if it exists \
+           - @import pulls the content of the referenced file into CLAUDE.md at load time \
         \
         BE EXTREMELY SPECIFIC. Reference actual type names, function names, and patterns from the provided code.";
 
@@ -400,6 +412,48 @@ fn collect_files_recursive(
                 files.push(rel);
             }
         }
+    }
+}
+
+/// Generate @import directives for .claude/rules/*.md files and mention skills directory.
+/// Returns empty string if no .claude/ directory exists.
+fn generate_imports(project_path: &str) -> String {
+    let root = std::path::Path::new(project_path);
+    let rules_dir = root.join(".claude").join("rules");
+    let skills_dir = root.join(".claude").join("skills");
+
+    let mut lines: Vec<String> = Vec::new();
+
+    if rules_dir.exists() && rules_dir.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(&rules_dir) {
+            let mut rule_files: Vec<String> = entries
+                .flatten()
+                .filter_map(|e| {
+                    let name = e.file_name().to_string_lossy().to_string();
+                    if name.ends_with(".md") {
+                        Some(name)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            rule_files.sort();
+
+            for file in &rule_files {
+                lines.push(format!("@import .claude/rules/{}", file));
+            }
+        }
+    }
+
+    if skills_dir.exists() && skills_dir.is_dir() {
+        lines.push(String::new());
+        lines.push("<!-- Skills are loaded from .claude/skills/ on demand -->".to_string());
+    }
+
+    if lines.is_empty() {
+        String::new()
+    } else {
+        lines.join("\n")
     }
 }
 
@@ -1038,6 +1092,38 @@ mod tests {
         assert!(content.contains("# Simple"));
         assert!(content.contains("Go"));
         assert!(content.contains("go build"));
+    }
+
+    #[test]
+    fn test_generate_imports_section() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().to_str().unwrap();
+
+        // Create .claude/rules/ with some .md files
+        let rules_dir = dir.path().join(".claude").join("rules");
+        std::fs::create_dir_all(&rules_dir).unwrap();
+        std::fs::write(rules_dir.join("testing.md"), "# Testing rules").unwrap();
+        std::fs::write(rules_dir.join("react.md"), "# React rules").unwrap();
+        std::fs::write(rules_dir.join("not-md.txt"), "ignored").unwrap();
+
+        // Create .claude/skills/ directory
+        let skills_dir = dir.path().join(".claude").join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+
+        let result = generate_imports(project_path);
+        assert!(result.contains("@import .claude/rules/react.md"));
+        assert!(result.contains("@import .claude/rules/testing.md"));
+        assert!(!result.contains("not-md.txt"));
+        assert!(result.contains("Skills are loaded from .claude/skills/"));
+    }
+
+    #[test]
+    fn test_generate_imports_no_claude_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().to_str().unwrap();
+
+        let result = generate_imports(project_path);
+        assert!(result.is_empty());
     }
 
     #[test]

@@ -130,6 +130,49 @@ test.describe("Skills Section", () => {
   });
 });
 
+test.describe("Skill Export", () => {
+  test.beforeEach(async ({ page }) => {
+    await setupTauriMocks(page, { hasApiKey: true, hasClaudeMd: true });
+    await page.goto("/");
+    await page.waitForSelector("text=Project Overview", { timeout: 10000 });
+    const gotItBtn = page.getByRole("button", { name: "Got it" });
+    if (await gotItBtn.isVisible()) {
+      await gotItBtn.click();
+      await page.waitForTimeout(300);
+    }
+    await page.locator("aside").getByText("Skills").click();
+    await page.waitForTimeout(500);
+    await page.locator("main").getByRole("button", { name: /My Skills/ }).click();
+    await page.waitForTimeout(500);
+  });
+
+  test("shows Export to .claude button when editing existing skill", async ({ page }) => {
+    await page.getByText("Component Creator").click();
+    await page.waitForTimeout(300);
+    await expect(page.getByRole("button", { name: /Export to \.claude/i })).toBeVisible({ timeout: 3000 });
+  });
+
+  test("does not show Export button for new skill", async ({ page }) => {
+    const newSkillBtn = page.locator("main").getByRole("button", { name: /New Skill/i });
+    if (await newSkillBtn.isVisible()) {
+      await newSkillBtn.click();
+      await page.waitForTimeout(300);
+      await expect(page.getByRole("button", { name: /Export to \.claude/i })).not.toBeVisible();
+    }
+  });
+
+  test("clicking Export shows success message", async ({ page }) => {
+    await page.getByText("Component Creator").click();
+    await page.waitForTimeout(300);
+    const exportBtn = page.getByRole("button", { name: /Export to \.claude/i });
+    await expect(exportBtn).toBeVisible({ timeout: 3000 });
+    await exportBtn.click();
+    await page.waitForTimeout(500);
+    // Mock returns /mock/project/.claude/skills/mock-skill/SKILL.md
+    await expect(page.getByText(/Exported to.*SKILL\.md/i)).toBeVisible({ timeout: 5000 });
+  });
+});
+
 test.describe("Pattern Detection", () => {
   test.beforeEach(async ({ page }) => {
     await setupTauriMocks(page, { hasApiKey: true, hasClaudeMd: true });

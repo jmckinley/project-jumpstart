@@ -33,6 +33,7 @@
 import { useState } from "react";
 
 type HookType = "post-tool-use" | "pre-compact" | "session-end" | "skill";
+type HookActionType = "command" | "prompt" | "agent";
 
 interface HookTypeConfig {
   id: HookType;
@@ -88,7 +89,35 @@ interface HooksGeneratorProps {
   onGenerate: (testCommand: string, filePatterns?: string[]) => Promise<string | null>;
 }
 
-function generatePreCompactConfig(command: string, timeout: number): string {
+function buildHookAction(
+  actionType: HookActionType,
+  command: string,
+  description: string,
+  timeout: number,
+  isAsync: boolean,
+): Record<string, unknown> {
+  const action: Record<string, unknown> = { type: actionType };
+  if (actionType === "command") {
+    action.command = command;
+  } else if (actionType === "prompt") {
+    action.prompt = command;
+  } else if (actionType === "agent") {
+    action.agent = command;
+  }
+  action.description = description;
+  action.timeout = timeout;
+  if (isAsync) {
+    action.async = true;
+  }
+  return action;
+}
+
+function generatePreCompactConfig(
+  command: string,
+  timeout: number,
+  actionType: HookActionType,
+  isAsync: boolean,
+): string {
   return JSON.stringify(
     {
       hooks: {
@@ -96,12 +125,13 @@ function generatePreCompactConfig(command: string, timeout: number): string {
           {
             matcher: "",
             hooks: [
-              {
-                type: "command",
+              buildHookAction(
+                actionType,
                 command,
-                description: "Save critical context before compaction",
+                "Save critical context before compaction",
                 timeout,
-              },
+                isAsync,
+              ),
             ],
           },
         ],
@@ -112,7 +142,12 @@ function generatePreCompactConfig(command: string, timeout: number): string {
   );
 }
 
-function generateSessionEndConfig(command: string, timeout: number): string {
+function generateSessionEndConfig(
+  command: string,
+  timeout: number,
+  actionType: HookActionType,
+  isAsync: boolean,
+): string {
   return JSON.stringify(
     {
       hooks: {
@@ -120,12 +155,13 @@ function generateSessionEndConfig(command: string, timeout: number): string {
           {
             matcher: "",
             hooks: [
-              {
-                type: "command",
+              buildHookAction(
+                actionType,
                 command,
-                description: "Extract learnings from session transcript",
+                "Extract learnings from session transcript",
                 timeout,
-              },
+                isAsync,
+              ),
             ],
           },
         ],
@@ -141,12 +177,22 @@ function generateSkillHookYaml(
   event: string,
   filePatterns: string[],
 ): string {
+  const toolsSection = `allowed-tools:
+  - Read
+  - Glob
+  - Grep
+  - Edit
+  - Write
+  - Bash`;
   const patternsLine =
     filePatterns.length > 0
       ? `\nfile_patterns:\n${filePatterns.map((p) => `  - "${p}"`).join("\n")}`
       : "";
 
   return `---
+description: Your skill description here
+model: sonnet
+${toolsSection}
 hooks:
   - event: ${event}
     command: "${command}"${patternsLine}
@@ -169,6 +215,8 @@ export function HooksGenerator({ defaultCommand, onGenerate }: HooksGeneratorPro
   const [filePatterns, setFilePatterns] = useState("*.ts,*.tsx");
   const [timeout, setTimeout_] = useState(30000);
   const [skillEvent, setSkillEvent] = useState("PostToolUse");
+  const [hookActionType, setHookActionType] = useState<HookActionType>("command");
+  const [asyncHook, setAsyncHook] = useState(false);
   const [generatedConfig, setGeneratedConfig] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -196,10 +244,10 @@ export function HooksGenerator({ defaultCommand, onGenerate }: HooksGeneratorPro
         config = await onGenerate(testCommand, patterns.length > 0 ? patterns : undefined);
         break;
       case "pre-compact":
-        config = generatePreCompactConfig(testCommand, timeout);
+        config = generatePreCompactConfig(testCommand, timeout, hookActionType, asyncHook);
         break;
       case "session-end":
-        config = generateSessionEndConfig(testCommand, timeout);
+        config = generateSessionEndConfig(testCommand, timeout, hookActionType, asyncHook);
         break;
       case "skill":
         config = generateSkillHookYaml(testCommand, skillEvent, patterns);
@@ -294,6 +342,35 @@ export function HooksGenerator({ defaultCommand, onGenerate }: HooksGeneratorPro
               <option value="Stop">Stop (at session end)</option>
             </select>
           </div>
+        )}
+
+        {(activeHookType === "post-tool-use" || activeHookType === "pre-compact" || activeHookType === "session-end") && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-400">
+              Hook Action Type
+            </label>
+            <select
+              value={hookActionType}
+              onChange={(e) => setHookActionType(e.target.value as HookActionType)}
+              className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 focus:border-blue-500 focus:outline-none"
+            >
+              <option value="command">Command (run a shell command)</option>
+              <option value="prompt">Prompt (send text to Claude)</option>
+              <option value="agent">Agent (invoke a sub-agent)</option>
+            </select>
+          </div>
+        )}
+
+        {(activeHookType === "post-tool-use" || activeHookType === "pre-compact" || activeHookType === "session-end") && (
+          <label className="flex items-center gap-2 text-xs text-neutral-400">
+            <input
+              type="checkbox"
+              checked={asyncHook}
+              onChange={(e) => setAsyncHook(e.target.checked)}
+              className="rounded border-neutral-700 bg-neutral-800"
+            />
+            Run asynchronously (non-blocking)
+          </label>
         )}
 
         {(activeHookType === "pre-compact" || activeHookType === "session-end") && (

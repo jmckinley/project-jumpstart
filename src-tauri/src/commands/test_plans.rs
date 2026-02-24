@@ -1275,13 +1275,12 @@ pub async fn generate_hooks_config(
     let patterns = file_patterns.unwrap_or_else(|| vec!["*.ts".to_string(), "*.tsx".to_string()]);
     let pattern_str = patterns.join("|");
 
+    let matcher = format!("Edit|Write on {}", pattern_str);
+
     let config = serde_json::json!({
         "hooks": {
             "PostToolUse": [{
-                "matcher": {
-                    "tool": "Edit|Write",
-                    "path": pattern_str
-                },
+                "matcher": matcher,
                 "hooks": [{
                     "type": "command",
                     "command": test_command,
@@ -1653,6 +1652,31 @@ mod tests {
 
         let result = find_corresponding_test_file("src/orphan.ts", project.to_str().unwrap());
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_generate_hooks_config_string_matcher() {
+        // The matcher must be a string, not an object
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let config_str = rt.block_on(async {
+            generate_hooks_config(
+                "pnpm test --run".to_string(),
+                Some(vec!["*.ts".to_string(), "*.tsx".to_string()]),
+            )
+            .await
+            .unwrap()
+        });
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+        let matcher = &parsed["hooks"]["PostToolUse"][0]["matcher"];
+        // matcher must be a string, not an object
+        assert!(matcher.is_string(), "matcher should be a string, got: {}", matcher);
+        assert_eq!(matcher.as_str().unwrap(), "Edit|Write on *.ts|*.tsx");
+        // hook type must be "command"
+        let hook_type = &parsed["hooks"]["PostToolUse"][0]["hooks"][0]["type"];
+        assert_eq!(hook_type.as_str().unwrap(), "command");
     }
 
     #[test]

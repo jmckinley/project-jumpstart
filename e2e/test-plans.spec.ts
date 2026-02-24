@@ -149,6 +149,58 @@ test.describe("Test Plan Tools", () => {
   });
 });
 
+test.describe("Hooks Generator Features", () => {
+  test.beforeEach(async ({ page }) => {
+    await setupTauriMocks(page, { hasApiKey: true, hasClaudeMd: true });
+    await page.goto("/");
+    await page.waitForSelector("text=Project Overview", { timeout: 10000 });
+    await page.locator("aside").getByText("Test Plans").click();
+    await page.waitForTimeout(500);
+    await page.locator("main").getByRole("button", { name: /Tools/i }).click();
+    await page.waitForTimeout(500);
+  });
+
+  test("shows Hook Action Type selector", async ({ page }) => {
+    await expect(page.getByText(/Hook Action Type/i).first()).toBeVisible({ timeout: 5000 });
+  });
+
+  test("shows async checkbox", async ({ page }) => {
+    await expect(page.getByText(/Run asynchronously/i).first()).toBeVisible({ timeout: 5000 });
+  });
+
+  test("hook action type has command, prompt, and agent options", async ({ page }) => {
+    // Playwright uses locator("select") instead of getByDisplayValue
+    const actionSelect = page.locator("select").filter({ hasText: /Command/i }).first();
+    await expect(actionSelect).toBeVisible({ timeout: 5000 });
+  });
+
+  test("PreCompact tab shows action type selector", async ({ page }) => {
+    await page.getByText("PreCompact").click();
+    await page.waitForTimeout(300);
+    await expect(page.getByText(/Hook Action Type/i).first()).toBeVisible({ timeout: 5000 });
+  });
+
+  test("SessionEnd tab shows action type selector", async ({ page }) => {
+    await page.getByText("SessionEnd").click();
+    await page.waitForTimeout(300);
+    await expect(page.getByText(/Hook Action Type/i).first()).toBeVisible({ timeout: 5000 });
+  });
+
+  test("Skill Hook tab shows frontmatter fields in generated YAML", async ({ page }) => {
+    await page.getByText("Skill Hook").click();
+    await page.waitForTimeout(300);
+    const generateBtn = page.getByText("Generate YAML Config");
+    await expect(generateBtn).toBeVisible({ timeout: 5000 });
+    await generateBtn.click();
+    await page.waitForTimeout(500);
+    // Should show YAML with frontmatter fields
+    const pre = page.locator("pre").first();
+    await expect(pre).toContainText("description:");
+    await expect(pre).toContainText("model: sonnet");
+    await expect(pre).toContainText("allowed-tools:");
+  });
+});
+
 test.describe("Test Plans without framework", () => {
   test("shows framework detection message when no framework", async ({ page }) => {
     await setupTauriMocks(page, { hasApiKey: true, hasClaudeMd: true, hasTestFramework: false });

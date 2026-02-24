@@ -173,7 +173,7 @@ describe("HooksGenerator", () => {
   });
 
   describe("Skill Hook generation", () => {
-    it("should generate Skill YAML config", async () => {
+    it("should generate Skill YAML config with frontmatter", async () => {
       render(<HooksGenerator onGenerate={vi.fn()} />);
 
       fireEvent.click(screen.getByText("Skill Hook"));
@@ -187,6 +187,9 @@ describe("HooksGenerator", () => {
       const preElement = document.querySelector("pre");
       expect(preElement?.textContent).toContain("hooks:");
       expect(preElement?.textContent).toContain("event: PostToolUse");
+      expect(preElement?.textContent).toContain("description: Your skill description here");
+      expect(preElement?.textContent).toContain("model: sonnet");
+      expect(preElement?.textContent).toContain("allowed-tools:");
     });
   });
 
@@ -251,6 +254,64 @@ describe("HooksGenerator", () => {
 
       await waitFor(() => {
         expect(screen.getByText(".claude/skills/*/SKILL.md")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("hook action types", () => {
+    it("should show hook action type selector for PostToolUse", () => {
+      render(<HooksGenerator onGenerate={vi.fn()} />);
+
+      expect(screen.getByText("Hook Action Type")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("Command (run a shell command)")).toBeInTheDocument();
+    });
+
+    it("should show hook action type selector for PreCompact", () => {
+      render(<HooksGenerator onGenerate={vi.fn()} />);
+
+      fireEvent.click(screen.getByText("PreCompact"));
+
+      expect(screen.getByText("Hook Action Type")).toBeInTheDocument();
+    });
+
+    it("should show async checkbox for PostToolUse", () => {
+      render(<HooksGenerator onGenerate={vi.fn()} />);
+
+      expect(screen.getByText("Run asynchronously (non-blocking)")).toBeInTheDocument();
+    });
+
+    it("should include prompt type in PreCompact config", async () => {
+      render(<HooksGenerator onGenerate={vi.fn()} />);
+
+      fireEvent.click(screen.getByText("PreCompact"));
+
+      // Change action type to prompt
+      const select = screen.getByDisplayValue("Command (run a shell command)");
+      fireEvent.change(select, { target: { value: "prompt" } });
+
+      fireEvent.click(screen.getByText("Generate JSON Config"));
+
+      await waitFor(() => {
+        const preElement = document.querySelector("pre");
+        expect(preElement?.textContent).toContain('"type": "prompt"');
+        expect(preElement?.textContent).toContain('"prompt":');
+      });
+    });
+
+    it("should include async flag when checked", async () => {
+      render(<HooksGenerator onGenerate={vi.fn()} />);
+
+      fireEvent.click(screen.getByText("PreCompact"));
+
+      // Check async checkbox
+      const checkbox = screen.getByRole("checkbox");
+      fireEvent.click(checkbox);
+
+      fireEvent.click(screen.getByText("Generate JSON Config"));
+
+      await waitFor(() => {
+        const preElement = document.querySelector("pre");
+        expect(preElement?.textContent).toContain('"async": true');
       });
     });
   });

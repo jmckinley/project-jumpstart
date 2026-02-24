@@ -59,6 +59,57 @@ test.describe("Onboarding Wizard", () => {
   });
 });
 
+test.describe("Onboarding - Stack Templates", () => {
+  test.beforeEach(async ({ page }) => {
+    await setupTauriMocks(page, { hasApiKey: true, hasClaudeMd: false, noProjects: true });
+    await page.goto("/");
+    await page.waitForSelector("text=Welcome to Project Jumpstart", { timeout: 10000 });
+    // Navigate to step 2 (Analysis Results) where templates are shown
+    await page.getByText("Select Project Folder").click();
+    await page.waitForTimeout(1000);
+    // Expand templates section (collapsed for detected projects)
+    const templateTrigger = page.getByText(/Quick Start Templates|Use a Template/i).first();
+    await expect(templateTrigger).toBeVisible({ timeout: 5000 });
+    await templateTrigger.click();
+    await page.waitForTimeout(300);
+  });
+
+  test("shows Quick Start Templates section on analysis step", async ({ page }) => {
+    // Templates should be expanded after beforeEach click
+    await expect(page.getByText("B2B SaaS")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("shows Python API template", async ({ page }) => {
+    const template = page.getByText("Python API");
+    await template.scrollIntoViewIfNeeded();
+    await expect(template).toBeVisible({ timeout: 5000 });
+  });
+
+  test("shows Rust Backend template", async ({ page }) => {
+    const template = page.getByText("Rust Backend", { exact: true });
+    await template.scrollIntoViewIfNeeded();
+    await expect(template).toBeVisible({ timeout: 5000 });
+  });
+
+  test("shows Go Service template", async ({ page }) => {
+    const template = page.getByText("Go Service");
+    await template.scrollIntoViewIfNeeded();
+    await expect(template).toBeVisible({ timeout: 5000 });
+  });
+
+  test("shows Java Enterprise template", async ({ page }) => {
+    const template = page.getByText("Java Enterprise");
+    await template.scrollIntoViewIfNeeded();
+    await expect(template).toBeVisible({ timeout: 5000 });
+  });
+
+  test("shows Additional Services section", async ({ page }) => {
+    const section = page.getByText("Additional Services (Optional)");
+    await section.scrollIntoViewIfNeeded();
+    await expect(section).toBeVisible({ timeout: 5000 });
+  });
+});
+
 test.describe("Onboarding - Enforcement Option", () => {
   test.beforeEach(async ({ page }) => {
     await setupTauriMocks(page, { hasApiKey: true, hasClaudeMd: false, noProjects: true });

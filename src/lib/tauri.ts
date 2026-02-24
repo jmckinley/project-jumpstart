@@ -300,6 +300,10 @@ export async function incrementSkillUsage(id: string): Promise<number> {
   return invoke<number>("increment_skill_usage", { id });
 }
 
+export async function exportSkillToFile(skillId: string, projectPath: string): Promise<string> {
+  return invoke<string>("export_skill_to_file", { skillId, projectPath });
+}
+
 export async function analyzeRalphPrompt(prompt: string): Promise<PromptAnalysis> {
   return invoke<PromptAnalysis>("analyze_ralph_prompt", { prompt });
 }
@@ -553,6 +557,10 @@ export async function deleteAgent(id: string): Promise<void> {
 
 export async function incrementAgentUsage(id: string): Promise<number> {
   return invoke<number>("increment_agent_usage", { id });
+}
+
+export async function exportAgentToFile(agentId: string, projectPath: string): Promise<string> {
+  return invoke<string>("export_agent_to_file", { agentId, projectPath });
 }
 
 export async function enhanceAgentInstructions(

@@ -144,6 +144,49 @@ test.describe("Agents Section", () => {
   });
 });
 
+test.describe("Agent Export", () => {
+  test.beforeEach(async ({ page }) => {
+    await setupTauriMocks(page, { hasApiKey: true, hasClaudeMd: true });
+    await page.goto("/");
+    await page.waitForSelector("text=Project Overview", { timeout: 10000 });
+    const gotItBtn = page.getByRole("button", { name: "Got it" });
+    if (await gotItBtn.isVisible()) {
+      await gotItBtn.click();
+      await page.waitForTimeout(300);
+    }
+    await page.locator("aside").getByText("Agents").click();
+    await page.waitForTimeout(500);
+    await page.locator("main").getByRole("button", { name: /My Agents/ }).click();
+    await page.waitForTimeout(500);
+  });
+
+  test("shows Export to .claude button when editing existing agent", async ({ page }) => {
+    await page.getByText("TDD Agent").click();
+    await page.waitForTimeout(300);
+    await expect(page.getByRole("button", { name: /Export to \.claude/i })).toBeVisible({ timeout: 3000 });
+  });
+
+  test("does not show Export button for new agent", async ({ page }) => {
+    const newAgentBtn = page.locator("main").getByRole("button", { name: /New Agent/i });
+    if (await newAgentBtn.isVisible()) {
+      await newAgentBtn.click();
+      await page.waitForTimeout(300);
+      await expect(page.getByRole("button", { name: /Export to \.claude/i })).not.toBeVisible();
+    }
+  });
+
+  test("clicking Export shows success message", async ({ page }) => {
+    await page.getByText("TDD Agent").click();
+    await page.waitForTimeout(300);
+    const exportBtn = page.getByRole("button", { name: /Export to \.claude/i });
+    await expect(exportBtn).toBeVisible({ timeout: 3000 });
+    await exportBtn.click();
+    await page.waitForTimeout(500);
+    // Mock returns /mock/project/.claude/agents/mock-agent.md
+    await expect(page.getByText(/Exported to.*\.md/i)).toBeVisible({ timeout: 5000 });
+  });
+});
+
 test.describe("Suggested Agents", () => {
   test("shows suggested agents for project", async ({ page }) => {
     await setupTauriMocks(page, { hasApiKey: true, hasClaudeMd: true });

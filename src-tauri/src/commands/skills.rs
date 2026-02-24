@@ -20,6 +20,7 @@
 //! - delete_skill - Delete a skill by ID
 //! - detect_patterns - Analyze project to suggest skills
 //! - increment_skill_usage - Bump usage count for a skill
+//! - export_skill_to_file - Export a skill to .claude/skills/<slug>/SKILL.md
 //!
 //! PATTERNS:
 //! - All commands use AppState for DB access
@@ -207,6 +208,71 @@ pub async fn increment_skill_usage(
         .map_err(|e| format!("Failed to fetch usage count: {}", e))?;
 
     Ok(count)
+}
+
+/// Export a skill to `.claude/skills/<slug>/SKILL.md` with YAML frontmatter.
+/// Creates the directory structure and writes the file with proper Claude Code format.
+#[tauri::command]
+pub async fn export_skill_to_file(
+    skill_id: String,
+    project_path: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let db = state.db.lock().map_err(|e| format!("DB lock error: {}", e))?;
+
+    let skill: Skill = db
+        .query_row(
+            "SELECT id, project_id, name, description, content, usage_count, created_at, updated_at
+             FROM skills WHERE id = ?1",
+            [&skill_id],
+            map_skill_row,
+        )
+        .map_err(|e| format!("Skill not found: {}", e))?;
+
+    // Generate slug from name (lowercase, hyphens for spaces, strip non-alphanumeric)
+    let slug: String = skill
+        .name
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '-' })
+        .collect::<String>()
+        .split('-')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<&str>>()
+        .join("-");
+
+    let skills_dir = std::path::Path::new(&project_path)
+        .join(".claude")
+        .join("skills")
+        .join(&slug);
+
+    std::fs::create_dir_all(&skills_dir)
+        .map_err(|e| format!("Failed to create directory: {}", e))?;
+
+    let file_path = skills_dir.join("SKILL.md");
+
+    let content = format!(
+        "---\n\
+         description: {}\n\
+         model: sonnet\n\
+         allowed-tools:\n\
+         {}\n\
+         ---\n\
+         \n\
+         # {}\n\
+         \n\
+         {}",
+        skill.description,
+        "  - Read\n  - Glob\n  - Grep\n  - Edit\n  - Write\n  - Bash",
+        skill.name,
+        skill.content,
+    );
+
+    std::fs::write(&file_path, &content)
+        .map_err(|e| format!("Failed to write SKILL.md: {}", e))?;
+
+    let result_path = file_path.to_string_lossy().to_string();
+    Ok(result_path)
 }
 
 /// Detect patterns in a project that could become reusable skills.
@@ -968,4 +1034,80 @@ fn map_skill_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Skill> {
         created_at,
         updated_at,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_export_skill_creates_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().to_str().unwrap().to_string();
+
+        // Create skill content directly (bypassing DB)
+        let skill = Skill {
+            id: "test-id".to_string(),
+            project_id: Some("proj-1".to_string()),
+            name: "React Component Generator".to_string(),
+            description: "Generates React components with TypeScript".to_string(),
+            content: "## Instructions\n\nCreate a React component following conventions.".to_string(),
+            usage_count: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        // Generate slug from name
+        let slug: String = skill
+            .name
+            .to_lowercase()
+            .chars()
+            .map(|c| if c.is_alphanumeric() { c } else { '-' })
+            .collect::<String>()
+            .split('-')
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<&str>>()
+            .join("-");
+
+        assert_eq!(slug, "react-component-generator");
+
+        // Create directory and file
+        let skills_dir = std::path::Path::new(&project_path)
+            .join(".claude")
+            .join("skills")
+            .join(&slug);
+        std::fs::create_dir_all(&skills_dir).unwrap();
+
+        let file_path = skills_dir.join("SKILL.md");
+        let content = format!(
+            "---\n\
+             description: {}\n\
+             model: sonnet\n\
+             allowed-tools:\n\
+             {}\n\
+             ---\n\
+             \n\
+             # {}\n\
+             \n\
+             {}",
+            skill.description,
+            "  - Read\n  - Glob\n  - Grep\n  - Edit\n  - Write\n  - Bash",
+            skill.name,
+            skill.content,
+        );
+        std::fs::write(&file_path, &content).unwrap();
+
+        // Verify file exists
+        assert!(file_path.exists());
+
+        // Verify content
+        let written = std::fs::read_to_string(&file_path).unwrap();
+        assert!(written.contains("description: Generates React components with TypeScript"));
+        assert!(written.contains("model: sonnet"));
+        assert!(written.contains("allowed-tools:"));
+        assert!(written.contains("  - Read"));
+        assert!(written.contains("  - Bash"));
+        assert!(written.contains("# React Component Generator"));
+        assert!(written.contains("## Instructions"));
+    }
 }

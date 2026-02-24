@@ -12,7 +12,7 @@
  *
  * EXPORTS:
  * - StackTemplate - Interface for a stack template
- * - STACK_TEMPLATES - Array of 12 pre-defined templates
+ * - STACK_TEMPLATES - Array of 16 pre-defined templates
  *
  * PATTERNS:
  * - Each template includes core stack (language, framework, database, testing, styling)
@@ -226,5 +226,67 @@ export const STACK_TEMPLATES: StackTemplate[] = [
     testing: "Vitest",
     styling: null,
     extras: {},
+  },
+  {
+    id: "python-api",
+    name: "Python API",
+    description: "Python backend with FastAPI and PostgreSQL",
+    icon: "Cpu",
+    language: "Python",
+    framework: "FastAPI",
+    database: "PostgreSQL",
+    testing: "pytest",
+    styling: null,
+    extras: {
+      auth: "FastAPI JWT",
+      hosting: "Railway",
+      monitoring: "Sentry",
+    },
+  },
+  {
+    id: "rust-backend",
+    name: "Rust Backend",
+    description: "High-performance Rust backend with Axum",
+    icon: "Zap",
+    language: "Rust",
+    framework: "Axum",
+    database: "PostgreSQL",
+    testing: "cargo test",
+    styling: null,
+    extras: {
+      hosting: "Fly.io",
+      monitoring: "Sentry",
+    },
+  },
+  {
+    id: "go-service",
+    name: "Go Service",
+    description: "Go microservice with Gin and PostgreSQL",
+    icon: "Box",
+    language: "Go",
+    framework: "Gin",
+    database: "PostgreSQL",
+    testing: "go test",
+    styling: null,
+    extras: {
+      hosting: "GCP Cloud Run",
+      monitoring: "Prometheus",
+    },
+  },
+  {
+    id: "java-enterprise",
+    name: "Java Enterprise",
+    description: "Enterprise Java with Spring Boot",
+    icon: "Building",
+    language: "Java",
+    framework: "Spring Boot",
+    database: "PostgreSQL",
+    testing: "JUnit",
+    styling: null,
+    extras: {
+      auth: "Spring Security",
+      hosting: "AWS",
+      monitoring: "Micrometer",
+    },
   },
 ];

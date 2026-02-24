@@ -40,7 +40,7 @@
 import { useState, useEffect } from "react";
 import type { Agent, AgentTier, AgentCategory, AgentWorkflowStep, AgentTool } from "@/types/agent";
 import { AGENT_CATEGORIES } from "@/data/agentCategories";
-import { enhanceAgentInstructions } from "@/lib/tauri";
+import { enhanceAgentInstructions, exportAgentToFile } from "@/lib/tauri";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useProjectStore } from "@/stores/projectStore";
 
@@ -76,6 +76,10 @@ export function AgentEditor({ agent, onSave, onCancel }: AgentEditorProps) {
   const [originalContent, setOriginalContent] = useState<string | null>(null);
   const [showingEnhanced, setShowingEnhanced] = useState(true);
   const [enhanceError, setEnhanceError] = useState<string | null>(null);
+
+  // Export state
+  const [exportingAgent, setExportingAgent] = useState(false);
+  const [exportAgentResult, setExportAgentResult] = useState<string | null>(null);
 
   const hasApiKey = useSettingsStore((s) => s.hasApiKey);
   const activeProject = useProjectStore((s) => s.activeProject);
@@ -237,9 +241,24 @@ export function AgentEditor({ agent, onSave, onCancel }: AgentEditorProps) {
     setTriggerPatterns(triggerPatterns.filter((p) => p !== pattern));
   };
 
+  const handleExportAgent = async () => {
+    if (!agent || !agent.id || !activeProject) return;
+    setExportingAgent(true);
+    setExportAgentResult(null);
+    try {
+      const path = await exportAgentToFile(agent.id, activeProject.path);
+      setExportAgentResult(path);
+    } catch (err) {
+      setExportAgentResult(`Error: ${err}`);
+    } finally {
+      setExportingAgent(false);
+    }
+  };
+
   const isEditing = agent !== null && agent.id !== "";
   const canSave = name.trim().length > 0;
   const canEnhance = instructions.trim().length > 0 && !enhancing;
+  const canExportAgent = isEditing && activeProject !== null;
   const isReviewing = enhancedContent !== null && originalContent !== null;
 
   return (
@@ -555,6 +574,17 @@ export function AgentEditor({ agent, onSave, onCancel }: AgentEditorProps) {
           </>
         )}
 
+        {/* Export result */}
+        {exportAgentResult && (
+          <div className={`rounded-md px-3 py-2 text-xs font-mono ${
+            exportAgentResult.startsWith("Error")
+              ? "bg-red-500/10 text-red-400"
+              : "bg-green-500/10 text-green-400"
+          }`}>
+            {exportAgentResult.startsWith("Error") ? exportAgentResult : `Exported to ${exportAgentResult}`}
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex items-center justify-end gap-3 border-t border-neutral-800 pt-4">
           <button
@@ -563,6 +593,15 @@ export function AgentEditor({ agent, onSave, onCancel }: AgentEditorProps) {
           >
             Cancel
           </button>
+          {canExportAgent && (
+            <button
+              onClick={handleExportAgent}
+              disabled={exportingAgent}
+              className="rounded-md border border-emerald-700 bg-emerald-900/30 px-4 py-2 text-sm font-medium text-emerald-400 transition-colors hover:bg-emerald-900/50 disabled:opacity-50"
+            >
+              {exportingAgent ? "Exporting..." : "Export to .claude"}
+            </button>
+          )}
           <button
             onClick={handleSave}
             disabled={!canSave}

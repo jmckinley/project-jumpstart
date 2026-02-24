@@ -57,10 +57,10 @@ use commands::enforcement::{
 use commands::settings::{get_all_settings, get_setting, save_setting, validate_api_key};
 use commands::watcher::{start_file_watcher, stop_file_watcher};
 use commands::skills::{
-    create_skill, delete_skill, detect_patterns, increment_skill_usage, list_skills, update_skill,
+    create_skill, delete_skill, detect_patterns, export_skill_to_file, increment_skill_usage, list_skills, update_skill,
 };
 use commands::agents::{
-    create_agent, delete_agent, enhance_agent_instructions, increment_agent_usage, list_agents, update_agent,
+    create_agent, delete_agent, enhance_agent_instructions, export_agent_to_file, increment_agent_usage, list_agents, update_agent,
 };
 use commands::kickstart::{generate_kickstart_prompt, generate_kickstart_claude_md, infer_tech_stack};
 use commands::test_plans::{
@@ -124,12 +124,14 @@ pub fn run() {
             delete_skill,
             detect_patterns,
             increment_skill_usage,
+            export_skill_to_file,
             list_agents,
             create_agent,
             update_agent,
             delete_agent,
             increment_agent_usage,
             enhance_agent_instructions,
+            export_agent_to_file,
             analyze_ralph_prompt,
             analyze_ralph_prompt_with_ai,
             start_ralph_loop,
