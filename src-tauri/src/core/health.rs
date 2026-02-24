@@ -782,6 +782,11 @@ mod tests {
     }
 
     #[test]
+    fn test_estimate_tokens_empty() {
+        assert_eq!(estimate_tokens(""), 0);
+    }
+
+    #[test]
     fn test_is_documentable_file() {
         assert!(is_documentable_file("App.tsx"));
         assert!(is_documentable_file("scanner.rs"));

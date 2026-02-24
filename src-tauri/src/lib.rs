@@ -38,6 +38,7 @@ mod models;
 use std::sync::Mutex;
 
 use tauri::Manager;
+use tauri::menu::{Menu, Submenu, PredefinedMenuItem};
 
 use commands::activity::{get_recent_activities, log_activity};
 use commands::claude_md::{generate_claude_md, get_health_score, read_claude_md, write_claude_md};
@@ -94,6 +95,37 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            // Custom menu: App + Edit + Window only (no File, View, Help)
+            let handle = app.handle();
+            let edit_menu = Submenu::with_items(handle, "Edit", true, &[
+                &PredefinedMenuItem::undo(handle, None)?,
+                &PredefinedMenuItem::redo(handle, None)?,
+                &PredefinedMenuItem::separator(handle)?,
+                &PredefinedMenuItem::cut(handle, None)?,
+                &PredefinedMenuItem::copy(handle, None)?,
+                &PredefinedMenuItem::paste(handle, None)?,
+                &PredefinedMenuItem::select_all(handle, None)?,
+            ])?;
+            let window_menu = Submenu::with_items(handle, "Window", true, &[
+                &PredefinedMenuItem::minimize(handle, None)?,
+                &PredefinedMenuItem::maximize(handle, None)?,
+                &PredefinedMenuItem::separator(handle)?,
+                &PredefinedMenuItem::close_window(handle, None)?,
+            ])?;
+            let menu = Menu::with_items(handle, &[
+                &Submenu::with_items(handle, "Project Jumpstart", true, &[
+                    &PredefinedMenuItem::about(handle, None, None)?,
+                    &PredefinedMenuItem::separator(handle)?,
+                    &PredefinedMenuItem::hide(handle, None)?,
+                    &PredefinedMenuItem::hide_others(handle, None)?,
+                    &PredefinedMenuItem::separator(handle)?,
+                    &PredefinedMenuItem::quit(handle, None)?,
+                ])?,
+                &edit_menu,
+                &window_menu,
+            ])?;
+            app.set_menu(menu)?;
+
             let conn = db::init_db().expect("Failed to initialize database");
             app.manage(db::AppState {
                 db: Mutex::new(conn),

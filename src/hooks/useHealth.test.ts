@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, waitFor } from "@testing-library/react";
 import { invoke } from "@tauri-apps/api/core";
 import { useHealth } from "./useHealth";
 import { useProjectStore } from "@/stores/projectStore";
@@ -50,7 +50,6 @@ const mockHealthScore = {
 describe("useHealth", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset invoke to a default resolved value to prevent test pollution
     vi.mocked(invoke).mockReset();
     vi.mocked(invoke).mockResolvedValue(mockHealthScore);
     vi.mocked(useProjectStore).mockImplementation((selector) =>
@@ -59,8 +58,10 @@ describe("useHealth", () => {
   });
 
   describe("initial state", () => {
-    it("should start with default values", () => {
-      vi.mocked(invoke).mockResolvedValue(mockHealthScore);
+    it("should start with default values when no project is selected", () => {
+      vi.mocked(useProjectStore).mockImplementation((selector) =>
+        selector({ activeProject: null } as ReturnType<typeof useProjectStore.getState>)
+      );
 
       const { result } = renderHook(() => useHealth());
 
@@ -71,6 +72,24 @@ describe("useHealth", () => {
       expect(result.current.discoveredTestCount).toBeNull();
       expect(result.current.loading).toBe(false);
       expect(result.current.error).toBeNull();
+    });
+  });
+
+  describe("auto-fetch", () => {
+    it("should auto-fetch health score when project is set", async () => {
+      vi.mocked(invoke).mockResolvedValue(mockHealthScore);
+
+      const { result } = renderHook(() => useHealth());
+
+      await waitFor(() => {
+        expect(result.current.score).toBe(75);
+      });
+
+      expect(invoke).toHaveBeenCalledWith("get_health_score", {
+        projectPath: mockProject.path,
+      });
+      expect(result.current.components).toEqual(mockHealthScore.components);
+      expect(result.current.contextRotRisk).toBe("low");
     });
   });
 
@@ -113,13 +132,10 @@ describe("useHealth", () => {
 
       const { result } = renderHook(() => useHealth());
 
-      // Start loading but don't await
-      act(() => {
-        result.current.refresh();
+      // The auto-fetch from useEffect will set loading=true
+      await waitFor(() => {
+        expect(result.current.loading).toBe(true);
       });
-
-      // Check loading is true immediately after starting
-      expect(result.current.loading).toBe(true);
 
       // Resolve and finish
       await act(async () => {
@@ -135,11 +151,10 @@ describe("useHealth", () => {
 
       const { result } = renderHook(() => useHealth());
 
-      await act(async () => {
-        await result.current.refresh();
+      await waitFor(() => {
+        expect(result.current.error).toBe("Network error");
       });
 
-      expect(result.current.error).toBe("Network error");
       expect(result.current.loading).toBe(false);
     });
 
@@ -150,11 +165,13 @@ describe("useHealth", () => {
 
       const { result } = renderHook(() => useHealth());
 
+      // Wait a tick to ensure no async calls happen
       await act(async () => {
-        await result.current.refresh();
+        await new Promise((r) => setTimeout(r, 10));
       });
 
       expect(invoke).not.toHaveBeenCalled();
+      expect(result.current.score).toBe(0);
     });
 
     it("should update contextRotRisk based on response", async () => {
@@ -165,11 +182,9 @@ describe("useHealth", () => {
 
       const { result } = renderHook(() => useHealth());
 
-      await act(async () => {
-        await result.current.refresh();
+      await waitFor(() => {
+        expect(result.current.contextRotRisk).toBe("high");
       });
-
-      expect(result.current.contextRotRisk).toBe("high");
     });
 
     it("should capture discoveredTestCount from response", async () => {
@@ -180,11 +195,9 @@ describe("useHealth", () => {
 
       const { result } = renderHook(() => useHealth());
 
-      await act(async () => {
-        await result.current.refresh();
+      await waitFor(() => {
+        expect(result.current.discoveredTestCount).toBe(42);
       });
-
-      expect(result.current.discoveredTestCount).toBe(42);
     });
 
     it("should set discoveredTestCount to null when absent", async () => {
@@ -192,8 +205,8 @@ describe("useHealth", () => {
 
       const { result } = renderHook(() => useHealth());
 
-      await act(async () => {
-        await result.current.refresh();
+      await waitFor(() => {
+        expect(result.current.score).toBe(75);
       });
 
       expect(result.current.discoveredTestCount).toBeNull();
