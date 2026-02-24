@@ -16,6 +16,7 @@
 //! - enforcement - EnforcementEvent, HookStatus, CiSnippet types
 //! - test_plan - TestPlan, TestCase, TestRun, TestCaseResult, TDDSession types
 //! - memory - MemorySource, Learning, MemoryHealth, ClaudeMdAnalysis types
+//! - session_handoff - SessionSnapshot type
 //!
 //! PATTERNS:
 //! - All models derive Serialize, Deserialize for Tauri IPC
@@ -37,3 +38,4 @@ pub mod test_plan;
 pub mod team_template;
 pub mod memory;
 pub mod performance;
+pub mod session_handoff;

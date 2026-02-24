@@ -84,6 +84,9 @@ use commands::performance::{
     analyze_performance, list_performance_reviews, get_performance_review, delete_performance_review,
     remediate_performance_file,
 };
+use commands::session_handoff::{
+    generate_handoff_context, get_latest_snapshot, generate_session_start_script,
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -213,6 +216,10 @@ pub fn run() {
             get_performance_review,
             delete_performance_review,
             remediate_performance_file,
+            // Session Handoff commands
+            generate_handoff_context,
+            get_latest_snapshot,
+            generate_session_start_script,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

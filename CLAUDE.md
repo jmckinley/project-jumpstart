@@ -43,6 +43,8 @@ See tree in `project-jumpstart-spec.md` Part 3. Key directories:
 - `src/types/` - TypeScript type definitions
 - `src/lib/tauri.ts` - IPC wrapper (60+ commands)
 - `src/data/` - Static library data (skills, agents, templates)
+- `src-tauri/src/commands/session_handoff.rs` - Session Handoff IPC commands
+- `src-tauri/src/models/session_handoff.rs` - SessionSnapshot model
 
 ## Rules & Documentation
 
@@ -57,9 +59,9 @@ Detailed rules are in `.claude/rules/`:
 
 ## Current Status
 
-**Feature-Complete (Beta Ready)** | 1,384 tests (953 frontend + 188 Rust + 243 E2E)
+**Feature-Complete (Beta Ready)** | 1,470 tests (1033 frontend + 194 Rust + 243 E2E)
 
-All sections implemented: Onboarding, Dashboard, CLAUDE.md Editor, Modules, Test Plans & TDD, Skills, Agents, Team Templates, RALPH, Context Health, Performance, Enforcement, Settings, Memory Management.
+All sections implemented: Onboarding, Dashboard (3-tier layout + Session Handoff), CLAUDE.md Editor, Modules, Test Plans & TDD, Skills, Agents, Team Templates, RALPH, Context Health, Performance, Enforcement, Settings, Memory Management.
 
 ## Important Decisions
 
@@ -95,6 +97,7 @@ All sections implemented: Onboarding, Dashboard, CLAUDE.md Editor, Modules, Test
 - `.claude/hooks/extract-learnings.sh` - SessionEnd: extracts learnings with semantic dedup
 - `.claude/hooks/check-test-staleness.sh` - SessionEnd: detects stale tests after source changes
 - `.claude/hooks/pre-compact.sh` - PreCompact: saves context before compaction
+- `.claude/hooks/session-handoff.sh` - SessionStart: injects previous session context
 - `.claude/skills/` - On-demand context (tauri-patterns, tdd-workflow, team-templates, freshness-engine)
 - `.claude/rules/` - Always-loaded domain rules (documentation, testing, rust, react, database)
 - `CLAUDE.local.md` - Personal learnings (gitignored, auto-populated)
@@ -103,6 +106,7 @@ All sections implemented: Onboarding, Dashboard, CLAUDE.md Editor, Modules, Test
 
 | Date | Change |
 |------|--------|
+| Feb 24, 2026 | Smart Session Handoff + Dashboard Redesign: AI-powered session snapshot capture with SessionStart hook for zero-ramp-up sessions. 3-tier dashboard layout (hero/primary/supporting). SessionHandoff hero card with expand/collapse details, stat chips, Install Hook button. session_snapshots DB table, 3 new Tauri commands, pub(crate) session_analysis helpers. QuickWins/RecentActivity compact mode. 194 Rust + 1033 frontend tests. |
 | Feb 23, 2026 | Claude Code Best Practices Compliance: Fixed hook config schema (string matcher), skill/agent export to .claude/ with YAML frontmatter, @import directives in CLAUDE.md generation, 4 new stack templates (Python/Rust/Go/Java). 188 Rust + 953 frontend tests. |
 | Feb 22, 2026 | Self-Healing Pre-Commit Hook v4.0.0: backup/validate/restore on every file modification, health file tracking (~/.project-jumpstart/.hook-health), auto-downgrade after 3 consecutive failures, HookHealth Rust model + commands, downgrade alert UI in GitHookSetup. 173 Rust + 945 frontend + 17 E2E enforcement tests. |
 | Feb 21, 2026 | Batch Auto-Remediation: AI-powered per-file performance fix via Claude API. RemediationPanel with quick-select, progress tracking, cancellation. Rust backend command + call_claude_long. 155 Rust + 933 frontend tests. |

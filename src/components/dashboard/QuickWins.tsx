@@ -24,11 +24,13 @@
  * - The onAction callback is optional; the button is hidden when not provided
  */
 
+import { useState } from "react";
 import type { QuickWin } from "@/types/health";
 
 interface QuickWinsProps {
   quickWins: QuickWin[];
   onAction?: (win: QuickWin) => void;
+  compact?: boolean;
 }
 
 const EFFORT_CONFIG: Record<
@@ -49,10 +51,15 @@ const EFFORT_CONFIG: Record<
   },
 };
 
-export function QuickWins({ quickWins, onAction }: QuickWinsProps) {
+export function QuickWins({ quickWins, onAction, compact }: QuickWinsProps) {
+  const [showAll, setShowAll] = useState(false);
+  const maxItems = compact ? 3 : quickWins.length;
+  const displayedWins = showAll ? quickWins : quickWins.slice(0, maxItems);
+  const hasMore = compact && quickWins.length > 3 && !showAll;
+
   return (
-    <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-6">
-      <h3 className="mb-4 text-sm font-medium uppercase tracking-wider text-neutral-400">
+    <div className={`rounded-xl border border-neutral-800 bg-neutral-900 ${compact ? "p-4" : "p-6"}`}>
+      <h3 className={`mb-4 font-medium uppercase tracking-wider text-neutral-400 ${compact ? "text-xs" : "text-sm"}`}>
         Quick Wins
       </h3>
 
@@ -65,52 +72,62 @@ export function QuickWins({ quickWins, onAction }: QuickWinsProps) {
           </p>
         </div>
       ) : (
-        <ul className="space-y-3">
-          {quickWins.map((win, index) => {
-            const effort = EFFORT_CONFIG[win.effort];
+        <>
+          <ul className="space-y-3">
+            {displayedWins.map((win, index) => {
+              const effort = EFFORT_CONFIG[win.effort];
 
-            return (
-              <li
-                key={`${win.title}-${index}`}
-                className="rounded-lg border border-neutral-800 bg-neutral-850 p-4 transition-colors hover:border-neutral-700"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-neutral-200">
-                      {win.title}
-                    </p>
-                    <p className="mt-1 text-xs text-neutral-500">
-                      {win.description}
-                    </p>
+              return (
+                <li
+                  key={`${win.title}-${index}`}
+                  className="rounded-lg border border-neutral-800 bg-neutral-850 p-4 transition-colors hover:border-neutral-700"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-neutral-200">
+                        {win.title}
+                      </p>
+                      <p className="mt-1 text-xs text-neutral-500">
+                        {win.description}
+                      </p>
+                    </div>
+
+                    {onAction && (
+                      <button
+                        onClick={() => onAction(win)}
+                        className="shrink-0 rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1 text-xs font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:bg-neutral-700"
+                      >
+                        Fix
+                      </button>
+                    )}
                   </div>
 
-                  {onAction && (
-                    <button
-                      onClick={() => onAction(win)}
-                      className="shrink-0 rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1 text-xs font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:bg-neutral-700"
+                  <div className="mt-3 flex items-center gap-2">
+                    {/* Impact badge */}
+                    <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/20 px-2 py-0.5 text-xs font-medium text-blue-400">
+                      +{win.impact} points
+                    </span>
+
+                    {/* Effort badge */}
+                    <span
+                      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${effort.className}`}
                     >
-                      Fix
-                    </button>
-                  )}
-                </div>
-
-                <div className="mt-3 flex items-center gap-2">
-                  {/* Impact badge */}
-                  <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/20 px-2 py-0.5 text-xs font-medium text-blue-400">
-                    +{win.impact} points
-                  </span>
-
-                  {/* Effort badge */}
-                  <span
-                    className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${effort.className}`}
-                  >
-                    {effort.label}
-                  </span>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                      {effort.label}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          {hasMore && (
+            <button
+              onClick={() => setShowAll(true)}
+              className="mt-3 text-xs font-medium text-indigo-400 hover:text-indigo-300"
+            >
+              Show {quickWins.length - 3} more...
+            </button>
+          )}
+        </>
       )}
     </div>
   );

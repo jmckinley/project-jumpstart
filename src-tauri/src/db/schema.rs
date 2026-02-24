@@ -24,7 +24,7 @@
 //!   ralph_loops (Phase 7), checkpoints (Phase 8), enforcement_events (Phase 9), settings,
 //!   activities (Phase 10), ralph_mistakes (for learning from loop errors),
 //!   test_plans, test_cases, test_runs, test_case_results, tdd_sessions (Test Plan Manager),
-//!   learnings (Memory Management)
+//!   learnings (Memory Management), session_snapshots (Session Handoff)
 //! - freshness_history stores per-file freshness snapshots for trend analysis
 //! - ralph_loops tracks RALPH loop execution with status (idle/running/paused/completed/failed)
 //! - ralph_loops.mode: "iterative" (default, accumulated context) or "prd" (fresh context per story)
@@ -360,6 +360,21 @@ pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
             FOREIGN KEY (project_id) REFERENCES projects(id)
         );
         CREATE INDEX IF NOT EXISTS idx_performance_reviews_project ON performance_reviews(project_id);
+
+        -- Session Snapshots table (Session Handoff)
+        CREATE TABLE IF NOT EXISTS session_snapshots (
+            id              TEXT PRIMARY KEY,
+            project_id      TEXT NOT NULL,
+            session_id      TEXT NOT NULL DEFAULT '',
+            summary         TEXT NOT NULL DEFAULT '',
+            pending_items   TEXT NOT NULL DEFAULT '[]',
+            git_state       TEXT NOT NULL DEFAULT '',
+            next_steps      TEXT NOT NULL DEFAULT '[]',
+            files_modified  TEXT NOT NULL DEFAULT '[]',
+            created_at      TEXT NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_session_snapshots_project ON session_snapshots(project_id);
         ",
     )?;
 

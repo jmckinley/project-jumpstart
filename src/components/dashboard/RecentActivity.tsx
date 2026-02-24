@@ -33,6 +33,7 @@ export interface Activity {
 
 interface RecentActivityProps {
   activities?: Activity[];
+  compact?: boolean;
 }
 
 function formatRelativeTime(timestamp: string): string {
@@ -120,12 +121,17 @@ function ActivityIcon({ type }: { type: string }) {
   }
 }
 
-export function RecentActivity({ activities }: RecentActivityProps) {
+export function RecentActivity({ activities, compact }: RecentActivityProps) {
   const hasActivities = activities && activities.length > 0;
+  const maxItems = compact ? 5 : undefined;
+  const displayedActivities = hasActivities && maxItems
+    ? activities.slice(0, maxItems)
+    : activities;
+  const hasMore = compact && hasActivities && activities.length > 5;
 
   return (
-    <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-6">
-      <h3 className="mb-4 text-sm font-medium uppercase tracking-wider text-neutral-400">
+    <div className={`rounded-xl border border-neutral-800 bg-neutral-900 ${compact ? "p-4" : "p-6"}`}>
+      <h3 className={`mb-4 font-medium uppercase tracking-wider text-neutral-400 ${compact ? "text-xs" : "text-sm"}`}>
         Recent Activity
       </h3>
 
@@ -148,24 +154,31 @@ export function RecentActivity({ activities }: RecentActivityProps) {
           </p>
         </div>
       ) : (
-        <ul className="space-y-1">
-          {activities.map((activity, index) => (
-            <li
-              key={`${activity.timestamp}-${index}`}
-              className="flex items-start gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-neutral-800/50"
-            >
-              <div className="mt-0.5 shrink-0">
-                <ActivityIcon type={activity.type} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-neutral-300">{activity.message}</p>
-              </div>
-              <span className="shrink-0 text-xs text-neutral-600">
-                {formatRelativeTime(activity.timestamp)}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="space-y-1">
+            {displayedActivities!.map((activity, index) => (
+              <li
+                key={`${activity.timestamp}-${index}`}
+                className="flex items-start gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-neutral-800/50"
+              >
+                <div className="mt-0.5 shrink-0">
+                  <ActivityIcon type={activity.type} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-neutral-300">{activity.message}</p>
+                </div>
+                <span className="shrink-0 text-xs text-neutral-600">
+                  {formatRelativeTime(activity.timestamp)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {hasMore && (
+            <p className="mt-2 px-3 text-xs text-neutral-600">
+              +{activities.length - 5} more activities
+            </p>
+          )}
+        </>
       )}
     </div>
   );

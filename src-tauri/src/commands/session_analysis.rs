@@ -70,7 +70,7 @@ pub struct SessionAnalysis {
 /// Claude Code stores transcripts in ~/.claude/projects/{path-with-dashes}/*.jsonl
 /// where the folder name is the project path with "/" replaced by "-"
 /// Example: /Users/john/my-project -> -Users-john-my-project
-fn find_session_transcript(project_path: &str) -> Option<PathBuf> {
+pub(crate) fn find_session_transcript(project_path: &str) -> Option<PathBuf> {
     let home = dirs::home_dir()?;
     let claude_projects = home.join(".claude").join("projects");
 
@@ -153,7 +153,7 @@ fn find_most_recent_jsonl(dir: &PathBuf) -> Option<(PathBuf, std::time::SystemTi
 /// - type: "user" or "assistant"
 /// - message.role: "user" or "assistant"
 /// - message.content: string (human text) or array (tool results, thinking, tool_use)
-fn read_recent_messages(transcript_path: &PathBuf, max_messages: usize) -> Vec<String> {
+pub(crate) fn read_recent_messages(transcript_path: &PathBuf, max_messages: usize) -> Vec<String> {
     let content = match fs::read_to_string(transcript_path) {
         Ok(c) => c,
         Err(_) => return vec![],
@@ -206,7 +206,7 @@ fn read_recent_messages(transcript_path: &PathBuf, max_messages: usize) -> Vec<S
 
 /// Extract human-readable text from message content
 /// Handles both string content and array of content blocks
-fn extract_message_text(content: &serde_json::Value) -> String {
+pub(crate) fn extract_message_text(content: &serde_json::Value) -> String {
     // If content is a plain string (human messages)
     if let Some(text) = content.as_str() {
         return text.to_string();

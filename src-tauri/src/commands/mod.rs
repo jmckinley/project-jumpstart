@@ -22,6 +22,7 @@
 //! - test_plans - Test plan management and TDD workflow commands
 //! - session_analysis - AI-powered session transcript analysis
 //! - memory - Memory management commands (sources, learnings, health, analysis)
+//! - session_handoff - Session handoff commands (generate, get snapshot, install hook)
 //!
 //! PATTERNS:
 //! - Each submodule contains #[tauri::command] functions
@@ -50,3 +51,4 @@ pub mod session_analysis;
 pub mod team_templates;
 pub mod memory;
 pub mod performance;
+pub mod session_handoff;

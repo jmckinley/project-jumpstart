@@ -109,8 +109,10 @@ import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { RefreshDocsButton } from "@/components/dashboard/RefreshDocsButton";
 import { SmartNextStep } from "@/components/dashboard/SmartNextStep";
 import { SessionInsights } from "@/components/dashboard/SessionInsights";
+import { SessionHandoff } from "@/components/dashboard/SessionHandoff";
 import type { Activity } from "@/components/dashboard/RecentActivity";
 import { getRecentActivities, startFileWatcher, stopFileWatcher, getSetting, listSkills, listAgents, getHookStatus, readClaudeMd, listTestPlans, checkHooksConfigured } from "@/lib/tauri";
+import { useSessionHandoff } from "@/hooks/useSessionHandoff";
 import { Editor } from "@/components/claude-md/Editor";
 import { FileTree } from "@/components/modules/FileTree";
 import { DocStatus } from "@/components/modules/DocStatus";
@@ -195,6 +197,7 @@ interface MainPanelProps {
 
 function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void }) {
   const { score, components, quickWins, contextRotRisk, discoveredTestCount, refresh } = useHealth();
+  const { snapshot, capturing, installing, captureSnapshot, installHook } = useSessionHandoff();
   const { modules, hasScanned, scan: scanModules } = useModules();
   const activeProject = useProjectStore((s) => s.activeProject);
   const hasApiKey = useSettingsStore((s) => s.hasApiKey);
@@ -336,84 +339,59 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
         )}
       </div>
 
+      {/* TIER 1: Hero Zone */}
+      {activeProject && (
+        snapshot || !hasApiKey || !hasClaudeMd ? (
+          <SessionHandoff
+            snapshot={snapshot}
+            capturing={capturing}
+            installing={installing}
+            onCapture={captureSnapshot}
+            onInstallHook={installHook}
+          />
+        ) : (
+          <SmartNextStep
+            hasApiKey={hasApiKey}
+            hasClaudeMd={hasClaudeMd}
+            isEmptyProject={isEmptyProject}
+            moduleCoverage={moduleCoverage}
+            totalModules={totalModules}
+            staleModules={staleModules}
+            hasSkills={hasSkills}
+            hasAgents={hasAgents}
+            hasEnforcement={hasEnforcement}
+            hasTestFramework={hasTestFramework}
+            hasTestPlan={hasTestPlan}
+            hasClaudeCodeHooks={hasClaudeCodeHooks}
+            testCoverage={0}
+            contextRotRisk={contextRotRisk}
+            projectId={activeProject.id}
+            onNavigate={(section) => onNavigate?.(section)}
+          />
+        )
+      )}
+
+      {/* Inline alerts */}
       <ContextRotAlert
         risk={contextRotRisk}
         onReview={() => onNavigate?.("modules")}
       />
 
-      {/* Smart Next Step Recommendation */}
-      {activeProject && (
-        <SmartNextStep
-          hasApiKey={hasApiKey}
-          hasClaudeMd={hasClaudeMd}
-          isEmptyProject={isEmptyProject}
-          moduleCoverage={moduleCoverage}
-          totalModules={totalModules}
-          staleModules={staleModules}
-          hasSkills={hasSkills}
-          hasAgents={hasAgents}
-          hasEnforcement={hasEnforcement}
-          hasTestFramework={hasTestFramework}
-          hasTestPlan={hasTestPlan}
-          hasClaudeCodeHooks={hasClaudeCodeHooks}
-          testCoverage={0}
-          contextRotRisk={contextRotRisk}
-          projectId={activeProject.id}
-          onNavigate={(section) => onNavigate?.(section)}
-        />
-      )}
-
-      {/* Session Insights - AI-powered recommendations from transcript */}
-      {activeProject && (
-        <SessionInsights
-          hasApiKey={hasApiKey}
-          onNavigate={(section) => onNavigate?.(section)}
-        />
-      )}
-
-      {/* Kickstart Card for Empty Projects */}
-      {isEmptyProject && (
-        <div className="rounded-xl border border-purple-500/30 bg-gradient-to-br from-purple-950/30 to-blue-950/30 p-6">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-blue-600">
-              <svg
-                className="h-6 w-6 text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"
-                />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-neutral-100">
-                New Project?
-              </h3>
-              <p className="mt-1 text-sm text-neutral-400">
-                Generate a Claude Code kickstart prompt to bootstrap your project with AI-powered best practices.
-              </p>
-              <button
-                onClick={() => onNavigate?.("modules")}
-                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-500"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                </svg>
-                Generate Kickstart Prompt
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* TIER 2: Primary Metrics (2-col) */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <HealthScore score={score} components={components} discoveredTestCount={discoveredTestCount} />
+        {activeProject && (
+          <SessionInsights
+            hasApiKey={hasApiKey}
+            onNavigate={(section) => onNavigate?.(section)}
+          />
+        )}
+      </div>
+
+      {/* TIER 3: Supporting Info (2-col, compact) */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <QuickWins
+          compact
           quickWins={quickWins}
           onAction={(win) => {
             const title = win.title.toLowerCase();
@@ -426,9 +404,8 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
             else onNavigate?.("modules");
           }}
         />
+        <RecentActivity compact activities={activities} />
       </div>
-
-      <RecentActivity activities={activities} />
     </div>
   );
 }

@@ -68,6 +68,18 @@ export const mockHealthScore = {
   discoveredTestCount: 42,
 };
 
+export const mockSessionSnapshot = {
+  id: "snap-1",
+  projectId: "test-project-1",
+  sessionId: "session-abc",
+  summary: "Implemented authentication middleware and JWT validation",
+  pendingItems: ["Add rate limiting middleware", "Write integration tests for auth flow"],
+  gitState: "feature/auth (3 modified)",
+  nextSteps: ["Write unit tests for JWT validation", "Add refresh token support"],
+  filesModified: ["src/middleware/auth.ts", "src/utils/jwt.ts", "src/routes/login.ts"],
+  createdAt: new Date().toISOString(),
+};
+
 export const mockPerformanceReview = {
   id: "perf-review-1",
   projectId: "test-project-1",
@@ -947,6 +959,18 @@ export async function setupTauriMocks(page: Page, options: {
             message: "Applied AI fix",
           }));
 
+        // Session Handoff
+        case "generate_handoff_context":
+          await new Promise(r => setTimeout(r, 500));
+          return mocks.sessionSnapshot;
+
+        case "get_latest_snapshot":
+          return mocks.sessionSnapshot;
+
+        case "generate_session_start_script":
+          await new Promise(r => setTimeout(r, 200));
+          return "/mock/project/.claude/hooks/session-handoff.sh";
+
         // Skills CRUD
         case "create_skill":
           return { id: `skill-${Date.now()}`, name: args?.name, description: args?.description, content: args?.content, projectId: args?.projectId || "test-project-1", usageCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
@@ -1184,6 +1208,7 @@ export async function setupTauriMocks(page: Page, options: {
       testStalenessReport: mockTestStalenessReport,
       claudeMdAnalysis: mockClaudeMdAnalysis,
       performanceReview: mockPerformanceReview,
+      sessionSnapshot: mockSessionSnapshot,
       patterns: mockPatterns,
       promptAnalysis: mockPromptAnalysis,
       ralphLoop: mockRalphLoop,

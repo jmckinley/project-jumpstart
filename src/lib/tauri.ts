@@ -136,6 +136,11 @@
  * - promoteLearning - Promote a learning to CLAUDE.md or rules file
  * - appendToProjectFile - Append content to a file relative to project root
  *
+ * Session Handoff:
+ * - generateHandoffContext - Capture session state via AI analysis
+ * - getLatestSnapshot - Get most recent session snapshot
+ * - generateSessionStartScript - Generate hook script for auto-context injection
+ *
  * PATTERNS:
  * - Each function wraps a single Tauri command
  * - Functions are async and return typed promises
@@ -974,6 +979,37 @@ export async function remediatePerformanceFile(
   return invoke<RemediationResult[]>("remediate_performance_file", {
     filePath,
     issues,
+    projectPath,
+  });
+}
+
+// Session Handoff Commands
+// =============================================================================
+
+import type { SessionSnapshot } from "@/types/session-handoff";
+
+export async function generateHandoffContext(
+  projectPath: string,
+  projectId: string,
+): Promise<SessionSnapshot> {
+  return invoke<SessionSnapshot>("generate_handoff_context", {
+    projectPath,
+    projectId,
+  });
+}
+
+export async function getLatestSnapshot(
+  projectId: string,
+): Promise<SessionSnapshot | null> {
+  return invoke<SessionSnapshot | null>("get_latest_snapshot", {
+    projectId,
+  });
+}
+
+export async function generateSessionStartScript(
+  projectPath: string,
+): Promise<string> {
+  return invoke<string>("generate_session_start_script", {
     projectPath,
   });
 }
