@@ -59,7 +59,7 @@ Detailed rules are in `.claude/rules/`:
 
 ## Current Status
 
-**Feature-Complete (Beta Ready)** | 1,470 tests (1033 frontend + 194 Rust + 243 E2E)
+**Feature-Complete (Beta Ready)** | 1,472 tests (1,034 frontend + 195 Rust + 243 E2E)
 
 All sections implemented: Onboarding, Dashboard (3-tier layout + Session Handoff), CLAUDE.md Editor, Modules, Test Plans & TDD, Skills, Agents, Team Templates, RALPH, Context Health, Performance, Enforcement, Settings, Memory Management.
 
@@ -106,7 +106,8 @@ All sections implemented: Onboarding, Dashboard (3-tier layout + Session Handoff
 
 | Date | Change |
 |------|--------|
-| Feb 24, 2026 | Smart Session Handoff + Dashboard Redesign: AI-powered session snapshot capture with SessionStart hook for zero-ramp-up sessions. 3-tier dashboard layout (hero/primary/supporting). SessionHandoff hero card with expand/collapse details, stat chips, Install Hook button. session_snapshots DB table, 3 new Tauri commands, pub(crate) session_analysis helpers. QuickWins/RecentActivity compact mode. 194 Rust + 1033 frontend tests. |
+| Feb 24, 2026 | Health Score Reliability + Session Insights Fix: spawn_blocking + 10s timeout for get_health_score to prevent Tokio async deadlock on large projects. Shared SKIP_DIRS constant (30+ dirs) across test_runner/health/freshness. File size guards (512KB), reduced recursion depth. Simplified useHealth hook. Session analysis serde alias fix for AI response parsing. 195 Rust + 1034 frontend + 243 E2E tests. |
+| Feb 24, 2026 | Smart Session Handoff + Dashboard Redesign: AI-powered session snapshot capture with SessionStart hook for zero-ramp-up sessions. 3-tier dashboard layout (hero/primary/supporting). SessionHandoff hero card with expand/collapse details, stat chips, Install Hook button. session_snapshots DB table, 3 new Tauri commands, pub(crate) session_analysis helpers. QuickWins/RecentActivity compact mode. |
 | Feb 23, 2026 | Claude Code Best Practices Compliance: Fixed hook config schema (string matcher), skill/agent export to .claude/ with YAML frontmatter, @import directives in CLAUDE.md generation, 4 new stack templates (Python/Rust/Go/Java). 188 Rust + 953 frontend tests. |
 | Feb 22, 2026 | Self-Healing Pre-Commit Hook v4.0.0: backup/validate/restore on every file modification, health file tracking (~/.project-jumpstart/.hook-health), auto-downgrade after 3 consecutive failures, HookHealth Rust model + commands, downgrade alert UI in GitHookSetup. 173 Rust + 945 frontend + 17 E2E enforcement tests. |
 | Feb 21, 2026 | Batch Auto-Remediation: AI-powered per-file performance fix via Claude API. RemediationPanel with quick-select, progress tracking, cancellation. Rust backend command + call_claude_long. 155 Rust + 933 frontend tests. |

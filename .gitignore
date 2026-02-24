@@ -33,8 +33,11 @@ target/
 
 # Build output
 *.dmg
+*.exe
+*.msi
 *.zip
 *.app
+releases/
 
 # Test artifacts
 coverage/
