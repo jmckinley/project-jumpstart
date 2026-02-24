@@ -40,6 +40,7 @@ use crate::db::AppState;
 #[serde(rename_all = "camelCase")]
 pub struct SessionRecommendation {
     /// Type: "agent", "test", "pattern", "doc", "skill"
+    #[serde(alias = "rec_type")]
     pub rec_type: String,
     /// Short title for the recommendation
     pub title: String,
@@ -283,7 +284,7 @@ Analyze the conversation and suggest specific, actionable improvements. Return O
   "session_summary": "1-2 sentence summary of what the developer has been working on",
   "recommendations": [
     {
-      "rec_type": "agent|test|pattern|doc|skill",
+      "recType": "agent|test|pattern|doc|skill",
       "title": "Short actionable title (5-8 words)",
       "reason": "Why this is valuable based on the session context",
       "details": "Specific implementation details",

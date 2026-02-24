@@ -309,18 +309,18 @@ function DashboardView({ onNavigate }: { onNavigate?: (section: string) => void 
   }, [activeProject]);
 
   useEffect(() => {
-    refresh();
+    // Health score is auto-fetched by useHealth on mount and project change.
+    // Only scan modules and fetch activities here.
     scanModules();
     fetchActivities();
 
-    // Poll activities and health score every 15 seconds
+    // Poll activities every 15 seconds (health score polls via its own hook)
     const interval = setInterval(() => {
       fetchActivities();
-      refresh();
     }, 15_000);
 
     return () => clearInterval(interval);
-  }, [refresh, scanModules, fetchActivities]);
+  }, [scanModules, fetchActivities]);
 
   const handleRefreshComplete = useCallback(() => {
     refresh();

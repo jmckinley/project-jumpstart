@@ -345,22 +345,21 @@ fn estimate_dir_header_tokens(dir: &Path) -> u32 {
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
 
-        if name.starts_with('.')
-            || name == "node_modules"
-            || name == "target"
-            || name == "dist"
-            || name == "build"
-        {
+        if name.starts_with('.') || super::test_runner::SKIP_DIRS.contains(&name.as_str()) {
             continue;
         }
 
         if path.is_dir() {
             tokens += estimate_dir_header_tokens(&path);
         } else if is_documentable_file(&name) {
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                let header: String = content.lines().take(30).collect::<Vec<_>>().join("\n");
-                if header.contains("@module") || header.contains("@description") {
-                    tokens += estimate_tokens(&header);
+            // Only read small source files (skip large generated/data files)
+            let size = entry.metadata().map(|m| m.len()).unwrap_or(u64::MAX);
+            if size < 512_000 {
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    let header: String = content.lines().take(30).collect::<Vec<_>>().join("\n");
+                    if header.contains("@module") || header.contains("@description") {
+                        tokens += estimate_tokens(&header);
+                    }
                 }
             }
         }
@@ -448,16 +447,19 @@ fn count_documented_files(dir: &Path, total: &mut u32, documented: &mut u32) {
         let name = entry.file_name().to_string_lossy().to_string();
 
         // Skip hidden dirs and common non-source dirs
-        if name.starts_with('.') || name == "node_modules" || name == "target" || name == "dist" || name == "build" {
+        if name.starts_with('.') || super::test_runner::SKIP_DIRS.contains(&name.as_str()) {
             continue;
         }
 
         if path.is_dir() {
             count_documented_files(&path, total, documented);
         } else if is_documentable_file(&name) {
-            *total += 1;
-            if has_doc_header(&path) {
-                *documented += 1;
+            let size = entry.metadata().map(|m| m.len()).unwrap_or(u64::MAX);
+            if size < 512_000 {
+                *total += 1;
+                if has_doc_header(&path) {
+                    *documented += 1;
+                }
             }
         }
     }

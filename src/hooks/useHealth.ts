@@ -4,7 +4,7 @@
  *
  * PURPOSE:
  * - Fetch health score from the backend for the active project
- * - Auto-fetch when the active project changes
+ * - Auto-fetch when the active project changes or component remounts
  * - Expose component breakdown and quick wins
  * - Track loading and error states
  *
@@ -23,11 +23,11 @@
  *
  * CLAUDE NOTES:
  * - Health score range is always 0-100
- * - Uses useEffect to auto-fetch, plus exposes refresh() for manual re-fetch
- * - Stale request guard prevents out-of-order responses when project changes rapidly
+ * - Uses a simple fetch-on-change pattern with activeProject.id as trigger
+ * - refresh() can be called manually for on-demand re-fetch
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useProjectStore } from "@/stores/projectStore";
 import { getHealthScore } from "@/lib/tauri";
 import type { HealthComponents, QuickWin } from "@/types/health";
@@ -42,29 +42,25 @@ interface HealthState {
   error: string | null;
 }
 
+const DEFAULT_STATE: HealthState = {
+  score: 0,
+  components: null,
+  quickWins: [],
+  contextRotRisk: "low",
+  discoveredTestCount: null,
+  loading: false,
+  error: null,
+};
+
 export function useHealth() {
   const activeProject = useProjectStore((s) => s.activeProject);
-  const requestId = useRef(0);
+  const [state, setState] = useState<HealthState>(DEFAULT_STATE);
 
-  const [state, setState] = useState<HealthState>({
-    score: 0,
-    components: null,
-    quickWins: [],
-    contextRotRisk: "low",
-    discoveredTestCount: null,
-    loading: false,
-    error: null,
-  });
-
-  const refresh = useCallback(async () => {
-    if (!activeProject) return;
-
-    const id = ++requestId.current;
+  // Fetch health score for the given project path
+  const fetchScore = useCallback(async (projectPath: string) => {
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      const health = await getHealthScore(activeProject.path);
-      // Guard against stale responses (project changed while awaiting)
-      if (requestId.current !== id) return;
+      const health = await getHealthScore(projectPath);
       setState({
         score: health.total,
         components: health.components,
@@ -75,33 +71,28 @@ export function useHealth() {
         error: null,
       });
     } catch (err) {
-      if (requestId.current !== id) return;
       setState((s) => ({
         ...s,
         loading: false,
         error: err instanceof Error ? err.message : "Failed to fetch health score",
       }));
     }
-  }, [activeProject]);
+  }, []);
 
-  // Auto-fetch when active project changes
+  // Auto-fetch when active project changes (keyed on project ID, not object reference)
   useEffect(() => {
     if (!activeProject) {
-      // Reset state when no project is selected
-      setState({
-        score: 0,
-        components: null,
-        quickWins: [],
-        contextRotRisk: "low",
-        discoveredTestCount: null,
-        loading: false,
-        error: null,
-      });
+      setState(DEFAULT_STATE);
       return;
     }
+    fetchScore(activeProject.path);
+  }, [activeProject?.id, fetchScore]);
 
-    refresh();
-  }, [activeProject, refresh]);
+  // Manual refresh uses current active project
+  const refresh = useCallback(async () => {
+    if (!activeProject) return;
+    await fetchScore(activeProject.path);
+  }, [activeProject, fetchScore]);
 
   return {
     ...state,

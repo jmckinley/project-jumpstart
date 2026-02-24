@@ -1086,10 +1086,33 @@ pub fn count_static_grep(path: &Path) -> u32 {
     count_test_patterns_recursive(path, 0)
 }
 
+/// Directories to skip when scanning for test/source files.
+/// Includes dependency dirs, build output, data dirs, and framework caches.
+pub(crate) const SKIP_DIRS: &[&str] = &[
+    // Package managers & deps
+    "node_modules", "target", "vendor", ".venv", "venv", "env",
+    "__pycache__", "site-packages", ".tox", ".nox",
+    // Build output
+    "dist", "build", "out", "output", ".output",
+    ".next", ".nuxt", ".vercel", ".turbo", ".svelte-kit",
+    ".parcel-cache", ".webpack", ".cache",
+    // Test & coverage output
+    "coverage", "playwright-report", "test-results", "cypress",
+    "storybook-static", ".storybook",
+    // Data, assets & generated content
+    "data", "datasets", "models", "uploads", "public", "static",
+    "assets", "media", "fixtures",
+    // IDE & tool output
+    ".idea", ".vscode",
+    // Misc large dirs
+    "logs", "tmp", "temp",
+];
+
 /// Recursively walk directories counting test pattern matches in test files.
+/// Designed to be fast: skips non-source dirs, limits depth and file size.
 fn count_test_patterns_recursive(dir: &Path, depth: u32) -> u32 {
     // Don't recurse too deeply
-    if depth > 10 {
+    if depth > 6 {
         return 0;
     }
 
@@ -1104,29 +1127,27 @@ fn count_test_patterns_recursive(dir: &Path, depth: u32) -> u32 {
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
 
-        // Skip common non-source directories
-        if name.starts_with('.')
-            || name == "node_modules"
-            || name == "target"
-            || name == "dist"
-            || name == "build"
-            || name == ".git"
-            || name == "__pycache__"
-            || name == "vendor"
-        {
+        // Skip hidden dirs/files and known non-source directories
+        if name.starts_with('.') || SKIP_DIRS.contains(&name.as_str()) {
             continue;
         }
 
         if path.is_dir() {
             count += count_test_patterns_recursive(&path, depth + 1);
         } else if is_test_file(&name) {
-            if let Ok(content) = fs::read_to_string(&path) {
-                count += count_test_calls(&content, &name);
+            // Only read files under 512KB (test files should be small)
+            let size = entry.metadata().map(|m| m.len()).unwrap_or(u64::MAX);
+            if size < 512_000 {
+                if let Ok(content) = fs::read_to_string(&path) {
+                    count += count_test_calls(&content, &name);
+                }
             }
         } else if name.ends_with(".rs") {
-            // Rust uses inline #[test] in regular source files
-            if let Ok(content) = fs::read_to_string(&path) {
-                count += content.matches("#[test]").count() as u32;
+            let size = entry.metadata().map(|m| m.len()).unwrap_or(u64::MAX);
+            if size < 512_000 {
+                if let Ok(content) = fs::read_to_string(&path) {
+                    count += content.matches("#[test]").count() as u32;
+                }
             }
         }
     }

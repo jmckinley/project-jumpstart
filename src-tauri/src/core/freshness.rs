@@ -250,20 +250,6 @@ fn walk_with_freshness(dir: &Path, project_path: &str, results: &mut Vec<ModuleS
         return;
     }
 
-    let ignore_dirs = [
-        "node_modules",
-        "target",
-        ".git",
-        "dist",
-        "build",
-        ".next",
-        "__pycache__",
-        ".venv",
-        "venv",
-        "coverage",
-        ".turbo",
-    ];
-
     let entries = match fs::read_dir(dir) {
         Ok(e) => e,
         Err(_) => return,
@@ -273,14 +259,12 @@ fn walk_with_freshness(dir: &Path, project_path: &str, results: &mut Vec<ModuleS
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
 
-        if name.starts_with('.') {
+        if name.starts_with('.') || super::test_runner::SKIP_DIRS.contains(&name.as_str()) {
             continue;
         }
 
         if path.is_dir() {
-            if !ignore_dirs.contains(&name.as_str()) {
-                walk_with_freshness(&path, project_path, results, depth + 1);
-            }
+            walk_with_freshness(&path, project_path, results, depth + 1);
         } else if analyzer::is_documentable(&name) {
             let abs_path = path.to_string_lossy().to_string();
             let rel_path = make_relative(&abs_path, project_path);

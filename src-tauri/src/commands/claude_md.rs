@@ -198,6 +198,7 @@ pub async fn generate_claude_md(
 
 /// Calculate and return the health score for a project path.
 /// Queries the database for skill count and latest test metrics to include in the calculation.
+/// Uses spawn_blocking for filesystem operations to avoid blocking Tokio worker threads.
 #[tauri::command]
 pub async fn get_health_score(
     project_path: String,
@@ -261,25 +262,53 @@ pub async fn get_health_score(
         }
     };
 
-    // When no test run data exists, discover tests via fast static grep.
-    // Uses pattern matching only (no framework commands) so it completes in milliseconds,
-    // safe to call on every 15-second health score poll.
-    let has_run_data = test_coverage.is_some_and(|c| c > 0.0)
-        || test_pass_rate.is_some_and(|r| r > 0.0);
+    // Move blocking filesystem + calculation work off the Tokio worker thread.
+    // Without spawn_blocking, concurrent health score requests block all Tokio
+    // workers and IPC responses can never be sent back (async deadlock).
+    // Timeout after 10 seconds to avoid hanging on very large projects.
+    let path = project_path.clone();
+    let blocking_task = tokio::task::spawn_blocking(move || {
+        let has_run_data = test_coverage.is_some_and(|c| c > 0.0)
+            || test_pass_rate.is_some_and(|r| r > 0.0);
 
-    let discovered_test_count = if !has_run_data {
-        let count = test_runner::count_static_grep(std::path::Path::new(&project_path));
-        if count > 0 { Some(count) } else { None }
-    } else {
-        None
+        let discovered_test_count = if !has_run_data {
+            let count = test_runner::count_static_grep(std::path::Path::new(&path));
+            if count > 0 { Some(count) } else { None }
+        } else {
+            None
+        };
+
+        health::calculate_health_with_tests(
+            &path,
+            skill_count,
+            test_coverage,
+            test_pass_rate,
+            perf_score,
+            discovered_test_count,
+        )
+    });
+
+    let result = match tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        blocking_task,
+    )
+    .await
+    {
+        Ok(Ok(score)) => score,
+        Ok(Err(e)) => return Err(format!("Health score task failed: {}", e)),
+        Err(_) => {
+            // Timed out — return a basic score from DB-only data
+            health::calculate_health_with_tests(
+                // Use a non-existent path so filesystem checks return defaults
+                "",
+                skill_count,
+                test_coverage,
+                test_pass_rate,
+                perf_score,
+                None,
+            )
+        }
     };
 
-    Ok(health::calculate_health_with_tests(
-        &project_path,
-        skill_count,
-        test_coverage,
-        test_pass_rate,
-        perf_score,
-        discovered_test_count,
-    ))
+    Ok(result)
 }
